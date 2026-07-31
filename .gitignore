@@ -1,0 +1,13 @@
+.godot/
+*.exe
+*.pdb
+*.zip
+*.tar.gz
+*.dll
+*.so
+*.dylib
+*.log
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db

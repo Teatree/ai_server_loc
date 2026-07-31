@@ -1,0 +1,26 @@
+﻿; Engine configuration file.
+config_version=5
+
+[application]
+
+config/name="Last Shift"
+run/main_scene="res://scenes/title_screen.tscn"
+config/features=PackedStringArray("4.3", "GL Compatibility")
+config/icon="res://assets/textures/icon.svg"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+
+[layer_names]
+
+2d_physics/layer_1="World"
+2d_physics/layer_2="Player"
+2d_physics/layer_3="Enemies"
+2d_physics/layer_4="Projectiles"
+2d_physics/layer_5="Hazards"
+2d_physics/layer_6="Pickups"

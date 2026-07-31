@@ -1,0 +1,411 @@
+{
+  "schema_version": 1,
+  "project": {
+    "name": "LAST SHIFT",
+    "engine": "Godot 4.x",
+    "language": "typed GDScript",
+    "workflow": "one fresh OpenCode session per story"
+  },
+  "selection_policy": {
+    "order": "priority_ascending_then_array_order",
+    "resume_in_progress_first": true,
+    "dependencies_must_be_done": true,
+    "maximum_stories_per_session": 1
+  },
+  "active_story_id": null,
+  "status_values": [
+    "open",
+    "in_progress",
+    "blocked",
+    "done"
+  ],
+  "stories": [
+    {
+      "id": "S00",
+      "priority": 0,
+      "title": "Audit and stabilize the current repository",
+      "status": "open",
+      "dependencies": [],
+      "objective": "Inventory the partial project, preserve useful work, establish a clean baseline, and make the current project importable before adding features.",
+      "acceptance_criteria": [
+        "Repository structure and current implementation state are documented in PROGRESS.md.",
+        "project.godot exists or is created with a valid main scene.",
+        "Broken references, parser errors, and obviously truncated files are identified.",
+        "The Godot executable is excluded from Git.",
+        "The global validation script succeeds, or the story is blocked with exact diagnostics.",
+        "No unrelated working code is discarded."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "project.godot",
+        "main scene",
+        ".gitignore",
+        "existing scripts and scenes",
+        "PROGRESS.md"
+      ]
+    },
+    {
+      "id": "S01",
+      "priority": 10,
+      "title": "Create the launchable project shell and title flow",
+      "status": "open",
+      "dependencies": [
+        "S00"
+      ],
+      "objective": "Provide a stable title screen, New Game flow, placeholder level, pause flow, and return-to-title lifecycle.",
+      "acceptance_criteria": [
+        "The project launches directly to a title screen.",
+        "New Game opens a playable placeholder level.",
+        "Pause and return-to-title work without duplicate nodes or stale state.",
+        "The UI is navigable by keyboard and mouse.",
+        "The project survives two consecutive title-to-game-to-title cycles."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "scenes/ui",
+        "scenes/levels",
+        "scripts/ui",
+        "project.godot"
+      ]
+    },
+    {
+      "id": "S02",
+      "priority": 20,
+      "title": "Implement responsive player movement",
+      "status": "open",
+      "dependencies": [
+        "S01"
+      ],
+      "objective": "Implement a typed CharacterBody2D controller with acceleration, air control, variable jump, coyote time, jump buffering, dodge, one-way-platform drop-through, and stable respawn reset behavior.",
+      "acceptance_criteria": [
+        "Horizontal acceleration and ground/air deceleration are distinct and configurable.",
+        "Variable-height jump, coyote time, and jump buffering behave correctly at edge boundaries.",
+        "Dodge has a cooldown and cannot leave the player permanently locked.",
+        "One-way-platform drop-through works.",
+        "Respawn clears velocity, transient timers, and movement state.",
+        "Movement parameters are centralized outside the controller where practical."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "player scene",
+        "player controller",
+        "movement configuration",
+        "movement tests"
+      ]
+    },
+    {
+      "id": "S03",
+      "priority": 30,
+      "title": "Implement health, damage, death, and checkpoint respawn",
+      "status": "open",
+      "dependencies": [
+        "S02"
+      ],
+      "objective": "Create reusable health and damage components with one-shot death, invulnerability windows, knockback metadata, and player checkpoint respawn.",
+      "acceptance_criteria": [
+        "Damage data carries amount, type, source, hit position, direction, and knockback.",
+        "Entities cannot receive damage after death.",
+        "Death emits exactly once.",
+        "The player has post-hit invulnerability and visible feedback hooks.",
+        "Checkpoint respawn restores a valid controllable state.",
+        "Deterministic tests cover death-once and invulnerability behavior."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "components/health",
+        "components/damage",
+        "player",
+        "checkpoint",
+        "tests"
+      ]
+    },
+    {
+      "id": "S04",
+      "priority": 40,
+      "title": "Implement the weapon framework and pistol",
+      "status": "open",
+      "dependencies": [
+        "S03"
+      ],
+      "objective": "Create a data-driven weapon interface and a functional pistol with independent aiming, safe muzzle handling, ammunition rules, recoil, and testable fire-rate logic.",
+      "acceptance_criteria": [
+        "Mouse, right-stick, and keyboard fallback aiming are supported.",
+        "The pistol can fire in horizontal, vertical, and diagonal directions.",
+        "Muzzle obstruction prevents firing through walls.",
+        "Fire-rate restrictions cannot be bypassed by input spam.",
+        "Ammunition never becomes negative.",
+        "Weapon data is separated from player movement logic."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "weapons",
+        "aim component",
+        "projectiles or hitscan",
+        "HUD hooks",
+        "tests"
+      ]
+    },
+    {
+      "id": "S05",
+      "priority": 50,
+      "title": "Implement Shambler enemy, perception, and basic combat",
+      "status": "open",
+      "dependencies": [
+        "S04"
+      ],
+      "objective": "Implement one complete zombie archetype with an explicit state machine, sight, line of sight, noise memory, pursuit, attack telegraph, damage, and death.",
+      "acceptance_criteria": [
+        "The Shambler has explicit idle, investigate, chase, attack, stagger, and dead states.",
+        "Sight uses distance, field of view, and line-of-sight checks.",
+        "Gunfire noise can trigger investigation.",
+        "Last-known player position expires after a configurable duration.",
+        "Dead or inactive enemies stop receiving perception events.",
+        "The enemy can damage the player and be killed by the pistol."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "enemy state machine",
+        "perception",
+        "noise events",
+        "Shambler scene",
+        "combat tests"
+      ]
+    },
+    {
+      "id": "S06",
+      "priority": 60,
+      "title": "Build the first complete combat arena",
+      "status": "open",
+      "dependencies": [
+        "S05"
+      ],
+      "objective": "Replace the placeholder level with a coherent traversal-and-combat arena containing platforms, hazards, a checkpoint, pickups, spawn points, and one optional side route.",
+      "acceptance_criteria": [
+        "The player can traverse from entry to exit.",
+        "The arena contains static, one-way, and moving platforms.",
+        "At least one environmental hazard and one health or ammo pickup function.",
+        "Enemy spawn points are authored and categorized.",
+        "The checkpoint can be activated and used after death.",
+        "Traversal geometry is visually distinguishable from hazards and background."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "level scene",
+        "moving platforms",
+        "hazards",
+        "pickups",
+        "spawn markers"
+      ]
+    },
+    {
+      "id": "S07",
+      "priority": 70,
+      "title": "Add shotgun, rifle, melee, reload, and weapon switching",
+      "status": "open",
+      "dependencies": [
+        "S06"
+      ],
+      "objective": "Extend the weapon framework with the remaining weapons, stable reload state, magazines, reserve ammunition, switching, recoil accumulation, and melee interruption.",
+      "acceptance_criteria": [
+        "Shotgun pellet spread and knockback are functional.",
+        "The rifle supports automatic fire and recoil recovery.",
+        "Melee has a cooldown and can interrupt weak enemies.",
+        "Reload completion occurs exactly once.",
+        "Switching cannot bypass fire-rate or reload restrictions.",
+        "Weapon HUD data remains correct after switching and respawn."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "weapon resources",
+        "reload state",
+        "weapon inventory",
+        "HUD",
+        "tests"
+      ]
+    },
+    {
+      "id": "S08",
+      "priority": 80,
+      "title": "Add Runner, Spitter, Brute, and platform navigation",
+      "status": "open",
+      "dependencies": [
+        "S07"
+      ],
+      "objective": "Implement three differentiated zombie archetypes and a pragmatic platform-aware navigation system with authored links, ledge safety, stuck recovery, and crowd separation.",
+      "acceptance_criteria": [
+        "Runner, Spitter, and Brute have distinct state transitions and combat behavior.",
+        "Dangerous attacks are telegraphed.",
+        "At least one enemy can traverse an authored jump or drop link.",
+        "Enemies distinguish reachable, blocked, jump-required, drop-required, and unreachable targets.",
+        "Enemies avoid repeating impossible jumps indefinitely.",
+        "Crowd separation prevents exact positional stacking."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "enemy archetypes",
+        "navigation links",
+        "platform graph",
+        "crowd separation",
+        "debug visualization"
+      ]
+    },
+    {
+      "id": "S09",
+      "priority": 90,
+      "title": "Implement encounter director and final holdout",
+      "status": "open",
+      "dependencies": [
+        "S08"
+      ],
+      "objective": "Create a deterministic threat-budget director, progressive encounter phases, recovery periods, safe spawn selection, enemy caps, and a final holdout encounter.",
+      "acceptance_criteria": [
+        "The director tracks budget, enemy count, player condition, recent combat, and phase.",
+        "Spawn points on screen or too close to the player are rejected.",
+        "A deterministic seed reproduces spawn and phase decisions.",
+        "Pressure escalates while recovery periods remain possible.",
+        "Enemy count and budget caps are enforced.",
+        "The final holdout can reach a clear victory condition."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "director",
+        "spawn selection",
+        "encounter phases",
+        "final arena",
+        "deterministic tests"
+      ]
+    },
+    {
+      "id": "S10",
+      "priority": 100,
+      "title": "Implement upgrades and deterministic choices",
+      "status": "open",
+      "dependencies": [
+        "S09"
+      ],
+      "objective": "Create an upgrade system with random deterministic choices, stack limits, exclusions, gameplay effects, and an upgrade-selection UI.",
+      "acceptance_criteria": [
+        "At least eight upgrades are defined as data.",
+        "Three choices are reproducible from a fixed seed.",
+        "Stack limits and mutually exclusive upgrades are enforced.",
+        "Descriptions show meaningful numerical effects.",
+        "Effects persist through checkpoint respawn.",
+        "Reloading a scene does not apply upgrades twice."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "upgrade resources",
+        "selection service",
+        "upgrade UI",
+        "player modifiers",
+        "tests"
+      ]
+    },
+    {
+      "id": "S11",
+      "priority": 110,
+      "title": "Implement versioned save and load",
+      "status": "open",
+      "dependencies": [
+        "S10"
+      ],
+      "objective": "Persist checkpoint, player state, weapons, ammunition, upgrades, completed encounters, deterministic seed, and relevant environment state using versioned safe data.",
+      "acceptance_criteria": [
+        "New Game, Continue, restart from checkpoint, and clear-save flows work.",
+        "Save/load round trip preserves the required state.",
+        "Missing and corrupt files fall back safely.",
+        "Invalid values are sanitized.",
+        "Unknown fields do not crash loading.",
+        "The save format contains an explicit version."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "save service",
+        "version migration",
+        "title menu",
+        "checkpoint state",
+        "tests"
+      ]
+    },
+    {
+      "id": "S12",
+      "priority": 120,
+      "title": "Complete HUD, feedback, audio architecture, and debug tools",
+      "status": "open",
+      "dependencies": [
+        "S11"
+      ],
+      "objective": "Add production-readable HUD and menus, centralized feedback, managed audio emitters, performance counters, and isolated debug controls.",
+      "acceptance_criteria": [
+        "HUD shows health, ammunition, weapon, reload, and encounter information.",
+        "Pause, death, victory, and options interfaces are functional.",
+        "Camera shake and hit stop combine predictably.",
+        "Transient audio and visual effects do not leak nodes.",
+        "The debug overlay exposes FPS, enemies, projectiles, director budget, player state, weapon state, checkpoint, and seed.",
+        "Debug actions can be disabled for a production build."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "HUD",
+        "menus",
+        "feedback service",
+        "audio pool",
+        "debug panel",
+        "performance counters"
+      ]
+    },
+    {
+      "id": "S13",
+      "priority": 130,
+      "title": "Integration audit, tests, documentation, and release baseline",
+      "status": "open",
+      "dependencies": [
+        "S12"
+      ],
+      "objective": "Perform a full integration pass, repair lifecycle defects, complete deterministic tests and documentation, and leave a runnable vertical slice with explicit known limitations.",
+      "acceptance_criteria": [
+        "The project imports and starts without parser or missing-resource errors.",
+        "The title-to-game-to-victory loop is playable.",
+        "Core movement, weapons, enemies, director, upgrades, and saving are covered by automated or documented manual checks.",
+        "README.md, ARCHITECTURE.md, TESTING.md, and PROGRESS.md match the implementation.",
+        "No required feature is represented only by a deceptive placeholder.",
+        "Remaining defects and highest-risk files are explicitly documented."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "entire project by subsystem",
+        "tests",
+        "documentation",
+        "lifecycle and regression repair"
+      ]
+    }
+  ]
+}
