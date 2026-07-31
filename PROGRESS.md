@@ -78,7 +78,7 @@ Append one entry per story attempt. Do not rewrite or summarize away prior entri
 ## 2026-08-01 — S01 Create the launchable project shell and title flow
 
 **Result:** done
-**Commit:** pending
+**Commit:** 544adb8
 **Files changed:**
 - project.godot
 - scenes/title_screen.tscn

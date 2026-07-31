@@ -1,364 +1,232 @@
 param(
     [string]$ProjectRoot = (Get-Location).Path,
-
-    [ValidateRange(1, 100)]
-    [int]$MaxStories = 20,
-
-    [ValidateRange(1, 10)]
-    [int]$MaxPassesPerStory = 4,
-
+    [ValidateRange(1, 100)][int]$MaxStories = 20,
+    [ValidateRange(1, 10)][int]$MaxPassesPerStory = 6,
     [string]$Model = "evox2/step-3.7-flash",
-
     [string]$Agent = "build"
 )
 
+Set-StrictMode -Version 2.0
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 Set-Location $ProjectRoot
 
-$tasksPath = Join-Path $ProjectRoot "TASKS.json"
-$validatePath = Join-Path $ProjectRoot "tools\validate.ps1"
-$logDirectory = Join-Path $ProjectRoot ".agent-logs"
-$reportPath = Join-Path $logDirectory "overnight-loop-report.md"
-$statusPath = Join-Path $logDirectory "overnight-loop-status.md"
-$eventsPath = Join-Path $logDirectory "overnight-loop-events.jsonl"
+$TasksPath = Join-Path $ProjectRoot "TASKS.json"
+$ValidatePath = Join-Path $ProjectRoot "tools\validate.ps1"
+$LogDirectory = Join-Path $ProjectRoot ".agent-logs"
 
-if (-not (Test-Path $tasksPath)) {
-    throw "TASKS.json was not found in: $ProjectRoot"
+if (-not (Test-Path $TasksPath)) {
+    throw ("TASKS.json not found in {0}" -f $ProjectRoot)
 }
 
-New-Item -ItemType Directory -Force $logDirectory | Out-Null
+New-Item -ItemType Directory -Force $LogDirectory | Out-Null
 
-$runId = Get-Date -Format "yyyyMMdd-HHmmss"
-$runStart = Get-Date
-$script:CurrentStoryId = "none"
-$script:CurrentStoryTitle = "none"
-$script:CurrentPass = 0
-$script:CompletedThisRun = 0
-$script:StopReason = "Run is active."
-$script:OpenCodeExe = $null
+$RunId = Get-Date -Format "yyyyMMdd-HHmmss"
+$RunStarted = Get-Date
+$ReportPath = Join-Path $LogDirectory ("overnight-report-{0}.md" -f $RunId)
+$StatusPath = Join-Path $LogDirectory "overnight-status.md"
 
-function Get-IsoTimestamp {
-    (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
+function Get-Timestamp {
+    return (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
 }
 
-function Add-ReportText {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Text
-    )
+function Add-Report {
+    param([string[]]$Lines)
 
-    Add-Content -Path $reportPath -Value $Text -Encoding UTF8
-}
-
-function Add-Event {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Type,
-
-        [hashtable]$Data = @{}
-    )
-
-    $event = [ordered]@{
-        timestamp = Get-IsoTimestamp
-        run_id = $runId
-        type = $Type
-        story_id = $script:CurrentStoryId
-        story_title = $script:CurrentStoryTitle
-        pass = $script:CurrentPass
-        data = $Data
+    foreach ($Line in $Lines) {
+        Add-Content -Path $ReportPath -Value $Line -Encoding UTF8
     }
-
-    $event |
-        ConvertTo-Json -Depth 10 -Compress |
-        Add-Content -Path $eventsPath -Encoding UTF8
 }
 
-function Write-CurrentStatus {
+function Write-LoopStatus {
     param(
         [string]$Phase,
-        [string]$Detail = ""
+        [string]$StoryId,
+        [string]$StoryTitle,
+        [int]$PassNumber,
+        [int]$CompletedCount,
+        [string]$Detail
     )
 
-    $elapsed = New-TimeSpan -Start $runStart -End (Get-Date)
+    $Elapsed = New-TimeSpan -Start $RunStarted -End (Get-Date)
 
-    $content = @"
-# Overnight Loop Status
+    $Lines = @(
+        "# Overnight Loop Status",
+        "",
+        ("- Updated: {0}" -f (Get-Timestamp)),
+        ("- Phase: {0}" -f $Phase),
+        ("- Story: {0} - {1}" -f $StoryId, $StoryTitle),
+        ("- Pass: {0}" -f $PassNumber),
+        ("- Stories completed this run: {0} / {1}" -f $CompletedCount, $MaxStories),
+        ("- Elapsed: {0}h {1}m {2}s" -f [math]::Floor($Elapsed.TotalHours), $Elapsed.Minutes, $Elapsed.Seconds),
+        ("- Detail: {0}" -f $Detail),
+        "",
+        ("- Full report: {0}" -f $ReportPath),
+        "- Per-pass logs: .agent-logs/*-opencode.log",
+        "- Validation logs: .agent-logs/*-validation.log"
+    )
 
-- **Updated:** $(Get-IsoTimestamp)
-- **Run ID:** $runId
-- **Phase:** $Phase
-- **Current story:** $($script:CurrentStoryId) — $($script:CurrentStoryTitle)
-- **Current pass:** $($script:CurrentPass)
-- **Stories completed this run:** $($script:CompletedThisRun) / $MaxStories
-- **Elapsed:** $([math]::Floor($elapsed.TotalHours))h $($elapsed.Minutes)m $($elapsed.Seconds)s
-- **Model:** $Model
-- **Stop reason / current detail:** $Detail
-
-## Files to inspect
-
-- Full human-readable report: `.agent-logs/overnight-loop-report.md`
-- Machine-readable events: `.agent-logs/overnight-loop-events.jsonl`
-- Per-pass OpenCode logs: `.agent-logs/*-opencode.log`
-- Per-story validation logs: `.agent-logs/*-validation.log`
-"@
-
-    Set-Content -Path $statusPath -Value $content -Encoding UTF8
+    Set-Content -Path $StatusPath -Value $Lines -Encoding UTF8
 }
 
-function Resolve-OpenCodeExecutable {
-    $exeCommand = Get-Command "opencode.exe" -ErrorAction SilentlyContinue
+function Resolve-OpenCodeExe {
+    $Command = Get-Command "opencode.exe" -ErrorAction SilentlyContinue
 
-    if ($exeCommand) {
-        return $exeCommand.Source
+    if ($Command) {
+        return $Command.Source
     }
 
-    $psWrapper = Get-Command "opencode.ps1" -ErrorAction SilentlyContinue
+    $Wrapper = Get-Command "opencode.ps1" -ErrorAction SilentlyContinue
 
-    if ($psWrapper) {
-        $candidate = Join-Path `
-            (Split-Path $psWrapper.Source) `
+    if ($Wrapper) {
+        $Candidate = Join-Path `
+            (Split-Path $Wrapper.Source) `
             "node_modules\opencode-ai\bin\opencode.exe"
 
-        if (Test-Path $candidate) {
-            return (Resolve-Path $candidate).Path
+        if (Test-Path $Candidate) {
+            return (Resolve-Path $Candidate).Path
         }
     }
 
-    throw "Could not locate opencode.exe. Confirm that OpenCode is installed and available on PATH."
+    throw "Could not locate opencode.exe."
 }
 
 function Read-Tasks {
-    Get-Content $tasksPath -Raw | ConvertFrom-Json
+    return (Get-Content $TasksPath -Raw | ConvertFrom-Json)
 }
 
 function Get-StoryById {
     param(
-        [Parameter(Mandatory = $true)]
         $Tasks,
-
-        [Parameter(Mandatory = $true)]
         [string]$StoryId
     )
 
-    $Tasks.stories |
-        Where-Object { $_.id -eq $StoryId } |
-        Select-Object -First 1
-}
-
-function Test-DependenciesDone {
-    param(
-        [Parameter(Mandatory = $true)]
-        $Story,
-
-        [Parameter(Mandatory = $true)]
-        [hashtable]$DoneIds
+    return (
+        $Tasks.stories |
+            Where-Object { $_.id -eq $StoryId } |
+            Select-Object -First 1
     )
-
-    foreach ($dependency in @($Story.dependencies)) {
-        if (-not $DoneIds.ContainsKey([string]$dependency)) {
-            return $false
-        }
-    }
-
-    return $true
 }
 
 function Get-NextStory {
-    param(
-        [Parameter(Mandatory = $true)]
-        $Tasks
-    )
+    param($Tasks)
 
-    $inProgress = @(
+    $InProgress = @(
         $Tasks.stories |
             Where-Object { $_.status -eq "in_progress" }
     )
 
-    if ($inProgress.Count -gt 1) {
-        throw "More than one story is in_progress: $($inProgress.id -join ', ')"
+    if ($InProgress.Count -gt 1) {
+        throw ("More than one story is in_progress: {0}" -f ($InProgress.id -join ", "))
     }
 
-    if ($inProgress.Count -eq 1) {
-        return $inProgress[0]
+    if ($InProgress.Count -eq 1) {
+        return $InProgress[0]
     }
 
-    $doneIds = @{}
+    $DoneIds = @{}
 
-    foreach ($story in $Tasks.stories) {
-        if ($story.status -eq "done") {
-            $doneIds[[string]$story.id] = $true
+    foreach ($Story in $Tasks.stories) {
+        if ($Story.status -eq "done") {
+            $DoneIds[[string]$Story.id] = $true
         }
     }
 
-    $eligible = @()
+    $Eligible = @()
 
-    foreach ($story in $Tasks.stories) {
-        if (
-            $story.status -eq "open" -and
-            (Test-DependenciesDone -Story $story -DoneIds $doneIds)
-        ) {
-            $eligible += $story
+    foreach ($Story in $Tasks.stories) {
+        if ($Story.status -ne "open") {
+            continue
+        }
+
+        $DependenciesDone = $true
+
+        foreach ($Dependency in @($Story.dependencies)) {
+            if (-not $DoneIds.ContainsKey([string]$Dependency)) {
+                $DependenciesDone = $false
+                break
+            }
+        }
+
+        if ($DependenciesDone) {
+            $Eligible += $Story
         }
     }
 
-    return $eligible |
-        Sort-Object `
-            @{ Expression = { [int]$_.priority }; Ascending = $true },
-            @{ Expression = { [string]$_.id }; Ascending = $true } |
-        Select-Object -First 1
+    return (
+        $Eligible |
+            Sort-Object `
+                @{ Expression = { [int]$_.priority }; Ascending = $true },
+                @{ Expression = { [string]$_.id }; Ascending = $true } |
+            Select-Object -First 1
+    )
 }
 
-function Get-LogDiagnostics {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$LogPath
-    )
+function Get-Diagnostics {
+    param([string]$LogPath)
 
-    $result = [ordered]@{
-        context_or_token_issue = $false
-        tool_or_json_issue = $false
-        api_or_network_issue = $false
-        memory_issue = $false
-        matching_lines = @()
+    $Result = [ordered]@{
+        ContextIssue = $false
+        JsonOrToolIssue = $false
+        ApiIssue = $false
+        MemoryIssue = $false
+        Lines = @()
     }
 
     if (-not (Test-Path $LogPath)) {
-        return $result
+        return [pscustomobject]$Result
     }
 
-    $patterns = [ordered]@{
-        context_or_token_issue = @(
-            "context window",
-            "context length",
-            "context limit",
-            "maximum context",
-            "too many tokens",
-            "tokens exceeds",
-            "exceeds the available context",
-            "prompt is too long",
-            "request too large"
-        )
-        tool_or_json_issue = @(
-            "JSON Parse error",
-            "Unterminated string",
-            "invalid json",
-            "malformed tool",
-            "tool call.*parse"
-        )
-        api_or_network_issue = @(
-            "socket closed",
-            "cannot connect",
-            "connection refused",
-            "timed out",
-            "timeout",
-            "Invalid API Key",
-            "unauthorized",
-            "HTTP 401",
-            "HTTP 403"
-        )
-        memory_issue = @(
-            "out of memory",
-            "allocation failed",
-            "VK_ERROR_OUT_OF_DEVICE_MEMORY",
-            "HIP.*memory",
-            "\bOOM\b"
-        )
+    $Patterns = [ordered]@{
+        ContextIssue = "context window|context length|context limit|too many tokens|prompt is too long|request too large|exceeds.*context"
+        JsonOrToolIssue = "JSON Parse error|Unterminated string|invalid json|malformed tool|tool call.*parse"
+        ApiIssue = "socket closed|cannot connect|connection refused|timed out|timeout|Invalid API Key|unauthorized|HTTP 401|HTTP 403"
+        MemoryIssue = "out of memory|allocation failed|VK_ERROR_OUT_OF_DEVICE_MEMORY|HIP.*memory|\bOOM\b"
     }
 
-    $allMatches = @()
+    $FoundLines = @()
 
-    foreach ($category in $patterns.Keys) {
-        foreach ($pattern in $patterns[$category]) {
-            $matches = @(
-                Select-String `
-                    -Path $LogPath `
-                    -Pattern $pattern `
-                    -CaseSensitive:$false `
-                    -ErrorAction SilentlyContinue
-            )
+    foreach ($Name in $Patterns.Keys) {
+        $Matches = @(
+            Select-String `
+                -Path $LogPath `
+                -Pattern $Patterns[$Name] `
+                -CaseSensitive:$false `
+                -ErrorAction SilentlyContinue
+        )
 
-            if ($matches.Count -gt 0) {
-                $result[$category] = $true
+        if ($Matches.Count -gt 0) {
+            $Result[$Name] = $true
 
-                foreach ($match in $matches) {
-                    $allMatches += "$($match.LineNumber): $($match.Line.Trim())"
-                }
+            foreach ($Match in $Matches) {
+                $FoundLines += ("{0}: {1}" -f $Match.LineNumber, $Match.Line.Trim())
             }
         }
     }
 
-    $result.matching_lines = @(
-        $allMatches |
+    $Result.Lines = @(
+        $FoundLines |
             Select-Object -Unique |
             Select-Object -First 20
     )
 
-    return $result
-}
-
-function Get-RecentLogLines {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$LogPath,
-
-        [int]$Count = 20
-    )
-
-    if (-not (Test-Path $LogPath)) {
-        return @("Log file was not created.")
-    }
-
-    return @(
-        Get-Content $LogPath -Tail $Count -ErrorAction SilentlyContinue
-    )
+    return [pscustomobject]$Result
 }
 
 function Invoke-OpenCodePass {
     param(
-        [Parameter(Mandatory = $true)]
+        [string]$OpenCodeExe,
         [string]$StoryId,
-
-        [Parameter(Mandatory = $true)]
         [int]$PassNumber
     )
 
-    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $logPath = Join-Path `
-        $logDirectory `
-        "$timestamp-$StoryId-pass$PassNumber-opencode.log"
+    $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $LogPath = Join-Path `
+        $LogDirectory `
+        ("{0}-{1}-pass{2}-opencode.log" -f $Stamp, $StoryId, $PassNumber)
 
-    $passStart = Get-Date
-
-    Add-ReportText @"
-
-## $(Get-IsoTimestamp) — $StoryId pass $PassNumber started
-
-- Story: **$StoryId — $($script:CurrentStoryTitle)**
-- Model: `$Model`
-- Agent: `$Agent`
-- Log: `$logPath`
-"@
-
-    Add-Event -Type "pass_started" -Data @{
-        log_path = $logPath
-        model = $Model
-        agent = $Agent
-    }
-
-    Write-CurrentStatus `
-        -Phase "OpenCode pass running" `
-        -Detail "$StoryId pass $PassNumber is active. See $logPath."
-
-    Write-Host ""
-    Write-Host "------------------------------------------------------------" -ForegroundColor DarkGray
-    Write-Host "Story $StoryId - fresh OpenCode pass $PassNumber" -ForegroundColor Cyan
-    Write-Host "Log: $logPath"
-    Write-Host "------------------------------------------------------------" -ForegroundColor DarkGray
-    Write-Host ""
-
-    $arguments = @(
+    $Arguments = @(
         "run",
         "--command", "next-story",
         "--model", $Model,
@@ -368,601 +236,486 @@ function Invoke-OpenCodePass {
         $StoryId
     )
 
-    $oldPreference = $ErrorActionPreference
+    $Started = Get-Date
+
+    $PreviousPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
 
     try {
-        & $script:OpenCodeExe @arguments 2>&1 |
+        & $OpenCodeExe @Arguments 2>&1 |
             ForEach-Object {
-                $_ | Tee-Object -FilePath $logPath -Append
+                $Line = [string]$_
+                Write-Host $Line
+                Add-Content -Path $LogPath -Value $Line -Encoding UTF8
             }
 
-        $exitCode = $LASTEXITCODE
+        $ExitCode = $LASTEXITCODE
     }
     finally {
-        $ErrorActionPreference = $oldPreference
+        $ErrorActionPreference = $PreviousPreference
     }
 
-    $passEnd = Get-Date
-    $duration = New-TimeSpan -Start $passStart -End $passEnd
-    $diagnostics = Get-LogDiagnostics -LogPath $logPath
-    $recentLines = Get-RecentLogLines -LogPath $logPath -Count 20
+    $Duration = New-TimeSpan -Start $Started -End (Get-Date)
+    $Diagnostics = Get-Diagnostics -LogPath $LogPath
+    $Tail = @(
+        Get-Content $LogPath -Tail 20 -ErrorAction SilentlyContinue
+    )
 
-    $diagnosticSummary = @()
-    if ($diagnostics.context_or_token_issue) {
-        $diagnosticSummary += "Possible context/token-limit issue detected."
-    }
-    if ($diagnostics.tool_or_json_issue) {
-        $diagnosticSummary += "Possible tool-call or JSON truncation issue detected."
-    }
-    if ($diagnostics.api_or_network_issue) {
-        $diagnosticSummary += "Possible API/network issue detected."
-    }
-    if ($diagnostics.memory_issue) {
-        $diagnosticSummary += "Possible memory-allocation issue detected."
-    }
-    if ($diagnosticSummary.Count -eq 0) {
-        $diagnosticSummary += "No known fatal-pattern diagnostic was detected in this pass log."
-    }
+    Add-Report -Lines @(
+        "",
+        ("## {0} - {1} pass {2}" -f (Get-Timestamp), $StoryId, $PassNumber),
+        "",
+        ("- Exit code: {0}" -f $ExitCode),
+        ("- Duration: {0}m {1}s" -f [math]::Floor($Duration.TotalMinutes), $Duration.Seconds),
+        ("- Context/token issue detected: {0}" -f $Diagnostics.ContextIssue),
+        ("- JSON/tool issue detected: {0}" -f $Diagnostics.JsonOrToolIssue),
+        ("- API/network issue detected: {0}" -f $Diagnostics.ApiIssue),
+        ("- Memory issue detected: {0}" -f $Diagnostics.MemoryIssue),
+        ("- Full pass log: {0}" -f $LogPath),
+        "",
+        "### Diagnostic matches"
+    )
 
-    Add-ReportText @"
-
-### Pass result
-
-- Exit code: **$exitCode**
-- Duration: $([math]::Floor($duration.TotalMinutes))m $($duration.Seconds)s
-- Diagnostics:
-$(
-    ($diagnosticSummary | ForEach-Object { "  - $_" }) -join [Environment]::NewLine
-)
-
-### Matching diagnostic lines
-
-$(
-    if ($diagnostics.matching_lines.Count -gt 0) {
-        ($diagnostics.matching_lines | ForEach-Object { "- `$_`" }) -join [Environment]::NewLine
+    if ($Diagnostics.Lines.Count -eq 0) {
+        Add-Report -Lines @("- None")
     }
     else {
-        "- None"
+        foreach ($DiagnosticLine in $Diagnostics.Lines) {
+            Add-Report -Lines @("- " + $DiagnosticLine)
+        }
     }
+
+    Add-Report -Lines @(
+        "",
+        "### Last 20 output lines",
+        "",
+        "~~~text"
+    )
+
+    if ($Tail.Count -eq 0) {
+        Add-Report -Lines @("(no output)")
+    }
+    else {
+        Add-Report -Lines $Tail
+    }
+
+    Add-Report -Lines @(
+        "~~~",
+        ""
+    )
+
+    return [pscustomobject]@{
+        ExitCode = $ExitCode
+        LogPath = $LogPath
+        Diagnostics = $Diagnostics
+    }
+}
+
+$OpenCodeExe = Resolve-OpenCodeExe
+$CompletedCount = 0
+$FinalReason = "Run active."
+
+Add-Report -Lines @(
+    "# Automatic OpenCode Overnight Report",
+    "",
+    ("- Run ID: {0}" -f $RunId),
+    ("- Started: {0}" -f (Get-Timestamp)),
+    ("- Project: {0}" -f $ProjectRoot),
+    ("- Model: {0}" -f $Model),
+    ("- Maximum stories: {0}" -f $MaxStories),
+    ("- Maximum passes per story: {0}" -f $MaxPassesPerStory),
+    ("- OpenCode executable: {0}" -f $OpenCodeExe),
+    ""
 )
 
-### Last 20 log lines
-
-```text
-$($recentLines -join [Environment]::NewLine)
-```
-"@
-
-    Add-Event -Type "pass_finished" -Data @{
-        exit_code = $exitCode
-        duration_seconds = [math]::Round($duration.TotalSeconds, 1)
-        log_path = $logPath
-        diagnostics = $diagnostics
-    }
-
-    return @{
-        exit_code = $exitCode
-        log_path = $logPath
-        diagnostics = $diagnostics
-    }
-}
-
-$initialReportHeader = @"
-# Automatic OpenCode Overnight Loop Report
-
-## Run $runId
-
-- Started: $(Get-IsoTimestamp)
-- Project: `$ProjectRoot`
-- Model: `$Model`
-- Agent: `$Agent`
-- Maximum stories: $MaxStories
-- Maximum fresh passes per story: $MaxPassesPerStory
-
-This file is append-only for the duration of the run. The most recent state is
-also written to `.agent-logs/overnight-loop-status.md`.
-"@
-
-Add-Content -Path $reportPath -Value $initialReportHeader -Encoding UTF8
-Add-Event -Type "run_started" -Data @{
-    project_root = $ProjectRoot
-    model = $Model
-    agent = $Agent
-    max_stories = $MaxStories
-    max_passes_per_story = $MaxPassesPerStory
-}
+Write-LoopStatus `
+    -Phase "Starting" `
+    -StoryId "none" `
+    -StoryTitle "none" `
+    -PassNumber 0 `
+    -CompletedCount 0 `
+    -Detail "Loop initialization completed."
 
 try {
-    $script:OpenCodeExe = Resolve-OpenCodeExecutable
+    while ($CompletedCount -lt $MaxStories) {
+        $Tasks = Read-Tasks
+        $Story = Get-NextStory -Tasks $Tasks
 
-    Write-CurrentStatus `
-        -Phase "Starting" `
-        -Detail "OpenCode executable resolved to $($script:OpenCodeExe)."
-
-    Add-ReportText @"
-
-## Environment
-
-- OpenCode executable: `$($script:OpenCodeExe)`
-- Starting Git commit: `$(git rev-parse HEAD)`
-- Starting working-tree status:
-
-```text
-$((git status --short) -join [Environment]::NewLine)
-```
-"@
-
-    Write-Host ""
-    Write-Host "Automatic OpenCode overnight story loop" -ForegroundColor Cyan
-    Write-Host "Project:              $ProjectRoot"
-    Write-Host "OpenCode executable:  $script:OpenCodeExe"
-    Write-Host "Model:                $Model"
-    Write-Host "Maximum stories:      $MaxStories"
-    Write-Host "Passes per story:     $MaxPassesPerStory"
-    Write-Host "Current status:       $statusPath"
-    Write-Host "Full report:          $reportPath"
-    Write-Host ""
-
-    while ($script:CompletedThisRun -lt $MaxStories) {
-        $tasks = Read-Tasks
-        $story = Get-NextStory -Tasks $tasks
-
-        if (-not $story) {
-            $script:StopReason = "No eligible stories remain."
-            Add-ReportText @"
-
-## Loop completed
-
-- Time: $(Get-IsoTimestamp)
-- Result: **No eligible stories remain**
-"@
-            Add-Event -Type "no_eligible_stories"
-            Write-Host "No eligible stories remain. The loop is complete." -ForegroundColor Green
+        if (-not $Story) {
+            $FinalReason = "No eligible stories remain."
+            Add-Report -Lines @(
+                "",
+                "## Loop completed",
+                "",
+                ("- Time: {0}" -f (Get-Timestamp)),
+                ("- Reason: {0}" -f $FinalReason)
+            )
             break
         }
 
-        $script:CurrentStoryId = [string]$story.id
-        $script:CurrentStoryTitle = [string]$story.title
-        $script:CurrentPass = 0
+        $StoryId = [string]$Story.id
+        $StoryTitle = [string]$Story.title
+        $StartCommit = (git rev-parse HEAD).Trim()
+        $StoryDone = $false
 
-        $storyId = $script:CurrentStoryId
-        $storyTitle = $script:CurrentStoryTitle
-        $storyStartCommit = (git rev-parse HEAD).Trim()
-        $storyFinished = $false
+        Add-Report -Lines @(
+            "",
+            ("# Story {0} - {1}" -f $StoryId, $StoryTitle),
+            "",
+            ("- Started: {0}" -f (Get-Timestamp)),
+            ("- Starting status: {0}" -f [string]$Story.status),
+            ("- Starting commit: {0}" -f $StartCommit)
+        )
 
-        Add-ReportText @"
+        for ($Pass = 1; $Pass -le $MaxPassesPerStory; $Pass++) {
+            Write-LoopStatus `
+                -Phase "OpenCode pass running" `
+                -StoryId $StoryId `
+                -StoryTitle $StoryTitle `
+                -PassNumber $Pass `
+                -CompletedCount $CompletedCount `
+                -Detail ("Running fresh pass {0} of {1}." -f $Pass, $MaxPassesPerStory)
 
-# Story $storyId — $storyTitle
+            $PassResult = Invoke-OpenCodePass `
+                -OpenCodeExe $OpenCodeExe `
+                -StoryId $StoryId `
+                -PassNumber $Pass
 
-- Started: $(Get-IsoTimestamp)
-- Starting commit: `$storyStartCommit`
-- Starting status: `$([string]$story.status)`
-"@
+            if ($PassResult.ExitCode -ne 0) {
+                $FinalReason = (
+                    "OpenCode exited with code {0} during {1} pass {2}." -f
+                    $PassResult.ExitCode,
+                    $StoryId,
+                    $Pass
+                )
 
-        Add-Event -Type "story_started" -Data @{
-            starting_commit = $storyStartCommit
-            starting_status = [string]$story.status
-        }
+                Add-Report -Lines @(
+                    "",
+                    "## LOOP STOPPED",
+                    "",
+                    ("- Time: {0}" -f (Get-Timestamp)),
+                    ("- Reason: {0}" -f $FinalReason),
+                    ("- Log: {0}" -f $PassResult.LogPath)
+                )
 
-        Write-Host ""
-        Write-Host "============================================================" -ForegroundColor DarkGray
-        Write-Host "Story: $storyId - $storyTitle" -ForegroundColor Yellow
-        Write-Host "============================================================" -ForegroundColor DarkGray
-
-        for ($pass = 1; $pass -le $MaxPassesPerStory; $pass++) {
-            $script:CurrentPass = $pass
-
-            $passResult = Invoke-OpenCodePass `
-                -StoryId $storyId `
-                -PassNumber $pass
-
-            $exitCode = [int]$passResult.exit_code
-
-            if ($exitCode -ne 0) {
-                $script:StopReason = "OpenCode exited with code $exitCode during $storyId pass $pass."
-
-                Add-ReportText @"
-
-## LOOP STOPPED
-
-- Time: $(Get-IsoTimestamp)
-- Reason: **$($script:StopReason)**
-- Pass log: `$($passResult.log_path)`
-- Review the diagnostic section above and the full pass log.
-"@
-
-                Add-Event -Type "loop_stopped" -Data @{
-                    reason = $script:StopReason
-                    log_path = $passResult.log_path
-                }
-
-                Write-CurrentStatus `
+                Write-LoopStatus `
                     -Phase "Stopped" `
-                    -Detail $script:StopReason
+                    -StoryId $StoryId `
+                    -StoryTitle $StoryTitle `
+                    -PassNumber $Pass `
+                    -CompletedCount $CompletedCount `
+                    -Detail $FinalReason
 
-                Write-Host $script:StopReason -ForegroundColor Red
-                exit $exitCode
+                exit $PassResult.ExitCode
             }
 
-            $updatedTasks = Read-Tasks
-            $updatedStory = Get-StoryById `
-                -Tasks $updatedTasks `
-                -StoryId $storyId
+            $UpdatedTasks = Read-Tasks
+            $UpdatedStory = Get-StoryById `
+                -Tasks $UpdatedTasks `
+                -StoryId $StoryId
 
-            if (-not $updatedStory) {
-                throw "Story $storyId disappeared from TASKS.json."
+            if (-not $UpdatedStory) {
+                throw ("Story {0} disappeared from TASKS.json." -f $StoryId)
             }
 
-            $status = [string]$updatedStory.status
-            $workingTreeSnapshot = @(
-                git status --short |
-                    Select-Object -First 80
+            $Status = [string]$UpdatedStory.status
+            $Head = (git rev-parse HEAD).Trim()
+            $WorkingTree = @(git status --short)
+
+            Add-Report -Lines @(
+                "",
+                ("### State after pass {0}" -f $Pass),
+                "",
+                ("- Story status: {0}" -f $Status),
+                ("- Git HEAD: {0}" -f $Head),
+                "- Working tree:",
+                "",
+                "~~~text"
             )
 
-            Add-ReportText @"
-
-### State after pass $pass
-
-- Story status: **$status**
-- Git HEAD: `$(git rev-parse HEAD)`
-- Working tree:
-
-```text
-$($workingTreeSnapshot -join [Environment]::NewLine)
-```
-"@
-
-            Add-Event -Type "story_state_after_pass" -Data @{
-                status = $status
-                git_head = (git rev-parse HEAD).Trim()
-                working_tree = $workingTreeSnapshot
+            if ($WorkingTree.Count -eq 0) {
+                Add-Report -Lines @("(clean)")
+            }
+            else {
+                Add-Report -Lines $WorkingTree
             }
 
-            Write-Host ""
-            Write-Host "Status after pass $pass: $status"
+            Add-Report -Lines @(
+                "~~~",
+                ""
+            )
 
-            if ($status -eq "blocked") {
-                $script:StopReason = "$storyId became blocked after pass $pass."
-
-                Add-ReportText @"
-
-## LOOP STOPPED
-
-- Time: $(Get-IsoTimestamp)
-- Reason: **$($script:StopReason)**
-- Read the latest entry in `PROGRESS.md` and the pass log.
-"@
-
-                Add-Event -Type "loop_stopped" -Data @{
-                    reason = $script:StopReason
-                    log_path = $passResult.log_path
-                }
-
-                Write-CurrentStatus `
-                    -Phase "Stopped" `
-                    -Detail $script:StopReason
-
-                Write-Host $script:StopReason -ForegroundColor Yellow
-                exit 21
-            }
-
-            if ($status -eq "done") {
-                $storyFinished = $true
+            if ($Status -eq "done") {
+                $StoryDone = $true
                 break
             }
 
-            if ($status -notin @("open", "in_progress")) {
-                $script:StopReason = "Unexpected story status '$status' for $storyId."
+            if ($Status -eq "blocked") {
+                $FinalReason = (
+                    "Story {0} became blocked after pass {1}." -f
+                    $StoryId,
+                    $Pass
+                )
 
-                Add-ReportText @"
+                Add-Report -Lines @(
+                    "",
+                    "## LOOP STOPPED",
+                    "",
+                    ("- Time: {0}" -f (Get-Timestamp)),
+                    ("- Reason: {0}" -f $FinalReason)
+                )
 
-## LOOP STOPPED
-
-- Time: $(Get-IsoTimestamp)
-- Reason: **$($script:StopReason)**
-"@
-
-                Add-Event -Type "loop_stopped" -Data @{
-                    reason = $script:StopReason
-                }
-
-                Write-CurrentStatus `
+                Write-LoopStatus `
                     -Phase "Stopped" `
-                    -Detail $script:StopReason
+                    -StoryId $StoryId `
+                    -StoryTitle $StoryTitle `
+                    -PassNumber $Pass `
+                    -CompletedCount $CompletedCount `
+                    -Detail $FinalReason
 
-                Write-Host $script:StopReason -ForegroundColor Red
-                exit 22
+                exit 21
             }
 
-            if ($pass -lt $MaxPassesPerStory) {
-                Write-Host "Story is not finished. Starting another fresh pass for the same story." -ForegroundColor Yellow
-
-                Add-ReportText @"
-
-The story remains `$status`. A fresh OpenCode pass will resume the same story.
-"@
+            if ($Status -notin @("open", "in_progress")) {
+                throw ("Unexpected status '{0}' for story {1}." -f $Status, $StoryId)
             }
         }
 
-        if (-not $storyFinished) {
-            $script:StopReason = "$storyId did not finish after $MaxPassesPerStory fresh passes."
+        if (-not $StoryDone) {
+            $FinalReason = (
+                "Story {0} did not finish after {1} fresh passes." -f
+                $StoryId,
+                $MaxPassesPerStory
+            )
 
-            Add-ReportText @"
+            Add-Report -Lines @(
+                "",
+                "## LOOP STOPPED",
+                "",
+                ("- Time: {0}" -f (Get-Timestamp)),
+                ("- Reason: {0}" -f $FinalReason),
+                "- Possible causes: story too large, context too small, repeated tool failure, or weak continuation notes."
+            )
 
-## LOOP STOPPED
-
-- Time: $(Get-IsoTimestamp)
-- Reason: **$($script:StopReason)**
-- This commonly indicates that the story is too large, the context budget is too small,
-  or the agent repeatedly failed to persist an actionable continuation.
-"@
-
-            Add-Event -Type "loop_stopped" -Data @{
-                reason = $script:StopReason
-            }
-
-            Write-CurrentStatus `
+            Write-LoopStatus `
                 -Phase "Stopped" `
-                -Detail $script:StopReason
+                -StoryId $StoryId `
+                -StoryTitle $StoryTitle `
+                -PassNumber $MaxPassesPerStory `
+                -CompletedCount $CompletedCount `
+                -Detail $FinalReason
 
-            Write-Host $script:StopReason -ForegroundColor Yellow
+            exit 22
+        }
+
+        $EndCommit = (git rev-parse HEAD).Trim()
+
+        if ($EndCommit -eq $StartCommit) {
+            $FinalReason = (
+                "Story {0} was marked done but no commit was created." -f
+                $StoryId
+            )
+
+            Add-Report -Lines @(
+                "",
+                "## LOOP STOPPED",
+                "",
+                ("- Time: {0}" -f (Get-Timestamp)),
+                ("- Reason: {0}" -f $FinalReason)
+            )
+
+            Write-LoopStatus `
+                -Phase "Stopped" `
+                -StoryId $StoryId `
+                -StoryTitle $StoryTitle `
+                -PassNumber 0 `
+                -CompletedCount $CompletedCount `
+                -Detail $FinalReason
+
             exit 23
         }
 
-        $storyEndCommit = (git rev-parse HEAD).Trim()
+        $RemainingChanges = @(git status --porcelain)
 
-        if ($storyEndCommit -eq $storyStartCommit) {
-            $script:StopReason = "$storyId was marked done, but no Git commit was created."
+        if ($RemainingChanges.Count -gt 0) {
+            $FinalReason = (
+                "Story {0} was marked done but uncommitted changes remain." -f
+                $StoryId
+            )
 
-            Add-ReportText @"
+            Add-Report -Lines @(
+                "",
+                "## LOOP STOPPED",
+                "",
+                ("- Time: {0}" -f (Get-Timestamp)),
+                ("- Reason: {0}" -f $FinalReason),
+                "- Remaining changes:",
+                "",
+                "~~~text"
+            )
 
-## LOOP STOPPED
+            Add-Report -Lines $RemainingChanges
 
-- Time: $(Get-IsoTimestamp)
-- Reason: **$($script:StopReason)**
-"@
+            Add-Report -Lines @(
+                "~~~",
+                ""
+            )
 
-            Add-Event -Type "loop_stopped" -Data @{
-                reason = $script:StopReason
-            }
-
-            Write-CurrentStatus `
+            Write-LoopStatus `
                 -Phase "Stopped" `
-                -Detail $script:StopReason
+                -StoryId $StoryId `
+                -StoryTitle $StoryTitle `
+                -PassNumber 0 `
+                -CompletedCount $CompletedCount `
+                -Detail $FinalReason
 
-            Write-Host $script:StopReason -ForegroundColor Red
             exit 24
         }
 
-        $workingTreeChanges = @(git status --porcelain)
-
-        if ($workingTreeChanges.Count -gt 0) {
-            $script:StopReason = "$storyId was marked done, but uncommitted changes remain."
-
-            Add-ReportText @"
-
-## LOOP STOPPED
-
-- Time: $(Get-IsoTimestamp)
-- Reason: **$($script:StopReason)**
-- Remaining changes:
-
-```text
-$($workingTreeChanges -join [Environment]::NewLine)
-```
-"@
-
-            Add-Event -Type "loop_stopped" -Data @{
-                reason = $script:StopReason
-                working_tree = $workingTreeChanges
-            }
-
-            Write-CurrentStatus `
-                -Phase "Stopped" `
-                -Detail $script:StopReason
-
-            Write-Host $script:StopReason -ForegroundColor Yellow
-            exit 25
+        if (-not (Test-Path $ValidatePath)) {
+            throw ("Validation script not found: {0}" -f $ValidatePath)
         }
 
-        if (-not (Test-Path $validatePath)) {
-            $script:StopReason = "Validation script not found: $validatePath"
+        $ValidationStamp = Get-Date -Format "yyyyMMdd-HHmmss"
+        $ValidationLog = Join-Path `
+            $LogDirectory `
+            ("{0}-{1}-validation.log" -f $ValidationStamp, $StoryId)
 
-            Add-ReportText @"
-
-## LOOP STOPPED
-
-- Time: $(Get-IsoTimestamp)
-- Reason: **$($script:StopReason)**
-"@
-
-            Add-Event -Type "loop_stopped" -Data @{
-                reason = $script:StopReason
-            }
-
-            Write-CurrentStatus `
-                -Phase "Stopped" `
-                -Detail $script:StopReason
-
-            Write-Host $script:StopReason -ForegroundColor Red
-            exit 26
-        }
-
-        $validationTimestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-        $validationLog = Join-Path `
-            $logDirectory `
-            "$validationTimestamp-$storyId-validation.log"
-
-        Write-CurrentStatus `
+        Write-LoopStatus `
             -Phase "Independent validation running" `
-            -Detail "Validating completed story $storyId. Log: $validationLog"
+            -StoryId $StoryId `
+            -StoryTitle $StoryTitle `
+            -PassNumber 0 `
+            -CompletedCount $CompletedCount `
+            -Detail ("Validation log: {0}" -f $ValidationLog)
 
-        Write-Host ""
-        Write-Host "Running independent Godot validation..." -ForegroundColor Cyan
-
-        $oldPreference = $ErrorActionPreference
+        $PreviousPreference = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
 
         try {
             & powershell `
                 -NoProfile `
                 -ExecutionPolicy Bypass `
-                -File $validatePath 2>&1 |
+                -File $ValidatePath 2>&1 |
                 ForEach-Object {
-                    $_ | Tee-Object -FilePath $validationLog -Append
+                    $Line = [string]$_
+                    Write-Host $Line
+                    Add-Content -Path $ValidationLog -Value $Line -Encoding UTF8
                 }
 
-            $validationExitCode = $LASTEXITCODE
+            $ValidationExitCode = $LASTEXITCODE
         }
         finally {
-            $ErrorActionPreference = $oldPreference
+            $ErrorActionPreference = $PreviousPreference
         }
 
-        $validationTail = Get-RecentLogLines `
-            -LogPath $validationLog `
-            -Count 30
+        $ValidationTail = @(
+            Get-Content $ValidationLog -Tail 30 -ErrorAction SilentlyContinue
+        )
 
-        Add-ReportText @"
+        Add-Report -Lines @(
+            "",
+            "## Independent validation",
+            "",
+            ("- Exit code: {0}" -f $ValidationExitCode),
+            ("- Log: {0}" -f $ValidationLog),
+            "",
+            "~~~text"
+        )
 
-## Story completion check
-
-- Ending commit: `$storyEndCommit`
-- Commits created during story:
-
-```text
-$((git log --oneline "$storyStartCommit..$storyEndCommit") -join [Environment]::NewLine)
-```
-
-- Files changed during story:
-
-```text
-$((git diff --name-status "$storyStartCommit..$storyEndCommit") -join [Environment]::NewLine)
-```
-
-- Independent validation exit code: **$validationExitCode**
-- Validation log: `$validationLog`
-
-### Last 30 validation lines
-
-```text
-$($validationTail -join [Environment]::NewLine)
-```
-"@
-
-        Add-Event -Type "validation_finished" -Data @{
-            exit_code = $validationExitCode
-            validation_log = $validationLog
-            ending_commit = $storyEndCommit
+        if ($ValidationTail.Count -eq 0) {
+            Add-Report -Lines @("(no output)")
+        }
+        else {
+            Add-Report -Lines $ValidationTail
         }
 
-        if ($validationExitCode -ne 0) {
-            $script:StopReason = "Independent validation failed for $storyId with exit code $validationExitCode."
+        Add-Report -Lines @(
+            "~~~",
+            ""
+        )
 
-            Add-ReportText @"
+        if ($ValidationExitCode -ne 0) {
+            $FinalReason = (
+                "Independent validation failed for {0} with exit code {1}." -f
+                $StoryId,
+                $ValidationExitCode
+            )
 
-## LOOP STOPPED
+            Add-Report -Lines @(
+                "",
+                "## LOOP STOPPED",
+                "",
+                ("- Time: {0}" -f (Get-Timestamp)),
+                ("- Reason: {0}" -f $FinalReason)
+            )
 
-- Time: $(Get-IsoTimestamp)
-- Reason: **$($script:StopReason)**
-- Validation log: `$validationLog`
-"@
-
-            Add-Event -Type "loop_stopped" -Data @{
-                reason = $script:StopReason
-                validation_log = $validationLog
-            }
-
-            Write-CurrentStatus `
+            Write-LoopStatus `
                 -Phase "Stopped" `
-                -Detail $script:StopReason
+                -StoryId $StoryId `
+                -StoryTitle $StoryTitle `
+                -PassNumber 0 `
+                -CompletedCount $CompletedCount `
+                -Detail $FinalReason
 
-            Write-Host $script:StopReason -ForegroundColor Red
-            exit $validationExitCode
+            exit $ValidationExitCode
         }
 
-        $script:CompletedThisRun++
+        $CompletedCount++
 
-        Add-ReportText @"
-
-## Story result
-
-- Result: **COMPLETED**
-- Story: **$storyId — $storyTitle**
-- Finished: $(Get-IsoTimestamp)
-- Final commit: `$storyEndCommit`
-- Independent validation: **PASS**
-- Stories completed this run: $($script:CompletedThisRun) / $MaxStories
-"@
-
-        Add-Event -Type "story_completed" -Data @{
-            ending_commit = $storyEndCommit
-            stories_completed_this_run = $script:CompletedThisRun
-        }
-
-        Write-CurrentStatus `
-            -Phase "Story completed" `
-            -Detail "$storyId completed and independently validated. Selecting the next story."
-
-        Write-Host ""
-        Write-Host "Completed $storyId successfully." -ForegroundColor Green
-        Write-Host "Stories completed this run: $($script:CompletedThisRun) of $MaxStories"
+        Add-Report -Lines @(
+            "",
+            "## Story completed",
+            "",
+            ("- Story: {0} - {1}" -f $StoryId, $StoryTitle),
+            ("- Time: {0}" -f (Get-Timestamp)),
+            ("- Ending commit: {0}" -f $EndCommit),
+            "- Independent validation: PASS",
+            ("- Stories completed this run: {0} / {1}" -f $CompletedCount, $MaxStories)
+        )
     }
 
-    if ($script:CompletedThisRun -ge $MaxStories) {
-        $script:StopReason = "Reached MaxStories=$MaxStories."
-
-        Add-ReportText @"
-
-## Loop limit reached
-
-- Time: $(Get-IsoTimestamp)
-- Result: **$($script:StopReason)**
-"@
-
-        Add-Event -Type "max_stories_reached" -Data @{
-            max_stories = $MaxStories
-        }
+    if ($CompletedCount -ge $MaxStories) {
+        $FinalReason = ("Reached MaxStories={0}." -f $MaxStories)
     }
 
-    Write-CurrentStatus `
+    Write-LoopStatus `
         -Phase "Finished" `
-        -Detail $script:StopReason
+        -StoryId "none" `
+        -StoryTitle "none" `
+        -PassNumber 0 `
+        -CompletedCount $CompletedCount `
+        -Detail $FinalReason
 
-    Add-Event -Type "run_finished" -Data @{
-        reason = $script:StopReason
-        stories_completed_this_run = $script:CompletedThisRun
-    }
-
-    Write-Host ""
-    Write-Host "Automatic overnight story loop finished." -ForegroundColor Cyan
+    Add-Report -Lines @(
+        "",
+        "## Run finished",
+        "",
+        ("- Time: {0}" -f (Get-Timestamp)),
+        ("- Reason: {0}" -f $FinalReason),
+        ("- Stories completed: {0}" -f $CompletedCount)
+    )
 }
 catch {
-    $script:StopReason = "Unhandled PowerShell error: $($_.Exception.Message)"
+    $FinalReason = ("PowerShell error: {0}" -f $_.Exception.Message)
 
-    Add-ReportText @"
+    Add-Report -Lines @(
+        "",
+        "## LOOP CRASHED",
+        "",
+        ("- Time: {0}" -f (Get-Timestamp)),
+        ("- Reason: {0}" -f $FinalReason),
+        ("- Position: {0}" -f $_.InvocationInfo.PositionMessage),
+        ("- Stack: {0}" -f $_.ScriptStackTrace)
+    )
 
-## LOOP CRASHED
-
-- Time: $(Get-IsoTimestamp)
-- Reason: **$($script:StopReason)**
-- PowerShell position: `$($_.InvocationInfo.PositionMessage)`
-- Script stack:
-
-```text
-$($_.ScriptStackTrace)
-```
-"@
-
-    Add-Event -Type "loop_crashed" -Data @{
-        reason = $script:StopReason
-        position = $_.InvocationInfo.PositionMessage
-        stack = $_.ScriptStackTrace
-    }
-
-    Write-CurrentStatus `
+    Write-LoopStatus `
         -Phase "Crashed" `
-        -Detail $script:StopReason
+        -StoryId "unknown" `
+        -StoryTitle "unknown" `
+        -PassNumber 0 `
+        -CompletedCount $CompletedCount `
+        -Detail $FinalReason
 
     throw
 }

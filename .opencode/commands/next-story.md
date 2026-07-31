@@ -57,3 +57,22 @@ Completion:
 - If unrelated changes prevent a safe commit, do not commit; document the reason.
 - End with the completion report required by `AGENTS.md`.
 - Stop after this one story.
+
+## Final Commit Ordering
+
+Before creating the final story commit:
+
+1. Update TASKS.json.
+2. Update PROGRESS.md.
+3. Run all validation.
+4. Stage every file belonging to the story.
+5. Create the final story commit.
+
+In PROGRESS.md, write:
+
+    **Commit:** included in final story commit; see Git history
+
+Do not insert the commit hash into PROGRESS.md after committing.
+
+Do not modify any tracked file after the final story commit. The final Git
+working tree must be clean when the session stops.
