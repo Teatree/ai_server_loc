@@ -43,7 +43,10 @@ function Invoke-GodotCheck {
     Write-Host "`n=== $Name ===" -ForegroundColor Cyan
     Write-Host "$godot $($Arguments -join ' ')"
 
-    $output = & $godot @Arguments 2>&1
+    $quotedGodot = "`"$godot`""
+    $quotedArgs = $Arguments | ForEach-Object { "`"$_`"" }
+    $cmdLine = "$quotedGodot $($quotedArgs -join ' ') 2>&1"
+    $output = cmd /c $cmdLine | Out-String
     $exitCode = $LASTEXITCODE
     $output | Tee-Object -FilePath $logPath | ForEach-Object { Write-Host $_ }
 

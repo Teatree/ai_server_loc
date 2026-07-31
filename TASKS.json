@@ -24,7 +24,7 @@
       "id": "S00",
       "priority": 0,
       "title": "Audit and stabilize the current repository",
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "objective": "Inventory the partial project, preserve useful work, establish a clean baseline, and make the current project importable before adding features.",
       "acceptance_criteria": [

@@ -28,6 +28,9 @@ Godot_v*-stable_win64_console.exe
 *.gguf
 hf-cache/
 
+# Godot resource UID files (generated on import)
+*.uid
+
 # Windows noise
 Thumbs.db
 Desktop.ini
