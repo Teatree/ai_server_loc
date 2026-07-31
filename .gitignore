@@ -11,3 +11,23 @@
 *.temp
 .DS_Store
 Thumbs.db
+# Godot generated files
+.godot/
+*.tmp
+*.log
+
+# Project-local Godot executables
+godot.exe
+Godot_v*-stable_win64.exe
+Godot_v*-stable_win64_console.exe
+
+# Agent validation output
+.agent-logs/
+
+# Local model/server artifacts, if copied into the project accidentally
+*.gguf
+hf-cache/
+
+# Windows noise
+Thumbs.db
+Desktop.ini
