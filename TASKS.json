@@ -12,7 +12,7 @@
     "dependencies_must_be_done": true,
     "maximum_stories_per_session": 1
   },
-  "active_story_id": null,
+  "active_story_id": "S02",
   "status_values": [
     "open",
     "in_progress",
@@ -75,28 +75,85 @@
     {
       "id": "S02",
       "priority": 20,
-      "title": "Implement responsive player movement",
-      "status": "open",
+      "title": "Implement basic player locomotion",
+      "status": "in_progress",
       "dependencies": [
         "S01"
       ],
-      "objective": "Implement a typed CharacterBody2D controller with acceleration, air control, variable jump, coyote time, jump buffering, dodge, one-way-platform drop-through, and stable respawn reset behavior.",
+      "objective": "Create a small typed player movement controller supporting horizontal ground and air movement, acceleration, deceleration, gravity, facing direction, and centralized movement configuration.",
       "acceptance_criteria": [
-        "Horizontal acceleration and ground/air deceleration are distinct and configurable.",
-        "Variable-height jump, coyote time, and jump buffering behave correctly at edge boundaries.",
-        "Dodge has a cooldown and cannot leave the player permanently locked.",
-        "One-way-platform drop-through works.",
-        "Respawn clears velocity, transient timers, and movement state.",
-        "Movement parameters are centralized outside the controller where practical."
+        "The player moves left and right using configured input actions.",
+        "Ground and air acceleration are distinct and configurable.",
+        "Ground and air deceleration are distinct and configurable.",
+        "Gravity and maximum fall speed are configurable.",
+        "Facing direction updates from horizontal movement.",
+        "The controller file is created through incremental tool edits rather than one large write.",
+        "Global validation passes."
       ],
       "validation": [
         "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
       ],
       "scope_hints": [
-        "player scene",
-        "player controller",
-        "movement configuration",
-        "movement tests"
+        "player controller skeleton",
+        "horizontal locomotion",
+        "gravity",
+        "movement configuration"
+      ]
+    },
+    {
+      "id": "S02B",
+      "priority": 21,
+      "title": "Add advanced jumping mechanics",
+      "status": "open",
+      "dependencies": [
+        "S02"
+      ],
+      "objective": "Extend the existing movement controller with variable-height jumping, coyote time, jump buffering, landing transitions, and reliable timer reset behavior.",
+      "acceptance_criteria": [
+        "The player can perform a normal configured jump.",
+        "Releasing jump early reduces jump height.",
+        "Coyote time allows a jump shortly after leaving a platform.",
+        "Jump buffering executes a recently pressed jump after landing.",
+        "Landing and leaving-ground transitions occur exactly once.",
+        "Jump timers reset correctly after respawn.",
+        "Global validation passes."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "jump mechanics",
+        "coyote timer",
+        "jump buffer timer",
+        "landing transitions"
+      ]
+    },
+    {
+      "id": "S02C",
+      "priority": 22,
+      "title": "Add dodge, drop-through, and movement reset",
+      "status": "open",
+      "dependencies": [
+        "S02B"
+      ],
+      "objective": "Extend the movement controller with dodge behavior, cooldowns, one-way-platform drop-through, input locking, knockback hooks, and complete respawn reset behavior.",
+      "acceptance_criteria": [
+        "Dodge has a configured duration and cooldown.",
+        "Dodge cannot leave the player permanently locked.",
+        "The player can drop through one-way platforms.",
+        "Input can be enabled and disabled safely.",
+        "Knockback can temporarily override normal movement.",
+        "Respawn clears velocity, timers, dodge state, knockback state, and queued input.",
+        "Global validation passes."
+      ],
+      "validation": [
+        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      ],
+      "scope_hints": [
+        "dodge",
+        "one-way platform drop-through",
+        "knockback hooks",
+        "respawn reset"
       ]
     },
     {
@@ -105,7 +162,7 @@
       "title": "Implement health, damage, death, and checkpoint respawn",
       "status": "open",
       "dependencies": [
-        "S02"
+        "S02C"
       ],
       "objective": "Create reusable health and damage components with one-shot death, invulnerability windows, knockback metadata, and player checkpoint respawn.",
       "acceptance_criteria": [

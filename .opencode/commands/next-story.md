@@ -58,6 +58,12 @@ Completion:
 - End with the completion report required by `AGENTS.md`.
 - Stop after this one story.
 
+HARD WRITE LIMIT:
+
+- Maximum 60 lines or approximately 6,000 characters per write/edit call.
+- Large files must be built through multiple small edits.
+- Never retry a truncated tool payload at the same size.
+
 ## Final Commit Ordering
 
 Before creating the final story commit:

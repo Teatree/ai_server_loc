@@ -121,3 +121,18 @@ End with a compact report containing:
 - Commit hash, or why no commit was made
 - Remaining risks
 - Explicit statement that the session is stopping
+
+## Hard Tool-Call Size Limits
+
+These limits are mandatory because large write calls have previously produced
+truncated JSON.
+
+- Never write or replace more than 60 lines in one tool call.
+- Never send more than approximately 6,000 characters in one write or edit.
+- Files expected to exceed 100 lines must be created incrementally.
+- First create a minimal skeleton.
+- Add methods in focused groups using separate edit calls.
+- Prefer targeted edits over replacing complete files.
+- After any JSON parse error or unterminated-string error, do not retry the
+  same payload. Reduce the next operation to one quarter of the previous size.
+- Record the failed operation and continuation point in PROGRESS.md.
