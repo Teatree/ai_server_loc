@@ -1,13 +1,10 @@
 extends Control
 
-signal new_game_requested
-
-@onready var _start_button: Button = $VBox/StartButton
+@onready var _vbox: VBoxContainer = $VBox
+@onready var _start_button: Button = _vbox.get_node("StartButton")
+@onready var _exit_button: Button = _vbox.get_node("ExitButton")
 
 
 func _ready() -> void:
-	_start_button.pressed.connect(_on_start_pressed)
-
-
-func _on_start_pressed() -> void:
-	new_game_requested.emit()
+	_start_button.pressed.connect(GameFlow.go_to_level)
+	_exit_button.pressed.connect(get_tree().quit)

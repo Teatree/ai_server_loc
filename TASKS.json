@@ -50,7 +50,7 @@
       "id": "S01",
       "priority": 10,
       "title": "Create the launchable project shell and title flow",
-      "status": "open",
+      "status": "done",
       "dependencies": [
         "S00"
       ],
