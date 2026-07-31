@@ -36,7 +36,7 @@ Append one entry per story attempt. Do not rewrite or summarize away prior entri
 ## 2026-08-01 00:17 — S00 Audit and stabilize the current repository
 
 **Result:** done
-**Commit:** pending
+**Commit:** 0b5d0bf
 **Files changed:**
 - scenes/title_screen.tscn
 - scenes/main_game.tscn
