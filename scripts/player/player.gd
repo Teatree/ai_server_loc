@@ -27,6 +27,16 @@ func _shoot() -> void:
 		_weapon_pivot.fire()
 
 
+func apply_knockback(velocity: Vector2, duration: float) -> void:
+	if movement_controller:
+		movement_controller.apply_knockback(velocity, duration)
+
+
+func drop_through() -> void:
+	if movement_controller:
+		movement_controller.drop_through()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		GameFlow.request_pause()

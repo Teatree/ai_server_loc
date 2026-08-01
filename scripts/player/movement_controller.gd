@@ -6,6 +6,9 @@ signal facing_changed(new_facing: int)
 signal jumped()
 signal left_ground()
 signal landed()
+signal dodge_started()
+signal dodge_ended()
+signal knockback_started()
 
 @export var config: MovementConfig
 @export var body: CharacterBody2D
@@ -15,15 +18,25 @@ var _jump_held: bool = false
 var _was_on_floor: bool = true
 var _coyote_timer: float = 0.0
 var _jump_buffer_timer: float = 0.0
+var _dodge_timer: float = 0.0
+var _dodge_cooldown_timer: float = 0.0
+var _dodge_direction: float = 0.0
+var _knockback_timer: float = 0.0
+var _knockback_velocity: Vector2 = Vector2.ZERO
+var _input_locked: bool = false
 
 
 func _physics_process(delta: float) -> void:
+	_update_dodge(delta)
+	_update_knockback(delta)
 	_handle_jump_input()
 	_apply_gravity(delta)
-	_apply_horizontal_movement(delta)
+	if not _input_locked:
+		_apply_horizontal_movement(delta)
 	_update_facing()
 	body.move_and_slide()
 	_update_ground_transitions(delta)
+	_handle_dodge_input()
 
 
 func _handle_jump_input() -> void:
@@ -43,6 +56,65 @@ func _handle_jump_input() -> void:
 			_jump_buffer_timer = 0.0
 			if body.is_on_floor():
 				_try_jump()
+
+
+func _handle_dodge_input() -> void:
+	if Input.is_action_just_pressed("dodge") and _dodge_cooldown_timer <= 0.0 and _dodge_timer <= 0.0:
+		var input_dir := Input.get_axis("move_left", "move_right")
+		if input_dir == 0.0:
+			input_dir = _facing
+		_dodge_direction = input_dir
+		_dodge_timer = config.dodge_duration
+		_dodge_cooldown_timer = config.dodge_cooldown
+		body.velocity.x = _dodge_direction * config.dodge_speed
+		body.velocity.y = 0.0
+		dodge_started.emit()
+
+
+func _update_dodge(delta: float) -> void:
+	if _dodge_timer > 0.0:
+		_dodge_timer -= delta
+		if _dodge_timer <= 0.0:
+			_dodge_timer = 0.0
+			dodge_ended.emit()
+	if _dodge_cooldown_timer > 0.0:
+		_dodge_cooldown_timer -= delta
+		if _dodge_cooldown_timer < 0.0:
+			_dodge_cooldown_timer = 0.0
+	if _dodge_timer > 0.0:
+		body.velocity.x = _dodge_direction * config.dodge_speed
+		if not body.is_on_floor():
+			body.velocity.y += config.gravity * config.dodge_gravity_scale * delta
+			body.velocity.y = min(body.velocity.y, config.max_fall_speed)
+
+
+func _update_knockback(delta: float) -> void:
+	if _knockback_timer > 0.0:
+		_knockback_timer -= delta
+		if _knockback_timer <= 0.0:
+			_knockback_timer = 0.0
+			_knockback_velocity = Vector2.ZERO
+	body.velocity = _knockback_velocity
+
+
+func apply_knockback(velocity: Vector2, duration: float) -> void:
+	_knockback_velocity = velocity
+	_knockback_timer = duration
+	knockback_started.emit()
+
+
+func set_input_locked(locked: bool) -> void:
+	_input_locked = locked
+	if locked:
+		body.velocity.x = 0.0
+
+
+func drop_through() -> void:
+	if body.is_on_floor():
+		body.velocity.y = config.drop_through_speed
+		body.set_collision_mask_value(config.one_way_platform_layer, false)
+		await get_tree().physics_frame
+		body.set_collision_mask_value(config.one_way_platform_layer, true)
 
 
 func _try_jump() -> void:
@@ -122,6 +194,12 @@ func reset() -> void:
 	_coyote_timer = 0.0
 	_jump_buffer_timer = 0.0
 	_was_on_floor = true
+	_dodge_timer = 0.0
+	_dodge_cooldown_timer = 0.0
+	_dodge_direction = 0.0
+	_knockback_timer = 0.0
+	_knockback_velocity = Vector2.ZERO
+	_input_locked = false
 
 
 func get_facing() -> int:

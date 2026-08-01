@@ -132,7 +132,7 @@
       "id": "S02C",
       "priority": 22,
       "title": "Add dodge, drop-through, and movement reset",
-      "status": "open",
+      "status": "done",
       "dependencies": [
         "S02B"
       ],

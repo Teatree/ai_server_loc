@@ -3,11 +3,11 @@
 ## Current State
 
 - Active story: none
-- Last completed story: S02B
+- Last completed story: S02C
 - Validation baseline: established (godot-import and godot-startup pass)
 - Current build status: stable; project imports and starts headlessly
 - Current main scene: res://scenes/title_screen.tscn
-- Known repository state: MovementController now implements variable-height jumping, coyote time, jump buffering, ground-transition signals, and respawn reset; jump input no longer triggers shooting
+- Known repository state: MovementController now implements dodge, drop-through, knockback, input locking, and complete respawn reset; dodge has duration/cooldown; knockback overrides movement temporarily
 
 This section should remain short. Update it at the end of each story.
 
@@ -212,6 +212,49 @@ Append one entry per story attempt. Do not rewrite or summarize away prior entri
 - S02B done; S02C ready to start
 - MovementConfig already contains dodge and drop-through values (future S02C scope)
 - MovementController signals: `facing_changed`, `jumped`, `left_ground`, `landed`
+
+## 2026-08-01 — S02C Add dodge, drop-through, and movement reset
+
+**Result:** done
+**Commit:** included in final story commit; see Git history
+**Files changed:**
+- project.godot
+- scripts/core/movement_config.gd
+- scripts/player/movement_controller.gd
+- scripts/player/player.gd
+
+**Implemented:**
+- Added `dodge` and `drop_through` input actions to project.godot (Left Shift and Down/Left Shift respectively)
+- Added `dodge_started`, `dodge_ended`, `knockback_started` signals to MovementController
+- Dodge uses configured duration and cooldown; locks horizontal velocity during active dodge
+- Knockback system: `apply_knockback(velocity, duration)` overrides body velocity for the duration
+- Input locking via `set_input_locked(locked)` disables horizontal movement safely
+- `drop_through()` disables one-way platform collision mask briefly to allow falling through
+- `reset()` clears all dodge, knockback, and input-lock state for respawn correctness
+- `player.gd` exposes `apply_knockback()` and `drop_through()` wrappers for external systems
+
+**Validation:**
+- `powershell -ExecutionPolicy Bypass -File .\tools\validate.ps1` — pass
+- godot-import — pass
+- godot-startup — pass
+- Acceptance criteria — all 7 verified
+
+**Problems encountered:**
+- None
+
+**Decisions:**
+- Dodge direction defaults to current facing when no horizontal input is held
+- Knockback sets body.velocity directly each frame while timer is active
+- Drop-through uses collision mask toggle for one frame to slip through platforms
+- Input lock prevents horizontal movement but still applies gravity
+
+**Remaining work:**
+- S03 next: health, damage, death, and checkpoint respawn
+
+**Context for next session:**
+- S02C done; S03 ready to start
+- MovementController supports full locomotion: ground/air movement, jumping, dodge, knockback, drop-through, input lock
+- MovementConfig now has `one_way_platform_layer` export
 
 ### Template
 
