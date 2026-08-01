@@ -30,6 +30,9 @@ func _ready() -> void:
 		health_component.died.connect(_on_died)
 		health_component.damaged.connect(_on_damaged)
 	_set_state(&"idle")
+	for weapon: Node in get_tree().get_nodes_in_group("weapon"):
+		if weapon.has_signal("noise_emitted"):
+			weapon.noise_emitted.connect(receive_noise)
 
 func _physics_process(delta: float) -> void:
 	if health_component and health_component.is_dead:
@@ -83,6 +86,12 @@ func _find_player() -> Node2D:
 func _has_clear_sight(target_pos: Vector2) -> bool:
 	if not _raycast:
 		return true
+
+	var forward: Vector2 = Vector2.RIGHT if _sprite.scale.x >= 0 else Vector2.LEFT
+	var to_target: Vector2 = (target_pos - global_position).normalized()
+	var angle_to_target: float = forward.angle_to(to_target)
+	if abs(angle_to_target) >= deg_to_rad(fov_degrees * 0.5):
+		return false
 
 	_raycast.global_position = global_position
 	_raycast.target_position = target_pos - global_position
@@ -166,7 +175,7 @@ func reset() -> void:
 		_raycast.enabled = true
 
 func receive_noise(position: Vector2, strength: float) -> void:
-	if health_component and health_component.is_dead:
+	if not is_active():
 		return
 	_last_known_position = position
 	_noise_timer = noise_memory_duration * clamp(strength, 0.5, 1.0)

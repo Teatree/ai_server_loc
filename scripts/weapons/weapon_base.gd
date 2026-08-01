@@ -5,6 +5,7 @@ signal fired(weapon: WeaponBase, origin: Vector2, direction: Vector2)
 signal dry_fire(weapon: WeaponBase)
 signal ammo_changed(current: int, maximum: int)
 signal state_changed(state: StringName)
+signal noise_emitted(position: Vector2, strength: float)
 
 @export var data: WeaponData :
 	set(value):
@@ -53,6 +54,8 @@ func fire(origin: Vector2, direction: Vector2) -> void:
 	_set_state(&"firing")
 	_apply_recoil(direction)
 	fired.emit(self, origin, direction)
+	if data:
+		noise_emitted.emit(origin, data.noise_strength)
 
 func add_ammo(amount: int) -> void:
 	if data.max_ammo < 0:

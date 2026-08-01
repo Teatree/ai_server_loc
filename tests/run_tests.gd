@@ -24,6 +24,10 @@ func _ready() -> void:
 	_test_dead_enemy_ignores_noise()
 	_test_shambler_dies_once()
 	_test_shambler_reset_clears_death()
+	_test_sight_blocked_by_obstacle()
+	_test_sight_outside_fov()
+	_test_gunfire_starts_investigation()
+	_test_inactive_enemy_ignores_events()
 	_print_summary()
 	get_tree().quit(0 if _failed == 0 else 1)
 
@@ -227,6 +231,71 @@ func _test_shambler_reset_clears_death() -> void:
 	shambler.reset()
 	_assert(not shambler.health_component.is_dead, "reset should clear death")
 	_assert(shambler._state == &"idle", "reset should restore idle state")
+	shambler.queue_free()
+
+func _test_sight_blocked_by_obstacle() -> void:
+	var shambler: Node = _load_shambler_scene()
+	shambler.global_position = Vector2(0, 0)
+	shambler._sprite.scale = Vector2.ONE
+	var obstacle: StaticBody2D = StaticBody2D.new()
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	shape.shape = RectangleShape2D.new()
+	shape.shape.size = Vector2(10, 40)
+	obstacle.add_child(shape)
+	obstacle.global_position = Vector2(25, 0)
+	add_child(obstacle)
+	var target: Node2D = Node2D.new()
+	target.global_position = Vector2(50, 0)
+	target.add_to_group("player")
+	add_child(target)
+	_assert(not shambler._has_clear_sight(target.global_position), "blocked sight should return false")
+	obstacle.queue_free()
+	target.queue_free()
+	shambler.queue_free()
+
+func _test_sight_outside_fov() -> void:
+	var shambler: Node = _load_shambler_scene()
+	shambler.global_position = Vector2(0, 0)
+	shambler._sprite.scale = Vector2.ONE
+	shambler.fov_degrees = 90.0
+	var target: Node2D = Node2D.new()
+	target.global_position = Vector2(100, 100)
+	target.add_to_group("player")
+	add_child(target)
+	_assert(not shambler._has_clear_sight(target.global_position), "target outside FOV should not be seen")
+	target.queue_free()
+	shambler.queue_free()
+
+func _test_gunfire_starts_investigation() -> void:
+	var weapon: Pistol = Pistol.new()
+	weapon.add_to_group("weapon")
+	weapon.data = WeaponData.new()
+	add_child(weapon)
+	var shambler: Node = _load_shambler_scene()
+	weapon.fire(Vector2(100, 0), Vector2.RIGHT)
+	_assert(shambler._state == &"investigate", "gunfire noise should set investigate state")
+	_assert(shambler._last_known_position == Vector2(100, 0), "last known position should be gunshot origin")
+	weapon.queue_free()
+	shambler.queue_free()
+
+func _test_sight_visible_to_player() -> void:
+	var shambler: Node = _load_shambler_scene()
+	shambler.global_position = Vector2(0, 0)
+	shambler._sprite.scale = Vector2.ONE
+	shambler.fov_degrees = 360.0
+	var target: Node2D = Node2D.new()
+	target.global_position = Vector2(50, 0)
+	target.add_to_group("player")
+	add_child(target)
+	_assert(shambler._has_clear_sight(target.global_position), "visible target within range should be seen")
+	target.queue_free()
+	shambler.queue_free()
+
+func _test_inactive_enemy_ignores_events() -> void:
+	var shambler: Node = _load_shambler_scene()
+	shambler.health_component.take_damage(DamageInfo.new(100.0))
+	shambler.receive_noise(Vector2(100, 0), 1.0)
+	_assert(shambler._state == &"dead", "dead shambler should stay dead after noise")
 	shambler.queue_free()
 
 func _load_shambler_scene() -> Node:

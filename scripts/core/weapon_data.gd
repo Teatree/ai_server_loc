@@ -14,3 +14,4 @@ class_name WeaponData
 @export var recoil_kick: float = 5.0
 @export var recoil_recovery: float = 8.0
 @export var muzzle_node_name: String = "Muzzle"
+@export var noise_strength: float = 1.0

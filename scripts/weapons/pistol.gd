@@ -42,7 +42,7 @@ func _spawn_projectile(origin: Vector2, direction: Vector2) -> void:
 	if not data:
 		return
 
-	var proj: Node2D = Node2D.new()
+	var proj: Area2D = Area2D.new()
 	proj.set_script(preload("res://scripts/weapons/projectile.gd"))
 	proj.global_position = origin
 	if proj.has_method("configure"):
