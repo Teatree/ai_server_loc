@@ -33,6 +33,8 @@ func _ready() -> void:
 	for weapon: Node in get_tree().get_nodes_in_group("weapon"):
 		if weapon.has_signal("noise_emitted"):
 			weapon.noise_emitted.connect(receive_noise)
+	if _raycast:
+		_raycast.add_exception(self)
 
 func _physics_process(delta: float) -> void:
 	if health_component and health_component.is_dead:
@@ -61,14 +63,18 @@ func _update_perception() -> void:
 
 	if _target:
 		var dist: float = global_position.distance_to(_target.global_position)
-		if dist <= sight_range and _has_clear_sight(_target.global_position):
-			_last_known_position = _target.global_position
-			_noise_timer = noise_memory_duration
-			if dist <= attack_range:
-				_set_state(&"attack")
-			else:
-				_set_state(&"chase")
-			return
+		if dist <= sight_range:
+			var to_target: Vector2 = (_target.global_position - global_position).normalized()
+			var forward: Vector2 = Vector2.RIGHT if _sprite.scale.x >= 0 else Vector2.LEFT
+			var angle_to_target: float = forward.angle_to(to_target)
+			if abs(angle_to_target) < deg_to_rad(fov_degrees * 0.5) and _has_clear_sight(_target.global_position):
+				_last_known_position = _target.global_position
+				_noise_timer = noise_memory_duration
+				if dist <= attack_range:
+					_set_state(&"attack")
+				else:
+					_set_state(&"chase")
+				return
 
 	if _last_known_position != Vector2.ZERO and _noise_timer > 0.0:
 		if global_position.distance_to(_last_known_position) < 5.0:

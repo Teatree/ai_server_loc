@@ -24,10 +24,13 @@ func _ready() -> void:
 	_test_dead_enemy_ignores_noise()
 	_test_shambler_dies_once()
 	_test_shambler_reset_clears_death()
+	_test_sight_visible_to_player()
 	_test_sight_blocked_by_obstacle()
 	_test_sight_outside_fov()
 	_test_gunfire_starts_investigation()
 	_test_inactive_enemy_ignores_events()
+	_test_noise_position_expires()
+	_test_expired_position_causes_idle()
 	_print_summary()
 	get_tree().quit(0 if _failed == 0 else 1)
 
@@ -233,6 +236,16 @@ func _test_shambler_reset_clears_death() -> void:
 	_assert(shambler._state == &"idle", "reset should restore idle state")
 	shambler.queue_free()
 
+func _test_expired_position_causes_idle() -> void:
+	var shambler: Node = _load_shambler_scene()
+	shambler.noise_memory_duration = 0.1
+	shambler.receive_noise(Vector2(100, 0), 1.0)
+	_assert(shambler._state == &"investigate", "should investigate after noise")
+	shambler._physics_process(0.2)
+	_assert(shambler._state == &"idle", "should return to idle after position expires")
+	shambler.queue_free()
+
+
 func _test_sight_blocked_by_obstacle() -> void:
 	var shambler: Node = _load_shambler_scene()
 	shambler.global_position = Vector2(0, 0)
@@ -258,6 +271,7 @@ func _test_sight_outside_fov() -> void:
 	shambler.global_position = Vector2(0, 0)
 	shambler._sprite.scale = Vector2.ONE
 	shambler.fov_degrees = 90.0
+	shambler.sight_range = 200.0
 	var target: Node2D = Node2D.new()
 	target.global_position = Vector2(100, 100)
 	target.add_to_group("player")
@@ -283,11 +297,18 @@ func _test_sight_visible_to_player() -> void:
 	shambler.global_position = Vector2(0, 0)
 	shambler._sprite.scale = Vector2.ONE
 	shambler.fov_degrees = 360.0
-	var target: Node2D = Node2D.new()
+	shambler.sight_range = 200.0
+	var target: StaticBody2D = StaticBody2D.new()
 	target.global_position = Vector2(50, 0)
 	target.add_to_group("player")
+	target.collision_layer = 2
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	shape.shape = RectangleShape2D.new()
+	shape.shape.size = Vector2(10, 40)
+	target.add_child(shape)
 	add_child(target)
-	_assert(shambler._has_clear_sight(target.global_position), "visible target within range should be seen")
+	_assert(shambler._has_clear_sight(target.global_position), "visible target within range and FOV should be seen")
+	shape.queue_free()
 	target.queue_free()
 	shambler.queue_free()
 
