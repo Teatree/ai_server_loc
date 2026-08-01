@@ -20,8 +20,6 @@ func _physics_process(delta: float) -> void:
 	_mouse_world = get_global_mouse_position()
 	if _weapon_pivot:
 		_weapon_pivot.look_at(_mouse_world)
-	if Input.is_action_just_pressed("jump"):
-		_shoot()
 
 
 func _shoot() -> void:

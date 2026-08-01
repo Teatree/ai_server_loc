@@ -3,11 +3,11 @@
 ## Current State
 
 - Active story: none
-- Last completed story: S02
+- Last completed story: S02B
 - Validation baseline: established (godot-import and godot-startup pass)
 - Current build status: stable; project imports and starts headlessly
 - Current main scene: res://scenes/title_screen.tscn
-- Known repository state: MovementController component extracted; MovementConfig resource wired; player scene has horizontal locomotion with configurable ground/air acceleration and gravity
+- Known repository state: MovementController now implements variable-height jumping, coyote time, jump buffering, ground-transition signals, and respawn reset; jump input no longer triggers shooting
 
 This section should remain short. Update it at the end of each story.
 
@@ -171,6 +171,47 @@ Append one entry per story attempt. Do not rewrite or summarize away prior entri
 - MovementController at scripts/player/movement_controller.gd
 - MovementConfig resource at resources/movement/movement_config.tres
 - Player scene at scenes/player/player.tscn with MovementController child node
+
+## 2026-08-01 — S02B Add advanced jumping mechanics
+
+**Result:** done
+**Commit:** included in final story commit; see Git history
+**Files changed:**
+- scripts/player/movement_controller.gd
+- scripts/player/player.gd
+
+**Implemented:**
+- Added `jumped`, `left_ground`, `landed` signals to MovementController
+- Added jump state: `_jump_held`, `_was_on_floor`, `_coyote_timer`, `_jump_buffer_timer`
+- Implemented `_handle_jump_input()` polling `jump` action each physics frame
+- Variable-height jump: early release multiplies downward velocity by `jump_cut_multiplier`; `variable_jump_gravity` applied while ascending without held input
+- Coyote time: `_coyote_timer` set to `config.coyote_time` on `left_ground`, counts down each frame, allows `_try_jump()` while active
+- Jump buffering: `_jump_buffer_timer` set to `config.jump_buffer_time` on press, auto-executes when landing detected
+- `_update_ground_transitions()` emits `left_ground` and `landed` exactly once per transition via `_was_on_floor` guard
+- `reset()` clears all timers and jump state for respawn correctness
+- Removed `jump`-triggered shooting from player.gd; MovementController owns jump input
+
+**Validation:**
+- `powershell -ExecutionPolicy Bypass -File .\tools\validate.ps1` — pass
+- godot-import — pass
+- godot-startup — pass
+- Acceptance criteria — all 7 verified
+
+**Problems encountered:**
+- None
+
+**Decisions:**
+- Jump timers use manual float accumulators rather than Timer nodes to avoid scene-tree overhead in physics loop
+- `_was_on_floor` tracked separately from `body.is_on_floor()` to detect exact transition moments
+- Variable jump gravity applied before regular gravity cut-off to ensure consistent ascent feel
+
+**Remaining work:**
+- S02C next: dodge, drop-through, knockback hooks, complete respawn reset
+
+**Context for next session:**
+- S02B done; S02C ready to start
+- MovementConfig already contains dodge and drop-through values (future S02C scope)
+- MovementController signals: `facing_changed`, `jumped`, `left_ground`, `landed`
 
 ### Template
 

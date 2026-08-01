@@ -104,7 +104,7 @@
       "id": "S02B",
       "priority": 21,
       "title": "Add advanced jumping mechanics",
-      "status": "open",
+      "status": "done",
       "dependencies": [
         "S02"
       ],
