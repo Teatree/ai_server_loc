@@ -12,7 +12,7 @@
     "dependencies_must_be_done": true,
     "maximum_stories_per_session": 1
   },
-    "active_story_id": null,
+    "active_story_id": "S05",
   "status_values": [
     "open",
     "in_progress",
@@ -216,7 +216,7 @@
       "id": "S05",
       "priority": 50,
       "title": "Implement Shambler enemy, perception, and basic combat",
-      "status": "open",
+      "status": "in_progress",
       "dependencies": [
         "S04"
       ],
