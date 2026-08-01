@@ -4,6 +4,7 @@
 - Ralph owns PRD status. Never edit the PRD, `TASKS.json`, or `.loop-state/`.
 - Do not read the full PRD or legacy task files; use the injected selected story.
 - Preserve useful existing work and never discard user changes.
+- Read the injected recovery packet. Same-story carryover may be continued only after verifying its diff belongs to the active story.
 - Change only paths listed under the selected story's Allowed Paths.
 - Do not modify the Godot executable, `.godot/`, imports, or generated logs.
 - Do not download assets, plugins, packages, or other dependencies.
@@ -13,6 +14,7 @@
 - After malformed tool output, retry at one quarter of the payload size.
 - Run every selected-story validation command and every global quality gate.
 - A failed test is ordinary unfinished work: diagnose it and omit COMPLETE.
+- In recovery mode, do not end after reproducing an unchanged failure; follow the required diagnosis-and-edit procedure.
 - Only emit `<promise>COMPLETE</promise>` when all criteria and checks pass.
 - Never start a second story in the same OpenCode session.
 - In no-commit mode, leave all work uncommitted.

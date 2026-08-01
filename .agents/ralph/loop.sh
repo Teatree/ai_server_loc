@@ -20,6 +20,8 @@ DEFAULT_PROMPT_BUILD=".agents/ralph/PROMPT_build.md"
 DEFAULT_GUARDRAILS_PATH=".ralph/guardrails.md"
 DEFAULT_ERRORS_LOG_PATH=".ralph/errors.log"
 DEFAULT_ACTIVITY_LOG_PATH=".ralph/activity.log"
+DEFAULT_RECOVERY_DIR=".ralph/recovery"
+DEFAULT_RECOVERY_SCRIPT="tools/ralph-recovery-state.ps1"
 DEFAULT_TMP_DIR=".ralph/.tmp"
 DEFAULT_RUNS_DIR=".ralph/runs"
 DEFAULT_GUARDRAILS_REF=".agents/ralph/references/GUARDRAILS.md"
@@ -74,6 +76,8 @@ PROMPT_BUILD="${PROMPT_BUILD:-$DEFAULT_PROMPT_BUILD}"
 GUARDRAILS_PATH="${GUARDRAILS_PATH:-$DEFAULT_GUARDRAILS_PATH}"
 ERRORS_LOG_PATH="${ERRORS_LOG_PATH:-$DEFAULT_ERRORS_LOG_PATH}"
 ACTIVITY_LOG_PATH="${ACTIVITY_LOG_PATH:-$DEFAULT_ACTIVITY_LOG_PATH}"
+RECOVERY_DIR="${RECOVERY_DIR:-$DEFAULT_RECOVERY_DIR}"
+RECOVERY_SCRIPT="${RECOVERY_SCRIPT:-$DEFAULT_RECOVERY_SCRIPT}"
 TMP_DIR="${TMP_DIR:-$DEFAULT_TMP_DIR}"
 RUNS_DIR="${RUNS_DIR:-$DEFAULT_RUNS_DIR}"
 GUARDRAILS_REF="${GUARDRAILS_REF:-$DEFAULT_GUARDRAILS_REF}"
@@ -100,6 +104,8 @@ PROMPT_BUILD="$(abs_path "$PROMPT_BUILD")"
 GUARDRAILS_PATH="$(abs_path "$GUARDRAILS_PATH")"
 ERRORS_LOG_PATH="$(abs_path "$ERRORS_LOG_PATH")"
 ACTIVITY_LOG_PATH="$(abs_path "$ACTIVITY_LOG_PATH")"
+RECOVERY_DIR="$(abs_path "$RECOVERY_DIR")"
+RECOVERY_SCRIPT="$(abs_path "$RECOVERY_SCRIPT")"
 TMP_DIR="$(abs_path "$TMP_DIR")"
 RUNS_DIR="$(abs_path "$RUNS_DIR")"
 GUARDRAILS_REF="$(abs_path "$GUARDRAILS_REF")"
@@ -277,7 +283,12 @@ if [ "$MODE" != "prd" ] && [ ! -f "$PRD_PATH" ]; then
   exit 1
 fi
 
-mkdir -p "$(dirname "$PROGRESS_PATH")" "$TMP_DIR" "$RUNS_DIR"
+if [ "$MODE" = "build" ] && [ ! -f "$RECOVERY_SCRIPT" ]; then
+  echo "Recovery helper not found: $RECOVERY_SCRIPT"
+  exit 1
+fi
+
+mkdir -p "$(dirname "$PROGRESS_PATH")" "$TMP_DIR" "$RUNS_DIR" "$RECOVERY_DIR"
 
 if [ ! -f "$PROGRESS_PATH" ]; then
   {
@@ -347,7 +358,8 @@ render_prompt() {
   local iter="$6"
   local run_log="$7"
   local run_meta="$8"
-  python3 - "$src" "$dst" "$PRD_PATH" "$AGENTS_PATH" "$PROGRESS_PATH" "$ROOT_DIR" "$GUARDRAILS_PATH" "$ERRORS_LOG_PATH" "$ACTIVITY_LOG_PATH" "$GUARDRAILS_REF" "$CONTEXT_REF" "$ACTIVITY_CMD" "$NO_COMMIT" "$story_meta" "$story_block" "$run_id" "$iter" "$run_log" "$run_meta" <<'PY'
+  local recovery_packet="$9"
+  python3 - "$src" "$dst" "$PRD_PATH" "$AGENTS_PATH" "$PROGRESS_PATH" "$ROOT_DIR" "$GUARDRAILS_PATH" "$ERRORS_LOG_PATH" "$ACTIVITY_LOG_PATH" "$GUARDRAILS_REF" "$CONTEXT_REF" "$ACTIVITY_CMD" "$NO_COMMIT" "$story_meta" "$story_block" "$run_id" "$iter" "$run_log" "$run_meta" "$recovery_packet" <<'PY'
 import sys
 from pathlib import Path
 
@@ -366,6 +378,7 @@ run_id = sys.argv[16] if len(sys.argv) > 16 else ""
 iteration = sys.argv[17] if len(sys.argv) > 17 else ""
 run_log = sys.argv[18] if len(sys.argv) > 18 else ""
 run_meta = sys.argv[19] if len(sys.argv) > 19 else ""
+recovery_path = sys.argv[20] if len(sys.argv) > 20 else ""
 repl = {
     "PRD_PATH": prd,
     "AGENTS_PATH": agents,
@@ -382,6 +395,7 @@ repl = {
     "ITERATION": iteration,
     "RUN_LOG_PATH": run_log,
     "RUN_META_PATH": run_meta,
+    "RECOVERY_PATH": recovery_path,
 }
 story = {"id": "", "title": "", "block": ""}
 quality_gates = []
@@ -399,6 +413,10 @@ if block_path and Path(block_path).exists():
 repl["STORY_ID"] = story["id"]
 repl["STORY_TITLE"] = story["title"]
 repl["STORY_BLOCK"] = story["block"]
+if recovery_path and Path(recovery_path).exists():
+    repl["RECOVERY_PACKET"] = Path(recovery_path).read_text()
+else:
+    repl["RECOVERY_PACKET"] = "No previous recovery state exists for this story."
 if quality_gates:
     repl["QUALITY_GATES"] = "\n".join([f"- {g}" for g in quality_gates])
 else:
@@ -719,6 +737,35 @@ log_error() {
   echo "[$timestamp] $message" >> "$ERRORS_LOG_PATH"
 }
 
+recovery_action() {
+  local action="$1"
+  local story_id="$2"
+  local log_path="${3:-}"
+  local run_id="${4:-}"
+  local iteration="${5:-0}"
+  local minimum_streak="${6:-0}"
+  powershell -NoProfile -File "$RECOVERY_SCRIPT" \
+    -Action "$action" -PrdPath "$PRD_PATH" -StoryId "$story_id" \
+    -RecoveryDir "$RECOVERY_DIR" -RepoRoot "$ROOT_DIR" \
+    -LogPath "$log_path" -RunId "$run_id" -Iteration "$iteration" \
+    -MinimumStreak "$minimum_streak"
+}
+
+CURRENT_STORY_ID=""
+CURRENT_ITERATION=0
+handle_interrupt() {
+  local exit_code="${1:-130}"
+  trap - INT TERM
+  if [ -n "$CURRENT_STORY_ID" ]; then
+    recovery_action "Interrupt" "$CURRENT_STORY_ID" "" "$RUN_TAG" "$CURRENT_ITERATION" 0 >/dev/null || true
+    update_story_status "$CURRENT_STORY_ID" "open" || true
+    log_error "ITERATION $CURRENT_ITERATION interrupted; recovery state preserved for $CURRENT_STORY_ID"
+    log_activity "ITERATION $CURRENT_ITERATION interrupted (story=$CURRENT_STORY_ID)"
+  fi
+  echo "Interrupted. Story recovery state was preserved."
+  exit "$exit_code"
+}
+
 append_run_summary() {
   local line="$1"
   python3 - "$ACTIVITY_LOG_PATH" "$line" <<'PY'
@@ -766,6 +813,7 @@ write_run_meta() {
   local commit_list="${14}"
   local changed_files="${15}"
   local dirty_files="${16}"
+  local recovery_result="${17:-}"
   {
     echo "# Ralph Run Summary"
     echo ""
@@ -806,6 +854,12 @@ write_run_meta() {
       echo "- (clean)"
     fi
     echo ""
+    if [ -n "$recovery_result" ]; then
+      echo "## Recovery"
+      echo "- Result: $recovery_result"
+      echo "- Packet: $RECOVERY_DIR/${story_id}.md"
+      echo ""
+    fi
   } > "$path"
 }
 
@@ -845,6 +899,9 @@ git_dirty_files() {
   fi
 }
 
+trap 'handle_interrupt 130' INT
+trap 'handle_interrupt 143' TERM
+
 echo "Ralph mode: $MODE"
 echo "Max iterations: $MAX_ITERATIONS"
 echo "PRD: $PRD_PATH"
@@ -879,13 +936,19 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       echo "No actionable open stories (all blocked or in progress). Remaining: $REMAINING"
       exit 0
     fi
+    CURRENT_STORY_ID="$STORY_ID"
+    CURRENT_ITERATION="$i"
   fi
 
   HEAD_BEFORE="$(git_head)"
   PROMPT_RENDERED="$TMP_DIR/prompt-$RUN_TAG-$i.md"
   LOG_FILE="$RUNS_DIR/run-$RUN_TAG-iter-$i.log"
   RUN_META="$RUNS_DIR/run-$RUN_TAG-iter-$i.md"
-  render_prompt "$PROMPT_FILE" "$PROMPT_RENDERED" "$STORY_META" "$STORY_BLOCK" "$RUN_TAG" "$i" "$LOG_FILE" "$RUN_META"
+  RECOVERY_PACKET=""
+  if [ "$MODE" = "build" ]; then
+    RECOVERY_PACKET="$(recovery_action "Prepare" "$STORY_ID" "" "$RUN_TAG" "$i" 0)"
+  fi
+  render_prompt "$PROMPT_FILE" "$PROMPT_RENDERED" "$STORY_META" "$STORY_BLOCK" "$RUN_TAG" "$i" "$LOG_FILE" "$RUN_META" "$RECOVERY_PACKET"
 
   if [ "$MODE" = "build" ] && [ -n "${STORY_ID:-}" ]; then
     log_activity "ITERATION $i start (mode=$MODE story=$STORY_ID)"
@@ -902,8 +965,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   fi
   set -e
   if [ "$CMD_STATUS" -eq 130 ] || [ "$CMD_STATUS" -eq 143 ]; then
-    echo "Interrupted."
-    exit "$CMD_STATUS"
+    handle_interrupt "$CMD_STATUS"
   fi
   ITER_END=$(date +%s)
   ITER_END_FMT=$(date '+%Y-%m-%d %H:%M:%S')
@@ -918,42 +980,51 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   CHANGED_FILES="$(git_changed_files "$HEAD_BEFORE" "$HEAD_AFTER")"
   DIRTY_FILES="$(git_dirty_files)"
   STATUS_LABEL="success"
+  RECOVERY_RESULT=""
   if [ "$CMD_STATUS" -ne 0 ]; then
     STATUS_LABEL="error"
   fi
   if [ "$MODE" = "build" ] && [ "$NO_COMMIT" = "false" ] && [ -n "$DIRTY_FILES" ]; then
     log_error "ITERATION $i left uncommitted changes; review run summary at $RUN_META"
   fi
-  write_run_meta "$RUN_META" "$MODE" "$i" "$RUN_TAG" "${STORY_ID:-}" "${STORY_TITLE:-}" "$ITER_START_FMT" "$ITER_END_FMT" "$ITER_DURATION" "$STATUS_LABEL" "$LOG_FILE" "$HEAD_BEFORE" "$HEAD_AFTER" "$COMMIT_LIST" "$CHANGED_FILES" "$DIRTY_FILES"
-  if [ "$MODE" = "build" ] && [ -n "${STORY_ID:-}" ]; then
-    append_run_summary "$(date '+%Y-%m-%d %H:%M:%S') | run=$RUN_TAG | iter=$i | mode=$MODE | story=$STORY_ID | duration=${ITER_DURATION}s | status=$STATUS_LABEL"
-  else
-    append_run_summary "$(date '+%Y-%m-%d %H:%M:%S') | run=$RUN_TAG | iter=$i | mode=$MODE | duration=${ITER_DURATION}s | status=$STATUS_LABEL"
-  fi
 
   if [ "$MODE" = "build" ]; then
     if [ "$CMD_STATUS" -ne 0 ]; then
+      STATUS_LABEL="error"
       log_error "ITERATION $i exited non-zero; review $LOG_FILE"
+      RECOVERY_RESULT="$(recovery_action "Record" "$STORY_ID" "$LOG_FILE" "$RUN_TAG" "$i" 0)"
+      log_error "ITERATION $i recovery: $RECOVERY_RESULT"
       update_story_status "$STORY_ID" "open"
       echo "Iteration failed; story reset to open."
     elif grep -q "<promise>COMPLETE</promise>" "$LOG_FILE"; then
-      if powershell -NoProfile -File ./tools/ralph-story-gate.ps1 -PrdPath "$PRD_PATH" -StoryId "$STORY_ID" -StartCommit "$HEAD_BEFORE"; then
+      if powershell -NoProfile -File ./tools/ralph-story-gate.ps1 -PrdPath "$PRD_PATH" -StoryId "$STORY_ID" -StartCommit "$HEAD_BEFORE" 2>&1 | tee -a "$LOG_FILE"; then
         if [ "$NO_COMMIT" = "true" ]; then
+          STATUS_LABEL="validated_no_commit"
           update_story_status "$STORY_ID" "open"
           echo "Validated no-commit run; story left open."
         else
+          STATUS_LABEL="complete"
           update_story_status "$STORY_ID" "done"
+          recovery_action "Complete" "$STORY_ID" "" "$RUN_TAG" "$i" 0 >/dev/null
           echo "Completion signal and independent gate passed; story marked done."
         fi
       else
+        STATUS_LABEL="gate_failed"
         HAS_ERROR="true"
+        RECOVERY_RESULT="$(recovery_action "Record" "$STORY_ID" "$LOG_FILE" "$RUN_TAG" "$i" 0)"
+        log_error "ITERATION $i gate failure recovery: $RECOVERY_RESULT"
         update_story_status "$STORY_ID" "open"
         echo "Independent gate failed; story reset to open."
       fi
     else
+      STATUS_LABEL="incomplete"
+      RECOVERY_RESULT="$(recovery_action "Record" "$STORY_ID" "$LOG_FILE" "$RUN_TAG" "$i" 0)"
+      log_error "ITERATION $i incomplete: $RECOVERY_RESULT"
       update_story_status "$STORY_ID" "open"
-      echo "No completion signal; story reset to open."
+      echo "No completion signal; recovery state recorded and story reset to open."
     fi
+    write_run_meta "$RUN_META" "$MODE" "$i" "$RUN_TAG" "$STORY_ID" "$STORY_TITLE" "$ITER_START_FMT" "$ITER_END_FMT" "$ITER_DURATION" "$STATUS_LABEL" "$LOG_FILE" "$HEAD_BEFORE" "$HEAD_AFTER" "$COMMIT_LIST" "$CHANGED_FILES" "$DIRTY_FILES" "$RECOVERY_RESULT"
+    append_run_summary "$(date '+%Y-%m-%d %H:%M:%S') | run=$RUN_TAG | iter=$i | mode=$MODE | story=$STORY_ID | duration=${ITER_DURATION}s | status=$STATUS_LABEL"
     REMAINING="$(remaining_from_prd)"
     echo "Iteration $i complete. Remaining stories: $REMAINING"
     if [ "$REMAINING" = "0" ]; then
@@ -961,6 +1032,8 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       exit 0
     fi
   else
+    write_run_meta "$RUN_META" "$MODE" "$i" "$RUN_TAG" "" "" "$ITER_START_FMT" "$ITER_END_FMT" "$ITER_DURATION" "$STATUS_LABEL" "$LOG_FILE" "$HEAD_BEFORE" "$HEAD_AFTER" "$COMMIT_LIST" "$CHANGED_FILES" "$DIRTY_FILES"
+    append_run_summary "$(date '+%Y-%m-%d %H:%M:%S') | run=$RUN_TAG | iter=$i | mode=$MODE | duration=${ITER_DURATION}s | status=$STATUS_LABEL"
     echo "Iteration $i complete."
   fi
   sleep 2

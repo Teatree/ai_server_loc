@@ -18,6 +18,7 @@ You are an autonomous coding agent. Your task is to complete the work for exactl
 - Iteration: {{ITERATION}}
 - Run Log: {{RUN_LOG_PATH}}
 - Run Summary: {{RUN_META_PATH}}
+- Recovery Packet: {{RECOVERY_PATH}}
 
 ## Global Quality Gates (apply to every story)
 {{QUALITY_GATES}}
@@ -28,6 +29,9 @@ Title: {{STORY_TITLE}}
 
 Story details:
 {{STORY_BLOCK}}
+
+## Persistent Recovery Context
+{{RECOVERY_PACKET}}
 
 If the story details are empty or missing, STOP and report that the PRD story format could not be parsed.
 
@@ -40,32 +44,34 @@ If the story details are empty or missing, STOP and report that the PRD story fo
 - Implement completely; no placeholders or stubs.
 - If No-commit is true, do NOT commit or push changes.
 - Do NOT edit the PRD JSON (status is handled by the loop).
-- All changes made during the run must be committed (including updates to progress/logs).
- - Before committing, perform a final **security**, **performance**, and **regression** review of your changes.
+- All story-owned changes must be committed, including valid same-story carryover from earlier iterations.
+- Before committing, perform a final **security**, **performance**, and **regression** review of your changes.
 
 ## Your Task (Do this in order)
 1. Read {{GUARDRAILS_PATH}} before any code changes.
 2. Read {{ERRORS_LOG_PATH}} for repeated failures to avoid.
-3. Do not reread the full PRD; Ralph already injected the selected story below.
-4. Fully audit and read all necessary files to understand the task end-to-end before implementing. Do not assume missing functionality.
-5. If {{AGENTS_PATH}} exists, follow its build/test instructions.
-6. Implement only the tasks that belong to {{STORY_ID}}.
-7. Run verification commands listed in the story, the global quality gates, and in {{AGENTS_PATH}} (if required).
-8. If the project has a build or dev workflow, run what applies:
+3. Read and obey the injected Persistent Recovery Context before repeating any prior command.
+4. Do not reread the full PRD; Ralph already injected the selected story below.
+5. Fully audit and read all necessary files to understand the task end-to-end before implementing. Do not assume missing functionality.
+6. If {{AGENTS_PATH}} exists, follow its build/test instructions.
+7. Implement only the tasks that belong to {{STORY_ID}}.
+8. Run verification commands listed in the story, the global quality gates, and in {{AGENTS_PATH}} (if required).
+9. If the project has a build or dev workflow, run what applies:
    - Build step (e.g., `npm run build`) if defined.
    - Dev server (e.g., `npm run dev`, `wrangler dev`) if it is the normal validation path.
    - Confirm no runtime/build errors in the console.
-9. Perform a brief audit before committing:
+10. Perform a brief audit before committing:
    - **Security:** check for obvious vulnerabilities or unsafe handling introduced by your changes.
    - **Performance:** check for avoidable regressions (extra queries, heavy loops, unnecessary re-renders).
    - **Regression:** verify existing behavior that could be impacted still works.
-10. If No-commit is false, commit the selected story without requiring a skill.
+11. If No-commit is false, commit the selected story without requiring a skill.
     - Stage only files matching the selected story's Allowed Paths.
-    - Never stage pre-existing or unrelated changes.
+    - Never stage unrelated changes.
+    - Same-story carryover candidates in the recovery packet may be continued and staged only after verifying their diffs belong to this story.
     - Confirm a clean working tree after commit: `git status --porcelain` should be empty.
     - After committing, capture the commit hash and subject using:
       `git show -s --format="%h %s" HEAD`.
-11. Append a progress entry to {{PROGRESS_PATH}} with run/commit/test details (format below).
+12. Append a progress entry to {{PROGRESS_PATH}} with run/commit/test details (format below).
     If No-commit is true, skip committing and note it in the progress entry.
 
 ## Progress Entry Format (Append Only)
@@ -99,6 +105,11 @@ When the selected story is complete, output:
 <promise>COMPLETE</promise>
 
 Otherwise, end normally without the signal.
+
+An incomplete run must still make useful progress. Do not merely reread files and reproduce
+an already-recorded validation failure. When recovery mode is active, follow its mandatory
+procedure and make a targeted story-scoped change unless evidence proves the existing test
+or acceptance criterion is incorrect; record that evidence when this exception applies.
 
 ## Additional Guardrails
 - When authoring documentation, capture the why (tests + implementation intent).
