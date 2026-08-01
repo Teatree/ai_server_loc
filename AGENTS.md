@@ -9,65 +9,44 @@
 - External assets, plugins, and downloads are prohibited unless the user explicitly approves them
 - The repository may already contain partial or broken work. Preserve useful existing work and repair it incrementally.
 
-## Loop Authority and Recovery
+## Ralph Loop Authority
 
-- `TASKS.json` is the machine-readable authority for story selection and status.
-- `PROGRESS.md` is historical context; when it conflicts with `TASKS.json`, repair
-  the prose state instead of changing the task to match stale prose.
-- `.loop-state/active.json` is the required handoff between fresh passes.
-- A resumed pass must execute its recorded `next_action` before broad inspection.
-- Tool, API, context, and memory failures are transient retries, not story failures.
-- Ordinary implementation defects remain `in_progress`; `blocked` is reserved for
-  external conditions requiring authority, software, or a user decision.
-- Completion is two phase: implementation sets `ready_for_validation`; only the
-  controller-triggered finalize command may set `done` and commit.
-- Never mark `done` or commit from `/next-story` or `/continue-story`.
-- Never start another acceptance criterion while the recorded failing check remains.
+- `.agents/tasks/prd-last-shift.json` is the story source of truth.
+- Ralph alone selects stories and updates PRD status. Agents never edit the PRD.
+- `TASKS.json`, `PROGRESS.md`, and `.loop-state/` are legacy records; do not edit
+  them during a Ralph run.
+- `.ralph/progress.md`, `.ralph/errors.log`, and `.ralph/guardrails.md` persist
+  lessons between fresh OpenCode sessions.
+- A failed test is unfinished work, not a blocker. Omit the completion signal so
+  Ralph reopens the same story for a fresh iteration.
+- Only external conditions requiring user authority are blockers.
 
 ## Scope Safety
 
-- Every active story declares `allowed_paths` in `TASKS.json`.
-- Refuse to modify or stage a path outside that list, except `TASKS.json`,
-  `PROGRESS.md`, `.loop-state/active.json`, and a justified `ARCHITECTURE.md` update.
-- A new story requires a clean working tree.
-- A resumed story may have changes only within its declared scope.
+- Every Ralph story declares `allowedPaths` in the PRD.
+- Refuse to modify or stage anything outside those paths.
+- Preserve pre-existing changes and continue them only when they belong to the
+  selected story.
 
 ## Core Loop
 
-Work on exactly **one story per OpenCode session**.
+Work on exactly **one Ralph-selected story per OpenCode session**.
 
-At the start of every `/next-story` run:
-
-1. Read `AGENTS.md`.
-2. Read `TASKS.json`.
-3. Read the current-state section and latest log entry in `PROGRESS.md`.
-4. Read only the relevant parts of `ARCHITECTURE.md`.
-5. Run `git status --short`.
-6. Select one story:
-   - Use the story ID supplied as `$ARGUMENTS`, when present.
-   - Otherwise select the highest-priority `open` story whose dependencies are all `done`.
-   - Resume an `in_progress` story instead of starting another one.
-7. Mark the selected story `in_progress` before implementation.
-8. State a plan of no more than eight bullets.
-
-At the end of the run:
-
-1. Execute every focused validation command listed for the story.
-2. Compare the result against every acceptance criterion ID.
-3. Update `.loop-state/active.json` with verified IDs and one next action.
-4. Leave failures `in_progress`; set `ready_for_validation` only when focused work passes.
-5. Stop without committing. Do not begin another story in the same session.
-
-The controller runs global validation after `ready_for_validation`. A separate
-`/finalize-story` pass updates `PROGRESS.md`, sets `done`, stages scoped files, and
-creates the single final commit.
+1. Read the selected story, Ralph guardrails, errors, and relevant project files.
+2. Run `git status --short` and verify every change belongs to `allowedPaths`.
+3. State a plan of no more than eight bullets.
+4. Continue useful partial work; do not restart the implementation blindly.
+5. Run every `validationCommands` entry and the global quality gates.
+6. In normal mode, commit only scoped files using `story(SXX): concise title`.
+7. Emit `<promise>COMPLETE</promise>` only when all criteria and checks pass.
+8. Otherwise stop normally; Ralph will reopen the story in a fresh session.
 
 ## Context Discipline
 
 - Do not load the entire repository unless the active story truly requires it.
 - Inspect filenames first, then open only relevant files and short surrounding ranges.
 - Do not repeat the complete project specification in responses.
-- Treat `TASKS.json`, `PROGRESS.md`, Git history, and tests as persistent memory.
+- Treat the Ralph PRD, `.ralph/` logs, Git history, and tests as persistent memory.
 - Prefer a new OpenCode session over continuing after the context becomes cluttered.
 - Never invoke compaction as part of this workflow. End the session instead.
 
@@ -112,14 +91,14 @@ A story cannot be marked `done` when:
 - Any acceptance criterion is unverified.
 - The implementation contains obvious placeholders for required behavior.
 
-If validation fails, keep the story `in_progress` and record in `.loop-state/active.json`:
+If validation fails, omit the completion signal and record in `.ralph/errors.log`:
 
 - The exact command
 - The relevant error
 - What was attempted
 - The smallest next action needed
 
-Mark the story `blocked` only when an external condition prevents further work.
+Ralph will reopen the story for a fresh iteration.
 
 ## Git Safety
 
@@ -133,7 +112,7 @@ Mark the story `blocked` only when an external condition prevents further work.
 story(SXX): concise story title
 ```
 
-- Commit only from `/finalize-story` after controller validation succeeds.
+- In no-commit mode, do not commit. In normal mode, commit only after validation.
 - If unrelated changes prevent a clean isolated commit, leave the story uncommitted and explain why in `PROGRESS.md`.
 
 ## Completion Response

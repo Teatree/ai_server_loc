@@ -2,6 +2,40 @@
 
 This kit replaces a framework-driven Ralph loop with a transparent project-local workflow.
 
+> **Current workflow (2026-08-01): Ralph is now the supervisor.** The older
+> PowerShell-controller notes below are retained only as migration history.
+
+## Current Ralph quick start
+
+Ralph 0.1.3 is installed globally. Project-local templates and configuration live
+under `.agents/ralph/`; the mechanically migrated PRD is
+`.agents/tasks/prd-last-shift.json`.
+
+Verify OpenCode connectivity before an unattended run:
+
+```powershell
+opencode run --pure --model evox2/step-3.7-flash --agent build --auto "Reply with pong only."
+```
+
+Run one uncommitted iteration through Git Bash:
+
+```powershell
+& 'C:\Program Files\Git\bin\bash.exe' -lc 'cd /d/_projects/local_llm_evo_x2_test && ./.agents/ralph/loop.sh build 1 --no-commit'
+```
+
+Run the unattended loop:
+
+```powershell
+.\run-full-story-loop.cmd
+```
+
+Ralph owns PRD status, starts a fresh OpenCode session for every iteration, and
+reopens any story that omits the completion signal. The local completion patch also
+runs `tools/ralph-story-gate.ps1`; no-commit runs always leave the story open.
+Runtime logs are under `.ralph/runs/`. Regenerate the PRD only for an intentional
+migration with `tools/convert-tasks-to-ralph.ps1`; regeneration resets unfinished
+Ralph stories to `open`.
+
 ## 1. Remove the globally installed Ralph CLI
 
 Run in PowerShell:

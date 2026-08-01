@@ -24,6 +24,9 @@ Godot_v*-stable_win64_console.exe
 # Agent validation output
 .agent-logs/
 .loop-state/
+.ralph/
+.agents/tasks/
+.agents/ralph/ralph.webp
 
 # Accidental Windows SDK metadata
 *.winmd

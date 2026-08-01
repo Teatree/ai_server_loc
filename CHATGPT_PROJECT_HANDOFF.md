@@ -1,6 +1,6 @@
 # LAST SHIFT — ChatGPT / OpenCode Project Handoff
 
-_Last updated from the conversation and the latest supplied overnight report on 2026-08-01._
+_Last updated during the Ralph migration on 2026-08-01._
 
 This file is the durable context package for a fresh ChatGPT conversation or another coding agent.  
 It records the project setup, automation design, completed work, current blocker, known failure modes, and the exact procedure for resuming safely.
@@ -17,7 +17,12 @@ It records the project setup, automation design, completed work, current blocker
 - **Godot executable observed by validation:** `D:\_projects\local_llm_evo_x2_test\godot.exe`
 - **Original project-local executable name mentioned earlier:** `Godot_v4.7.1-stable_win64.exe`
 - **Git branch observed:** `master`
-- **Development workflow:** one fresh OpenCode session per story, controlled by an external PowerShell loop
+- **Development workflow:** one fresh OpenCode session per Ralph iteration, controlled by `.agents/ralph/loop.sh`
+
+> Current automation authority is `.agents/tasks/prd-last-shift.json`. Ralph owns
+> status transitions; `TASKS.json`, `.loop-state/`, and the former PowerShell
+> controller are legacy records. On Windows, start the loop with
+> `run-full-story-loop.cmd`, which invokes Ralph through Git Bash.
 
 The project is intended to become a runnable vertical slice with:
 
