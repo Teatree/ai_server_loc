@@ -2,12 +2,13 @@
 
 ## Current State
 
-- Active story: none
+- Active story: S05A - Complete Shambler combat contracts and death lifecycle
 - Last completed story: S04
 - Validation baseline: established (godot-import, godot-startup, and godot-tests pass)
 - Current build status: stable; project imports and starts headlessly
 - Current main scene: res://scenes/title_screen.tscn
-- Known repository state: Weapon framework (WeaponData, WeaponBase, AimController, Pistol) implemented; projectile system added; player wired to fire via mouse/keyboard aim; deterministic tests cover fire-rate, ammo, and data separation
+- Known repository state: S05 work was split into S05A-S05C; existing partial
+  Shambler files are preserved for S05A to resume through the recovery loop.
 
 This section should remain short. Update it at the end of each story.
 
@@ -362,6 +363,21 @@ Append one entry per story attempt. Do not rewrite or summarize away prior entri
 - Player has AimController and Pistol as children of WeaponPivot
 - Fire input mapped in project.godot; aim_up/down/left/right for keyboard fallback
 - Tests at 22/22 passing
+
+## 2026-08-01 - Loop recovery configuration
+
+**Result:** loop configuration updated; gameplay unchanged
+
+**Implemented:**
+- Split oversized remaining stories into focused dependency-linked units.
+- Added persistent pass handoff, progress-aware retry limits, transient recovery,
+  independent validation, and separate finalization.
+- Moved the controller to `tools/story-loop-controller.ps1` because Windows blocked
+  recreation of the quarantined root controller filename.
+
+**Context for next session:**
+- Resume S05A through the launcher after loop preflight passes.
+- `TASKS.json` is authoritative when prose state is stale.
 
 ### Template
 

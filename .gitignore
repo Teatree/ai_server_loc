@@ -23,6 +23,10 @@ Godot_v*-stable_win64_console.exe
 
 # Agent validation output
 .agent-logs/
+.loop-state/
+
+# Accidental Windows SDK metadata
+*.winmd
 
 # Local model/server artifacts, if copied into the project accidentally
 *.gguf

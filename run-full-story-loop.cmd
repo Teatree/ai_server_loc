@@ -6,10 +6,12 @@ echo Starting OpenCode story loop...
 echo.
 
 powershell.exe -NoLogo -NoProfile ^
-  -File ".\run-story-loop.ps1" ^
+  -File ".\tools\story-loop-controller.ps1" ^
   -ProjectRoot "%CD%" ^
-  -MaxStories 20 ^
-  -MaxPassesPerStory 6
+  -MaxStories 0 ^
+  -HardPassLimit 20 ^
+  -MaxNoProgress 3 ^
+  -MaxTransientFailures 5
 
 set "EXIT_CODE=%ERRORLEVEL%"
 

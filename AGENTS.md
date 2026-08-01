@@ -9,6 +9,29 @@
 - External assets, plugins, and downloads are prohibited unless the user explicitly approves them
 - The repository may already contain partial or broken work. Preserve useful existing work and repair it incrementally.
 
+## Loop Authority and Recovery
+
+- `TASKS.json` is the machine-readable authority for story selection and status.
+- `PROGRESS.md` is historical context; when it conflicts with `TASKS.json`, repair
+  the prose state instead of changing the task to match stale prose.
+- `.loop-state/active.json` is the required handoff between fresh passes.
+- A resumed pass must execute its recorded `next_action` before broad inspection.
+- Tool, API, context, and memory failures are transient retries, not story failures.
+- Ordinary implementation defects remain `in_progress`; `blocked` is reserved for
+  external conditions requiring authority, software, or a user decision.
+- Completion is two phase: implementation sets `ready_for_validation`; only the
+  controller-triggered finalize command may set `done` and commit.
+- Never mark `done` or commit from `/next-story` or `/continue-story`.
+- Never start another acceptance criterion while the recorded failing check remains.
+
+## Scope Safety
+
+- Every active story declares `allowed_paths` in `TASKS.json`.
+- Refuse to modify or stage a path outside that list, except `TASKS.json`,
+  `PROGRESS.md`, `.loop-state/active.json`, and a justified `ARCHITECTURE.md` update.
+- A new story requires a clean working tree.
+- A resumed story may have changes only within its declared scope.
+
 ## Core Loop
 
 Work on exactly **one story per OpenCode session**.
@@ -29,15 +52,15 @@ At the start of every `/next-story` run:
 
 At the end of the run:
 
-1. Execute the global validation script.
-2. Execute every story-specific validation command.
-3. Compare the result against every acceptance criterion.
-4. Update `TASKS.json`.
-5. Update `PROGRESS.md`.
-6. Update `ARCHITECTURE.md` only when an architectural decision actually changed.
-7. Review `git diff --check` and `git diff --stat`.
-8. Commit only the files belonging to this story, when safe.
-9. Stop. Do not begin another story in the same session.
+1. Execute every focused validation command listed for the story.
+2. Compare the result against every acceptance criterion ID.
+3. Update `.loop-state/active.json` with verified IDs and one next action.
+4. Leave failures `in_progress`; set `ready_for_validation` only when focused work passes.
+5. Stop without committing. Do not begin another story in the same session.
+
+The controller runs global validation after `ready_for_validation`. A separate
+`/finalize-story` pass updates `PROGRESS.md`, sets `done`, stages scoped files, and
+creates the single final commit.
 
 ## Context Discipline
 
@@ -89,12 +112,14 @@ A story cannot be marked `done` when:
 - Any acceptance criterion is unverified.
 - The implementation contains obvious placeholders for required behavior.
 
-If validation cannot be completed, mark the story `blocked` and record:
+If validation fails, keep the story `in_progress` and record in `.loop-state/active.json`:
 
 - The exact command
 - The relevant error
 - What was attempted
 - The smallest next action needed
+
+Mark the story `blocked` only when an external condition prevents further work.
 
 ## Git Safety
 
@@ -108,6 +133,7 @@ If validation cannot be completed, mark the story `blocked` and record:
 story(SXX): concise story title
 ```
 
+- Commit only from `/finalize-story` after controller validation succeeds.
 - If unrelated changes prevent a clean isolated commit, leave the story uncommitted and explain why in `PROGRESS.md`.
 
 ## Completion Response

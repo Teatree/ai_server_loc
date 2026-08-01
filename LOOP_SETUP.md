@@ -106,6 +106,17 @@ Keep your existing provider configuration. Recommended compaction setting for th
 }
 ```
 
+The resolved `evox2/step-3.7-flash` model must expose at least:
+
+```json
+"limit": {
+  "context": 250000
+}
+```
+
+Keep llama-server at the same ceiling. The loop preflight rejects a lower OpenCode
+limit, but it cannot inspect the remote server allocation.
+
 A minimal project-level example is included as `opencode.project.example.json`. Merge it manually; do not overwrite your working provider configuration.
 
 Restart OpenCode after adding command files.
@@ -121,6 +132,29 @@ powershell -ExecutionPolicy Bypass -File .\tools\validate.ps1
 The first run may fail because the partial project is broken. That is expected; story `S00` exists specifically to establish the baseline.
 
 ## 7. Run the loop
+
+First run the non-mutating preflight:
+
+```powershell
+powershell -NoProfile -File .\tools\story-loop-controller.ps1 -PreflightOnly
+```
+
+It verifies task-state consistency, dependency IDs, allowed dirty paths, required
+files, and an OpenCode context of at least 250,000 tokens.
+
+For an unattended run, use the locally created launcher:
+
+```text
+run-full-story-loop.cmd
+```
+
+The controller starts with `/next-story`, resumes with `/continue-story`, retries
+transient tool failures without charging the story, and stops only after three
+consecutive no-progress passes, an external blocker, or the per-story hard safety
+ceiling. `MaxStories=0` keeps selecting eligible stories until none remain.
+
+Implementation moves to `ready_for_validation`. The controller then runs global
+validation and invokes `/finalize-story` for the single final commit.
 
 Start a fresh OpenCode session from the project root:
 
@@ -170,8 +204,10 @@ When review identifies a bounded defect, start another fresh session and run `/n
 new session
 → /loop-status
 → /next-story SXX
-→ agent validates and updates files
-→ review Git diff
+→ agent runs focused checks and writes .loop-state/active.json
+→ /continue-story SXX until ready_for_validation
+→ controller runs global validation
+→ /finalize-story SXX commits the validated story
 → close session
 → new session
 → /review-story SXX
@@ -179,4 +215,4 @@ new session
 → proceed to next story
 ```
 
-The design goal is not full autonomy. It is reliable bounded progress without context rot.
+The design goal is unattended completion through small, independently bounded stories.

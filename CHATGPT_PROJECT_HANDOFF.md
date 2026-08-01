@@ -77,14 +77,14 @@ The user intends to run both llama-server and OpenCode with:
 
 ```json
 "limit": {
-  "context": 282768
+  "context": 250000
 }
 ```
 
 and llama-server:
 
 ```powershell
--c 282768
+-c 250000
 ```
 
 ### Important context warning
@@ -97,7 +97,7 @@ A large configured context limit is only a ceiling. It does not guarantee that:
 - the model will reason better over very long histories
 - latency will remain acceptable
 
-With Q8 KV cache, a context of `282768` may consume substantial memory. Watch the llama-server console for:
+With Q8 KV cache, a context of `250000` may consume substantial memory. Watch the llama-server console for:
 
 - allocation failures
 - out-of-memory errors
@@ -125,7 +125,7 @@ The provider model context limit should match the llama-server context:
 
 ```json
 "limit": {
-  "context": 282768
+  "context": 250000
 }
 ```
 
@@ -225,11 +225,15 @@ The automation uses:
 - `PROGRESS.md`
 - `ARCHITECTURE.md`
 - `.opencode/commands/next-story.md`
+- `.opencode/commands/continue-story.md`
+- `.opencode/commands/finalize-story.md`
 - `.opencode/commands/review-story.md`
 - `.opencode/commands/validate-story.md`
 - `.opencode/commands/loop-status.md`
 - `tools/validate.ps1`
-- `run-story-loop.ps1`
+- `tools/validate-story.ps1`
+- `tools/story-loop-controller.ps1`
+- `.loop-state/active.json`
 - `.agent-logs/`
 
 ### Intended behavior
@@ -237,21 +241,19 @@ The automation uses:
 The PowerShell controller:
 
 1. reads `TASKS.json`
-2. resumes the single `in_progress` story, or selects the next eligible `open` story
-3. starts a fresh noninteractive OpenCode session
-4. gives the story multiple passes
-5. rereads story state after each pass
+2. resumes `in_progress` work from a structured handoff or selects eligible work
+3. starts a fresh focused OpenCode pass
+4. retries transient failures without charging story progress
+5. resets stagnation whenever tests, criteria, commits, or diffs improve
 6. stops on:
    - blocked story
    - unexpected status
-   - OpenCode nonzero exit
-   - story marked done without a commit
-   - dirty working tree after done
-   - missing validation script
-   - validation failure
-   - maximum passes reached
-7. independently runs `tools\validate.ps1`
-8. proceeds to the next story only after a clean validated completion
+   - unrecoverable OpenCode failure
+   - changes outside the story's allowed paths
+   - three consecutive no-progress passes
+   - hard safety ceiling
+7. independently validates `ready_for_validation` work
+8. invokes a separate finalization pass for metadata and the single commit
 
 ### Logs
 
@@ -505,10 +507,12 @@ echo Starting OpenCode story loop...
 echo.
 
 powershell.exe -NoLogo -NoProfile ^
-  -File ".\run-story-loop.ps1" ^
+  -File ".\tools\story-loop-controller.ps1" ^
   -ProjectRoot "%CD%" ^
-  -MaxStories 20 ^
-  -MaxPassesPerStory 6
+  -MaxStories 0 ^
+  -HardPassLimit 20 ^
+  -MaxNoProgress 3 ^
+  -MaxTransientFailures 5
 
 set "EXIT_CODE=%ERRORLEVEL%"
 

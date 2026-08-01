@@ -1,6 +1,14 @@
 param(
-    [int]$StartupFrames = 120
+    [int]$StartupFrames = 120,
+    [switch]$SkipImport,
+    [switch]$SkipStartup,
+    [switch]$TestsOnly
 )
+
+if ($TestsOnly) {
+    $SkipImport = $true
+    $SkipStartup = $true
+}
 
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -74,17 +82,21 @@ $godot = Find-GodotExecutable
 Write-Host "Project root: $root"
 Write-Host "Godot: $godot"
 
-Invoke-GodotCheck -Name "godot-import" -Arguments @(
-    "--headless",
-    "--path", $root,
-    "--import"
-)
+if (-not $SkipImport) {
+    Invoke-GodotCheck -Name "godot-import" -Arguments @(
+        "--headless",
+        "--path", $root,
+        "--import"
+    )
+}
 
-Invoke-GodotCheck -Name "godot-startup" -Arguments @(
-    "--headless",
-    "--path", $root,
-    "--quit-after", "$StartupFrames"
-)
+if (-not $SkipStartup) {
+    Invoke-GodotCheck -Name "godot-startup" -Arguments @(
+        "--headless",
+        "--path", $root,
+        "--quit-after", "$StartupFrames"
+    )
+}
 
 $testRunner = Join-Path $root "scenes\tests\test_runner.tscn"
 if (Test-Path $testRunner) {

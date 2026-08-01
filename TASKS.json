@@ -1,468 +1,415 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "project": {
     "name": "LAST SHIFT",
     "engine": "Godot 4.x",
     "language": "typed GDScript",
-    "workflow": "one fresh OpenCode session per story"
+    "workflow": "fresh focused passes with controller validation"
   },
   "selection_policy": {
-    "order": "priority_ascending_then_array_order",
-    "resume_in_progress_first": true,
+    "order": "priority_ascending_then_id",
+    "resume_active_first": true,
     "dependencies_must_be_done": true,
-    "maximum_stories_per_session": 1
+    "maximum_stories_per_agent_pass": 1
   },
-    "active_story_id": "S05",
-  "status_values": [
-    "open",
-    "in_progress",
-    "blocked",
-    "done"
-  ],
+  "execution_policy": {
+    "hard_pass_limit": 20,
+    "max_consecutive_no_progress": 3,
+    "max_transient_failures": 5,
+    "transient_failures_consume_progress_budget": false,
+    "two_phase_completion": true,
+    "blocked_is_external_only": true
+  },
+  "active_story_id": "S05A",
+  "status_values": ["open", "in_progress", "ready_for_validation", "blocked", "done"],
   "stories": [
     {
-      "id": "S00",
-      "priority": 0,
-      "title": "Audit and stabilize the current repository",
-      "status": "done",
-      "dependencies": [],
-      "objective": "Inventory the partial project, preserve useful work, establish a clean baseline, and make the current project importable before adding features.",
-      "acceptance_criteria": [
-        "Repository structure and current implementation state are documented in PROGRESS.md.",
-        "project.godot exists or is created with a valid main scene.",
-        "Broken references, parser errors, and obviously truncated files are identified.",
-        "The Godot executable is excluded from Git.",
-        "The global validation script succeeds, or the story is blocked with exact diagnostics.",
-        "No unrelated working code is discarded."
-      ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "project.godot",
-        "main scene",
-        ".gitignore",
-        "existing scripts and scenes",
-        "PROGRESS.md"
-      ]
+      "id": "S00", "priority": 0, "title": "Audit and stabilize the repository",
+      "status": "done", "dependencies": [],
+      "completion_record": "See PROGRESS.md and Git history."
     },
     {
-      "id": "S01",
-      "priority": 10,
-      "title": "Create the launchable project shell and title flow",
-      "status": "done",
-      "dependencies": [
-        "S00"
-      ],
-      "objective": "Provide a stable title screen, New Game flow, placeholder level, pause flow, and return-to-title lifecycle.",
-      "acceptance_criteria": [
-        "The project launches directly to a title screen.",
-        "New Game opens a playable placeholder level.",
-        "Pause and return-to-title work without duplicate nodes or stale state.",
-        "The UI is navigable by keyboard and mouse.",
-        "The project survives two consecutive title-to-game-to-title cycles."
-      ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "scenes/ui",
-        "scenes/levels",
-        "scripts/ui",
-        "project.godot"
-      ]
+      "id": "S01", "priority": 10, "title": "Create the launchable shell and title flow",
+      "status": "done", "dependencies": ["S00"],
+      "completion_record": "See PROGRESS.md and Git history."
     },
     {
-      "id": "S02",
-      "priority": 20,
-      "title": "Implement basic player locomotion",
-      "status": "done",
-      "dependencies": [
-        "S01"
-      ],
-      "objective": "Create a small typed player movement controller supporting horizontal ground and air movement, acceleration, deceleration, gravity, facing direction, and centralized movement configuration.",
-      "acceptance_criteria": [
-        "The player moves left and right using configured input actions.",
-        "Ground and air acceleration are distinct and configurable.",
-        "Ground and air deceleration are distinct and configurable.",
-        "Gravity and maximum fall speed are configurable.",
-        "Facing direction updates from horizontal movement.",
-        "The controller file is created through incremental tool edits rather than one large write.",
-        "Global validation passes."
-      ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "player controller skeleton",
-        "horizontal locomotion",
-        "gravity",
-        "movement configuration"
-      ]
+      "id": "S02", "priority": 20, "title": "Implement basic player locomotion",
+      "status": "done", "dependencies": ["S01"],
+      "completion_record": "See PROGRESS.md and Git history."
     },
     {
-      "id": "S02B",
-      "priority": 21,
-      "title": "Add advanced jumping mechanics",
-      "status": "done",
-      "dependencies": [
-        "S02"
-      ],
-      "objective": "Extend the existing movement controller with variable-height jumping, coyote time, jump buffering, landing transitions, and reliable timer reset behavior.",
-      "acceptance_criteria": [
-        "The player can perform a normal configured jump.",
-        "Releasing jump early reduces jump height.",
-        "Coyote time allows a jump shortly after leaving a platform.",
-        "Jump buffering executes a recently pressed jump after landing.",
-        "Landing and leaving-ground transitions occur exactly once.",
-        "Jump timers reset correctly after respawn.",
-        "Global validation passes."
-      ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "jump mechanics",
-        "coyote timer",
-        "jump buffer timer",
-        "landing transitions"
-      ]
+      "id": "S02B", "priority": 21, "title": "Add advanced jumping mechanics",
+      "status": "done", "dependencies": ["S02"],
+      "completion_record": "See PROGRESS.md and Git history."
     },
     {
-      "id": "S02C",
-      "priority": 22,
-      "title": "Add dodge, drop-through, and movement reset",
-      "status": "done",
-      "dependencies": [
-        "S02B"
-      ],
-      "objective": "Extend the movement controller with dodge behavior, cooldowns, one-way-platform drop-through, input locking, knockback hooks, and complete respawn reset behavior.",
-      "acceptance_criteria": [
-        "Dodge has a configured duration and cooldown.",
-        "Dodge cannot leave the player permanently locked.",
-        "The player can drop through one-way platforms.",
-        "Input can be enabled and disabled safely.",
-        "Knockback can temporarily override normal movement.",
-        "Respawn clears velocity, timers, dodge state, knockback state, and queued input.",
-        "Global validation passes."
-      ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "dodge",
-        "one-way platform drop-through",
-        "knockback hooks",
-        "respawn reset"
-      ]
+      "id": "S02C", "priority": 22, "title": "Add dodge, drop-through, and reset",
+      "status": "done", "dependencies": ["S02B"],
+      "completion_record": "See PROGRESS.md and Git history."
     },
     {
-      "id": "S03",
-      "priority": 30,
-      "title": "Implement health, damage, death, and checkpoint respawn",
-      "status": "done",
-      "dependencies": [
-        "S02C"
-      ],
-      "objective": "Create reusable health and damage components with one-shot death, invulnerability windows, knockback metadata, and player checkpoint respawn.",
-      "acceptance_criteria": [
-        "Damage data carries amount, type, source, hit position, direction, and knockback.",
-        "Entities cannot receive damage after death.",
-        "Death emits exactly once.",
-        "The player has post-hit invulnerability and visible feedback hooks.",
-        "Checkpoint respawn restores a valid controllable state.",
-        "Deterministic tests cover death-once and invulnerability behavior."
-      ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "components/health",
-        "components/damage",
-        "player",
-        "checkpoint",
-        "tests"
-      ]
+      "id": "S03", "priority": 30, "title": "Implement health, damage, death, and respawn",
+      "status": "done", "dependencies": ["S02C"],
+      "completion_record": "See PROGRESS.md and Git history."
     },
     {
-      "id": "S04",
-      "priority": 40,
-      "title": "Implement the weapon framework and pistol",
-      "status": "done",
-      "dependencies": [
-        "S03"
-      ],
-      "objective": "Create a data-driven weapon interface and a functional pistol with independent aiming, safe muzzle handling, ammunition rules, recoil, and testable fire-rate logic.",
-      "acceptance_criteria": [
-        "Mouse, right-stick, and keyboard fallback aiming are supported.",
-        "The pistol can fire in horizontal, vertical, and diagonal directions.",
-        "Muzzle obstruction prevents firing through walls.",
-        "Fire-rate restrictions cannot be bypassed by input spam.",
-        "Ammunition never becomes negative.",
-        "Weapon data is separated from player movement logic."
-      ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "weapons",
-        "aim component",
-        "projectiles or hitscan",
-        "HUD hooks",
-        "tests"
-      ]
+      "id": "S04", "priority": 40, "title": "Implement the weapon framework and pistol",
+      "status": "done", "dependencies": ["S03"],
+      "completion_record": "See PROGRESS.md and Git history."
     },
     {
-      "id": "S05",
-      "priority": 50,
-      "title": "Implement Shambler enemy, perception, and basic combat",
-      "status": "in_progress",
-      "dependencies": [
-        "S04"
-      ],
-      "objective": "Implement one complete zombie archetype with an explicit state machine, sight, line of sight, noise memory, pursuit, attack telegraph, damage, and death.",
+      "id": "S05A", "priority": 50, "title": "Complete Shambler combat contracts and death lifecycle",
+      "status": "in_progress", "dependencies": ["S04"],
+      "objective": "Finish the existing Shambler foundation without expanding perception or navigation scope.",
       "acceptance_criteria": [
-        "The Shambler has explicit idle, investigate, chase, attack, stagger, and dead states.",
-        "Sight uses distance, field of view, and line-of-sight checks.",
-        "Gunfire noise can trigger investigation.",
-        "Last-known player position expires after a configurable duration.",
-        "Dead or inactive enemies stop receiving perception events.",
-        "The enemy can damage the player and be killed by the pistol."
+        {"id": "S05A-AC1", "text": "Idle, investigate, chase, attack, stagger, and dead states are explicit and reset safely."},
+        {"id": "S05A-AC2", "text": "The Shambler accepts DamageInfo from pistol projectiles and dies exactly once."},
+        {"id": "S05A-AC3", "text": "Dead enemies ignore later damage and noise; reset restores a valid idle state."},
+        {"id": "S05A-AC4", "text": "Focused deterministic tests pass without weakening existing assertions."}
       ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "enemy state machine",
-        "perception",
-        "noise events",
-        "Shambler scene",
-        "combat tests"
-      ]
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S05A"],
+      "recovery_hints": ["Signal-count tests in this project must use class-member counters rather than lambda-captured local integers."],
+      "allowed_paths": ["scripts/enemies/*", "scenes/enemies/*", "scripts/core/*", "scripts/weapons/*", "tests/*", "TASKS.json", "PROGRESS.md"]
     },
     {
-      "id": "S06",
-      "priority": 60,
-      "title": "Build the first complete combat arena",
-      "status": "open",
-      "dependencies": [
-        "S05"
-      ],
-      "objective": "Replace the placeholder level with a coherent traversal-and-combat arena containing platforms, hazards, a checkpoint, pickups, spawn points, and one optional side route.",
+      "id": "S05B", "priority": 51, "title": "Implement Shambler sight and noise perception",
+      "status": "open", "dependencies": ["S05A"],
+      "objective": "Add deterministic distance, field-of-view, line-of-sight, and expiring noise memory.",
       "acceptance_criteria": [
-        "The player can traverse from entry to exit.",
-        "The arena contains static, one-way, and moving platforms.",
-        "At least one environmental hazard and one health or ammo pickup function.",
-        "Enemy spawn points are authored and categorized.",
-        "The checkpoint can be activated and used after death.",
-        "Traversal geometry is visually distinguishable from hazards and background."
+        {"id": "S05B-AC1", "text": "Sight requires range, configured field of view, and clear line of sight."},
+        {"id": "S05B-AC2", "text": "Gunfire noise starts investigation at the event position."},
+        {"id": "S05B-AC3", "text": "Last-known position expires deterministically and inactive enemies ignore events."},
+        {"id": "S05B-AC4", "text": "Focused perception tests cover visible, blocked, outside-FOV, and expired cases."}
       ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "level scene",
-        "moving platforms",
-        "hazards",
-        "pickups",
-        "spawn markers"
-      ]
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S05B"],
+      "allowed_paths": ["scripts/enemies/*", "scenes/enemies/*", "tests/*", "TASKS.json", "PROGRESS.md"]
     },
     {
-      "id": "S07",
-      "priority": 70,
-      "title": "Add shotgun, rifle, melee, reload, and weapon switching",
-      "status": "open",
-      "dependencies": [
-        "S06"
-      ],
-      "objective": "Extend the weapon framework with the remaining weapons, stable reload state, magazines, reserve ammunition, switching, recoil accumulation, and melee interruption.",
+      "id": "S05C", "priority": 52, "title": "Integrate Shambler pursuit and telegraphed attacks",
+      "status": "open", "dependencies": ["S05B"],
+      "objective": "Complete pursuit, attack telegraph, cooldown, player damage, and pistol combat integration.",
       "acceptance_criteria": [
-        "Shotgun pellet spread and knockback are functional.",
-        "The rifle supports automatic fire and recoil recovery.",
-        "Melee has a cooldown and can interrupt weak enemies.",
-        "Reload completion occurs exactly once.",
-        "Switching cannot bypass fire-rate or reload restrictions.",
-        "Weapon HUD data remains correct after switching and respawn."
+        {"id": "S05C-AC1", "text": "The Shambler pursues visible or remembered player positions and returns idle safely."},
+        {"id": "S05C-AC2", "text": "Attacks telegraph before applying damage and respect cooldown and range."},
+        {"id": "S05C-AC3", "text": "The enemy damages the player and can be killed by the pistol in an integration test."},
+        {"id": "S05C-AC4", "text": "Global validation passes with no parser or resource failures."}
       ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "weapon resources",
-        "reload state",
-        "weapon inventory",
-        "HUD",
-        "tests"
-      ]
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S05C"],
+      "allowed_paths": ["scripts/enemies/*", "scenes/enemies/*", "scripts/player/*", "scripts/weapons/*", "scenes/player/*", "tests/*", "TASKS.json", "PROGRESS.md"]
     },
     {
-      "id": "S08",
-      "priority": 80,
-      "title": "Add Runner, Spitter, Brute, and platform navigation",
-      "status": "open",
-      "dependencies": [
-        "S07"
-      ],
-      "objective": "Implement three differentiated zombie archetypes and a pragmatic platform-aware navigation system with authored links, ledge safety, stuck recovery, and crowd separation.",
+      "id": "S06A", "priority": 60, "title": "Author arena traversal and checkpoint route",
+      "status": "open", "dependencies": ["S05C"],
+      "objective": "Create a complete entry-to-exit traversal route with stable checkpoint respawn.",
       "acceptance_criteria": [
-        "Runner, Spitter, and Brute have distinct state transitions and combat behavior.",
-        "Dangerous attacks are telegraphed.",
-        "At least one enemy can traverse an authored jump or drop link.",
-        "Enemies distinguish reachable, blocked, jump-required, drop-required, and unreachable targets.",
-        "Enemies avoid repeating impossible jumps indefinitely.",
-        "Crowd separation prevents exact positional stacking."
+        {"id": "S06A-AC1", "text": "The player can traverse from entry to exit without debug intervention."},
+        {"id": "S06A-AC2", "text": "Static and one-way platforms are visually and physically distinct."},
+        {"id": "S06A-AC3", "text": "The authored checkpoint activates and respawns the player safely."}
       ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "enemy archetypes",
-        "navigation links",
-        "platform graph",
-        "crowd separation",
-        "debug visualization"
-      ]
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S06A"],
+      "allowed_paths": ["scenes/levels/*", "scripts/game/*", "scripts/components/*", "tests/*", "TASKS.json", "PROGRESS.md"]
     },
     {
-      "id": "S09",
-      "priority": 90,
-      "title": "Implement encounter director and final holdout",
-      "status": "open",
-      "dependencies": [
-        "S08"
-      ],
-      "objective": "Create a deterministic threat-budget director, progressive encounter phases, recovery periods, safe spawn selection, enemy caps, and a final holdout encounter.",
+      "id": "S06B", "priority": 61, "title": "Add moving platforms, hazards, and pickups",
+      "status": "open", "dependencies": ["S06A"],
+      "objective": "Add bounded arena interactions without changing the established route.",
       "acceptance_criteria": [
-        "The director tracks budget, enemy count, player condition, recent combat, and phase.",
-        "Spawn points on screen or too close to the player are rejected.",
-        "A deterministic seed reproduces spawn and phase decisions.",
-        "Pressure escalates while recovery periods remain possible.",
-        "Enemy count and budget caps are enforced.",
-        "The final holdout can reach a clear victory condition."
+        {"id": "S06B-AC1", "text": "At least one moving platform follows a deterministic authored path."},
+        {"id": "S06B-AC2", "text": "One hazard damages the player through the shared damage contract."},
+        {"id": "S06B-AC3", "text": "Health or ammunition pickup applies once and cleans itself up safely."}
       ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "director",
-        "spawn selection",
-        "encounter phases",
-        "final arena",
-        "deterministic tests"
-      ]
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S06B"],
+      "allowed_paths": ["scenes/levels/*", "scripts/components/*", "scripts/game/*", "tests/*", "TASKS.json", "PROGRESS.md"]
     },
     {
-      "id": "S10",
-      "priority": 100,
-      "title": "Implement upgrades and deterministic choices",
-      "status": "open",
-      "dependencies": [
-        "S09"
-      ],
-      "objective": "Create an upgrade system with random deterministic choices, stack limits, exclusions, gameplay effects, and an upgrade-selection UI.",
+      "id": "S06C", "priority": 62, "title": "Finish arena spawn points and side route",
+      "status": "open", "dependencies": ["S06B"],
+      "objective": "Complete enemy spawn metadata, an optional side route, and arena playability checks.",
       "acceptance_criteria": [
-        "At least eight upgrades are defined as data.",
-        "Three choices are reproducible from a fixed seed.",
-        "Stack limits and mutually exclusive upgrades are enforced.",
-        "Descriptions show meaningful numerical effects.",
-        "Effects persist through checkpoint respawn.",
-        "Reloading a scene does not apply upgrades twice."
+        {"id": "S06C-AC1", "text": "Enemy spawn markers are authored and categorized."},
+        {"id": "S06C-AC2", "text": "An optional side route rejoins the critical path safely."},
+        {"id": "S06C-AC3", "text": "Traversal, hazards, pickups, and respawn pass one integrated arena check."}
       ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "upgrade resources",
-        "selection service",
-        "upgrade UI",
-        "player modifiers",
-        "tests"
-      ]
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S06C"],
+      "allowed_paths": ["scenes/levels/*", "scripts/game/*", "scripts/enemies/*", "tests/*", "TASKS.json", "PROGRESS.md"]
     },
     {
-      "id": "S11",
-      "priority": 110,
-      "title": "Implement versioned save and load",
-      "status": "open",
-      "dependencies": [
-        "S10"
-      ],
-      "objective": "Persist checkpoint, player state, weapons, ammunition, upgrades, completed encounters, deterministic seed, and relevant environment state using versioned safe data.",
+      "id": "S07A", "priority": 70, "title": "Implement weapon inventory, reload, and switching",
+      "status": "open", "dependencies": ["S06C"],
+      "objective": "Establish magazines, reserve ammunition, reload authority, and safe switching.",
       "acceptance_criteria": [
-        "New Game, Continue, restart from checkpoint, and clear-save flows work.",
-        "Save/load round trip preserves the required state.",
-        "Missing and corrupt files fall back safely.",
-        "Invalid values are sanitized.",
-        "Unknown fields do not crash loading.",
-        "The save format contains an explicit version."
+        {"id": "S07A-AC1", "text": "Reload completes exactly once and transfers bounded reserve ammunition."},
+        {"id": "S07A-AC2", "text": "Switching cannot bypass fire-rate or reload restrictions."},
+        {"id": "S07A-AC3", "text": "Weapon state remains correct after respawn."}
       ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "save service",
-        "version migration",
-        "title menu",
-        "checkpoint state",
-        "tests"
-      ]
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S07A"],
+      "allowed_paths": ["scripts/weapons/*", "scripts/player/*", "scenes/player/*", "scripts/core/*", "tests/*", "TASKS.json", "PROGRESS.md"]
     },
     {
-      "id": "S12",
-      "priority": 120,
-      "title": "Complete HUD, feedback, audio architecture, and debug tools",
-      "status": "open",
-      "dependencies": [
-        "S11"
-      ],
-      "objective": "Add production-readable HUD and menus, centralized feedback, managed audio emitters, performance counters, and isolated debug controls.",
+      "id": "S07B", "priority": 71, "title": "Add the shotgun",
+      "status": "open", "dependencies": ["S07A"],
+      "objective": "Add a data-driven shotgun without changing inventory authority.",
       "acceptance_criteria": [
-        "HUD shows health, ammunition, weapon, reload, and encounter information.",
-        "Pause, death, victory, and options interfaces are functional.",
-        "Camera shake and hit stop combine predictably.",
-        "Transient audio and visual effects do not leak nodes.",
-        "The debug overlay exposes FPS, enemies, projectiles, director budget, player state, weapon state, checkpoint, and seed.",
-        "Debug actions can be disabled for a production build."
+        {"id": "S07B-AC1", "text": "A shot emits the configured pellet count and spread."},
+        {"id": "S07B-AC2", "text": "Damage, knockback, ammunition, and cooldown remain bounded."},
+        {"id": "S07B-AC3", "text": "Deterministic tests cover spread limits and empty-magazine behavior."}
       ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
-      ],
-      "scope_hints": [
-        "HUD",
-        "menus",
-        "feedback service",
-        "audio pool",
-        "debug panel",
-        "performance counters"
-      ]
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S07B"],
+      "allowed_paths": ["scripts/weapons/*", "scenes/weapons/*", "resources/weapons/*", "tests/*", "TASKS.json", "PROGRESS.md"]
     },
     {
-      "id": "S13",
-      "priority": 130,
-      "title": "Integration audit, tests, documentation, and release baseline",
-      "status": "open",
-      "dependencies": [
-        "S12"
-      ],
-      "objective": "Perform a full integration pass, repair lifecycle defects, complete deterministic tests and documentation, and leave a runnable vertical slice with explicit known limitations.",
+      "id": "S07C", "priority": 72, "title": "Add the automatic rifle",
+      "status": "open", "dependencies": ["S07B"],
+      "objective": "Add automatic fire and deterministic recoil recovery.",
       "acceptance_criteria": [
-        "The project imports and starts without parser or missing-resource errors.",
-        "The title-to-game-to-victory loop is playable.",
-        "Core movement, weapons, enemies, director, upgrades, and saving are covered by automated or documented manual checks.",
-        "README.md, ARCHITECTURE.md, TESTING.md, and PROGRESS.md match the implementation.",
-        "No required feature is represented only by a deceptive placeholder.",
-        "Remaining defects and highest-risk files are explicitly documented."
+        {"id": "S07C-AC1", "text": "Held input fires only at the configured automatic cadence."},
+        {"id": "S07C-AC2", "text": "Recoil accumulates and recovers within configured limits."},
+        {"id": "S07C-AC3", "text": "Reload and switching preserve rifle ammunition correctly."}
       ],
-      "validation": [
-        "powershell -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S07C"],
+      "allowed_paths": ["scripts/weapons/*", "scenes/weapons/*", "resources/weapons/*", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S07D", "priority": 73, "title": "Add melee and weapon integration hooks",
+      "status": "open", "dependencies": ["S07C"],
+      "objective": "Add bounded melee interruption and stable state-reporting hooks for later HUD work.",
+      "acceptance_criteria": [
+        {"id": "S07D-AC1", "text": "Melee respects range and cooldown and cannot damage repeatedly per swing."},
+        {"id": "S07D-AC2", "text": "Melee can interrupt eligible weak enemies without corrupting death state."},
+        {"id": "S07D-AC3", "text": "All weapons expose consistent ammunition, reload, equip, and state signals."}
       ],
-      "scope_hints": [
-        "entire project by subsystem",
-        "tests",
-        "documentation",
-        "lifecycle and regression repair"
-      ]
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S07D"],
+      "allowed_paths": ["scripts/weapons/*", "scripts/enemies/*", "scripts/player/*", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S08A", "priority": 80, "title": "Build authored platform navigation",
+      "status": "open", "dependencies": ["S07D"],
+      "objective": "Create a small authored platform graph with reachability and stuck recovery.",
+      "acceptance_criteria": [
+        {"id": "S08A-AC1", "text": "Targets classify as reachable, blocked, jump, drop, or unreachable."},
+        {"id": "S08A-AC2", "text": "An enemy traverses one authored jump and one drop link."},
+        {"id": "S08A-AC3", "text": "Failed links trigger bounded stuck recovery instead of infinite retries."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S08A"],
+      "allowed_paths": ["scripts/navigation/*", "scripts/enemies/*", "scenes/levels/*", "resources/enemies/*", "tests/*", "TASKS.json", "PROGRESS.md", "ARCHITECTURE.md"]
+    },
+    {
+      "id": "S08B", "priority": 81, "title": "Add the Runner enemy",
+      "status": "open", "dependencies": ["S08A"],
+      "objective": "Add a fast close-range archetype using shared enemy contracts.",
+      "acceptance_criteria": [
+        {"id": "S08B-AC1", "text": "Runner transitions and movement are distinct from the Shambler."},
+        {"id": "S08B-AC2", "text": "Its dangerous action has a visible deterministic telegraph."},
+        {"id": "S08B-AC3", "text": "Death, reset, perception, and navigation reuse shared contracts."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S08B"],
+      "allowed_paths": ["scripts/enemies/*", "scenes/enemies/*", "resources/enemies/*", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S08C", "priority": 82, "title": "Add the Spitter enemy",
+      "status": "open", "dependencies": ["S08B"],
+      "objective": "Add a telegraphed ranged archetype with bounded projectile behavior.",
+      "acceptance_criteria": [
+        {"id": "S08C-AC1", "text": "Spitter maintains its configured range and uses a telegraphed attack."},
+        {"id": "S08C-AC2", "text": "Enemy projectiles use shared damage ownership and clean up safely."},
+        {"id": "S08C-AC3", "text": "Blocked line of sight prevents ranged damage."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S08C"],
+      "allowed_paths": ["scripts/enemies/*", "scenes/enemies/*", "scripts/weapons/*", "resources/enemies/*", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S08D", "priority": 83, "title": "Add the Brute and crowd separation",
+      "status": "open", "dependencies": ["S08C"],
+      "objective": "Add the heavy archetype and prevent exact enemy stacking.",
+      "acceptance_criteria": [
+        {"id": "S08D-AC1", "text": "Brute attacks and stagger resistance are distinct and telegraphed."},
+        {"id": "S08D-AC2", "text": "Crowd separation prevents exact stacking without unstable impulses."},
+        {"id": "S08D-AC3", "text": "Mixed archetypes retain valid navigation, attack, and death states."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S08D"],
+      "allowed_paths": ["scripts/enemies/*", "scenes/enemies/*", "resources/enemies/*", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S09A", "priority": 90, "title": "Implement deterministic director budget and selection",
+      "status": "open", "dependencies": ["S08D"],
+      "objective": "Create seeded threat-budget accounting and capped enemy selection.",
+      "acceptance_criteria": [
+        {"id": "S09A-AC1", "text": "A fixed seed reproduces budget and enemy-selection decisions."},
+        {"id": "S09A-AC2", "text": "Living-enemy and threat-budget caps cannot be exceeded."},
+        {"id": "S09A-AC3", "text": "Director logic is deterministic without rendering."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S09A"],
+      "allowed_paths": ["scripts/director/*", "scripts/core/*", "resources/enemies/*", "tests/*", "TASKS.json", "PROGRESS.md", "ARCHITECTURE.md"]
+    },
+    {
+      "id": "S09B", "priority": 91, "title": "Add safe spawning and encounter phases",
+      "status": "open", "dependencies": ["S09A"],
+      "objective": "Filter unsafe spawns and implement pressure and recovery phases.",
+      "acceptance_criteria": [
+        {"id": "S09B-AC1", "text": "Visible or too-close spawn points are rejected."},
+        {"id": "S09B-AC2", "text": "Pressure escalates while bounded recovery periods remain possible."},
+        {"id": "S09B-AC3", "text": "Phase changes and spawn choices reproduce from a fixed seed."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S09B"],
+      "allowed_paths": ["scripts/director/*", "scenes/levels/*", "scripts/enemies/*", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S09C", "priority": 92, "title": "Build final holdout and victory flow",
+      "status": "open", "dependencies": ["S09B"],
+      "objective": "Integrate the director into a bounded final encounter with a clear victory condition.",
+      "acceptance_criteria": [
+        {"id": "S09C-AC1", "text": "The holdout progresses through authored phases under director caps."},
+        {"id": "S09C-AC2", "text": "Completion reaches victory exactly once and stops further spawning."},
+        {"id": "S09C-AC3", "text": "Restarting the encounter clears prior enemies, timers, and signals."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S09C"],
+      "allowed_paths": ["scripts/director/*", "scripts/game/*", "scenes/levels/*", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S10A", "priority": 100, "title": "Create upgrade data and modifier runtime",
+      "status": "open", "dependencies": ["S09C"],
+      "objective": "Define upgrade data, stacks, exclusions, and apply-once modifier contracts.",
+      "acceptance_criteria": [
+        {"id": "S10A-AC1", "text": "At least eight upgrades are represented as validated data."},
+        {"id": "S10A-AC2", "text": "Stack limits and mutual exclusions are enforced."},
+        {"id": "S10A-AC3", "text": "Runtime modifiers apply exactly once and survive checkpoint respawn."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S10A"],
+      "allowed_paths": ["scripts/upgrades/*", "resources/upgrades/*", "scripts/player/*", "tests/*", "TASKS.json", "PROGRESS.md", "ARCHITECTURE.md"]
+    },
+    {
+      "id": "S10B", "priority": 101, "title": "Implement deterministic upgrade choices",
+      "status": "open", "dependencies": ["S10A"],
+      "objective": "Produce reproducible valid choice sets from the session seed.",
+      "acceptance_criteria": [
+        {"id": "S10B-AC1", "text": "A fixed seed reproduces the same three valid choices."},
+        {"id": "S10B-AC2", "text": "Maxed or excluded upgrades never appear."},
+        {"id": "S10B-AC3", "text": "Descriptions expose the numerical effects used by runtime modifiers."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S10B"],
+      "allowed_paths": ["scripts/upgrades/*", "resources/upgrades/*", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S10C", "priority": 102, "title": "Add upgrade selection UI and integration",
+      "status": "open", "dependencies": ["S10B"],
+      "objective": "Present and apply one deterministic choice without duplicate application.",
+      "acceptance_criteria": [
+        {"id": "S10C-AC1", "text": "The UI displays three choices and their numerical effects."},
+        {"id": "S10C-AC2", "text": "Selecting once applies one upgrade and closes the choice state."},
+        {"id": "S10C-AC3", "text": "Scene reload and checkpoint respawn do not apply upgrades twice."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S10C"],
+      "allowed_paths": ["scripts/upgrades/*", "scripts/ui/*", "scenes/ui/*", "scripts/player/*", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S11A", "priority": 110, "title": "Define versioned save schema and sanitization",
+      "status": "open", "dependencies": ["S10C"],
+      "objective": "Create a versioned boundary that validates missing, corrupt, old, and invalid data.",
+      "acceptance_criteria": [
+        {"id": "S11A-AC1", "text": "Save data contains an explicit version and only stable identifiers."},
+        {"id": "S11A-AC2", "text": "Missing, corrupt, unknown, and invalid fields fall back safely."},
+        {"id": "S11A-AC3", "text": "Sanitization and migration logic is deterministic and unit tested."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S11A"],
+      "allowed_paths": ["scripts/save/*", "scripts/core/*", "tests/*", "TASKS.json", "PROGRESS.md", "ARCHITECTURE.md"]
+    },
+    {
+      "id": "S11B", "priority": 111, "title": "Implement save round trip for gameplay state",
+      "status": "open", "dependencies": ["S11A"],
+      "objective": "Persist and reconstruct checkpoint, weapons, upgrades, encounters, and seed.",
+      "acceptance_criteria": [
+        {"id": "S11B-AC1", "text": "A save/load round trip preserves every required stable field."},
+        {"id": "S11B-AC2", "text": "Runtime nodes reconstruct from sanitized data instead of serialized objects."},
+        {"id": "S11B-AC3", "text": "Loading cannot duplicate upgrades, ammunition, or encounter completion."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S11B"],
+      "allowed_paths": ["scripts/save/*", "scripts/game/*", "scripts/player/*", "scripts/weapons/*", "scripts/upgrades/*", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S11C", "priority": 112, "title": "Add New Game, Continue, and clear-save flows",
+      "status": "open", "dependencies": ["S11B"],
+      "objective": "Integrate safe save lifecycle actions into title and checkpoint flow.",
+      "acceptance_criteria": [
+        {"id": "S11C-AC1", "text": "New Game starts clean and Continue reflects valid save availability."},
+        {"id": "S11C-AC2", "text": "Continue and checkpoint restart reconstruct the expected state."},
+        {"id": "S11C-AC3", "text": "Clear-save removes availability and repeated lifecycle cycles remain clean."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S11C"],
+      "allowed_paths": ["scripts/save/*", "scripts/game/*", "scripts/ui/*", "scenes/title_screen.tscn", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S12A", "priority": 120, "title": "Build gameplay HUD and state menus",
+      "status": "open", "dependencies": ["S11C"],
+      "objective": "Add signal-driven health, ammunition, weapon, reload, encounter, death, and victory UI.",
+      "acceptance_criteria": [
+        {"id": "S12A-AC1", "text": "HUD reports health, ammunition, weapon, reload, and encounter state."},
+        {"id": "S12A-AC2", "text": "Pause, death, victory, and options states are navigable."},
+        {"id": "S12A-AC3", "text": "Repeated scene and pause cycles do not duplicate UI or signals."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S12A"],
+      "allowed_paths": ["scripts/ui/*", "scenes/ui/*", "scripts/game/*", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S12B", "priority": 121, "title": "Centralize camera and combat feedback",
+      "status": "open", "dependencies": ["S12A"],
+      "objective": "Compose camera shake, hit stop, and transient visual feedback safely.",
+      "acceptance_criteria": [
+        {"id": "S12B-AC1", "text": "Concurrent shake requests combine predictably within configured limits."},
+        {"id": "S12B-AC2", "text": "Hit stop restores time scale exactly once."},
+        {"id": "S12B-AC3", "text": "Transient effects release nodes and signals after repeated combat."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S12B"],
+      "allowed_paths": ["scripts/feedback/*", "scripts/game/*", "scenes/effects/*", "tests/*", "TASKS.json", "PROGRESS.md", "ARCHITECTURE.md"]
+    },
+    {
+      "id": "S12C", "priority": 122, "title": "Implement managed audio architecture",
+      "status": "open", "dependencies": ["S12B"],
+      "objective": "Provide bounded reusable audio emitters and stable category controls.",
+      "acceptance_criteria": [
+        {"id": "S12C-AC1", "text": "Transient sounds reuse or release emitters without node growth."},
+        {"id": "S12C-AC2", "text": "Music, effects, and UI categories expose stable volume controls."},
+        {"id": "S12C-AC3", "text": "Scene changes stop or retain audio according to explicit ownership."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S12C"],
+      "allowed_paths": ["scripts/audio/*", "scripts/ui/*", "project.godot", "tests/*", "TASKS.json", "PROGRESS.md", "ARCHITECTURE.md"]
+    },
+    {
+      "id": "S12D", "priority": 123, "title": "Add debug overlay and performance counters",
+      "status": "open", "dependencies": ["S12C"],
+      "objective": "Expose isolated diagnostics that can be disabled for production.",
+      "acceptance_criteria": [
+        {"id": "S12D-AC1", "text": "Overlay reports FPS, enemies, projectiles, director, player, weapon, checkpoint, and seed."},
+        {"id": "S12D-AC2", "text": "Debug actions are isolated from production input and can be disabled."},
+        {"id": "S12D-AC3", "text": "Counters do not perform repeated broad scene-tree searches each frame."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S12D"],
+      "allowed_paths": ["scripts/debug/*", "scripts/ui/*", "scenes/ui/*", "project.godot", "tests/*", "TASKS.json", "PROGRESS.md"]
+    },
+    {
+      "id": "S13A", "priority": 130, "title": "Run integration and lifecycle audit",
+      "status": "open", "dependencies": ["S12D"],
+      "objective": "Repair cross-system lifecycle defects and verify the playable vertical slice.",
+      "acceptance_criteria": [
+        {"id": "S13A-AC1", "text": "Import, startup, tests, and title-to-victory flow pass."},
+        {"id": "S13A-AC2", "text": "Repeated scene, death, pause, save, and victory cycles do not duplicate state."},
+        {"id": "S13A-AC3", "text": "Core systems have automated checks or explicit reproducible manual checks."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S13A"],
+      "allowed_paths": ["scripts/*", "scripts/**/*", "scenes/*", "scenes/**/*", "resources/*", "resources/**/*", "tests/*", "tools/validate.ps1", "TASKS.json", "PROGRESS.md", "ARCHITECTURE.md"]
+    },
+    {
+      "id": "S13B", "priority": 131, "title": "Finalize documentation and release baseline",
+      "status": "open", "dependencies": ["S13A"],
+      "objective": "Align durable documentation with the validated implementation and record known limitations.",
+      "acceptance_criteria": [
+        {"id": "S13B-AC1", "text": "README, architecture, testing, and progress documents match the build."},
+        {"id": "S13B-AC2", "text": "Required features are not represented by deceptive placeholders."},
+        {"id": "S13B-AC3", "text": "Known limitations, risky files, and release validation are recorded."},
+        {"id": "S13B-AC4", "text": "The final repository is clean and global validation passes."}
+      ],
+      "validation": ["powershell -NoProfile -File .\\tools\\validate-story.ps1 -StoryId S13B"],
+      "allowed_paths": ["README.md", "TESTING.md", "ARCHITECTURE.md", "PROGRESS.md", "TASKS.json", "tools/*"]
     }
   ]
 }
