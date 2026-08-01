@@ -48,6 +48,11 @@ func _try_fire() -> void:
 		_weapon_pivot.fire(muzzle, dir)
 
 
+func take_damage(info: DamageInfo) -> void:
+	if health_component:
+		health_component.take_damage(info)
+
+
 func apply_knockback(velocity: Vector2, duration: float) -> void:
 	if movement_controller:
 		movement_controller.apply_knockback(velocity, duration)

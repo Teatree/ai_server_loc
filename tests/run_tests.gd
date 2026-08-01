@@ -326,3 +326,90 @@ func _load_shambler_scene() -> Node:
 	return instance
 
 
+# --- S05C integration tests ---
+
+var _telegraph_fired: bool = false
+var _telegraph_damage_applied: bool = false
+
+func _test_pursuit_moves_toward_player() -> void:
+	var shambler: Node = _load_shambler_scene()
+	shambler.global_position = Vector2(0, 0)
+	shambler._sprite.scale = Vector2.ONE
+	shambler.sight_range = 200.0
+	shambler.chase_speed = 100.0
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(100, 0)
+	player.add_to_group("player")
+	add_child(player)
+	var start_pos: Vector2 = shambler.global_position
+	shambler._physics_process(0.1)
+	_assert(shambler._state == &"chase", "shambler should chase visible player")
+	shambler._physics_process(0.2)
+	_assert(shambler.global_position.x > start_pos.x, "shambler should move toward player")
+	player.queue_free()
+	shambler.queue_free()
+
+
+func _test_telegraph_before_attack() -> void:
+	var shambler: Node = _load_shambler_scene()
+	shambler.global_position = Vector2(0, 0)
+	shambler._sprite.scale = Vector2.ONE
+	shambler.attack_range = 100.0
+	shambler.attack_damage = 10.0
+	shambler.attack_telegraph_duration = 0.2
+	_telegraph_fired = false
+	_telegraph_damage_applied = false
+	shambler.attack_telegraph_started.connect(func(): _telegraph_fired = true)
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(30, 0)
+	player.add_to_group("player")
+	add_child(player)
+	shambler._physics_process(0.1)
+	_assert(shambler._state == &"attack_telegraph", "should enter telegraph state when in range")
+	_assert(_telegraph_fired, "telegraph signal should fire")
+	_assert(shambler._attack_timer > 0.0, "attack cooldown should be set after telegraph")
+	shambler.queue_free()
+	player.queue_free()
+
+
+func _test_shambler_damages_player() -> void:
+	var shambler: Node = _load_shambler_scene()
+	shambler.global_position = Vector2(0, 0)
+	shambler._sprite.scale = Vector2.ONE
+	shambler.attack_range = 100.0
+	shambler.attack_damage = 15.0
+	var player: CharacterBody2D = CharacterBody2D.new()
+	player.global_position = Vector2(30, 0)
+	player.add_to_group("player")
+	var health: HealthComponent = HealthComponent.new()
+	health.max_health = 100.0
+	player.add_child(health)
+	add_child(player)
+	shambler._physics_process(0.1)
+	_assert(shambler._state == &"attack_telegraph", "should telegraph first")
+	shambler._telegraph_timer = 0.0
+	shambler._physics_process(0.1)
+	_assert(health.current_health < 100.0, "player should take damage from shambler attack")
+	player.queue_free()
+	shambler.queue_free()
+
+
+func _test_pistol_kills_shambler() -> void:
+	var shambler: Node = _load_shambler_scene()
+	shambler.global_position = Vector2(0, 0)
+	shambler._sprite.scale = Vector2.ONE
+	var weapon: Pistol = Pistol.new()
+	weapon.add_to_group("weapon")
+	weapon.data = WeaponData.new()
+	weapon.data.damage = 100.0
+	weapon.data.fire_rate = 0.01
+	weapon.data.max_ammo = -1
+	add_child(weapon)
+	_assert(not shambler.health_component.is_dead, "shambler should start alive")
+	weapon.fire(shambler.global_position, Vector2.RIGHT)
+	weapon._process(0.02)
+	_assert(shambler.health_component.is_dead, "pistol shot should kill shambler")
+	weapon.queue_free()
+	shambler.queue_free()
+
+

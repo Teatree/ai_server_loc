@@ -2,6 +2,7 @@ extends CharacterBody2D
 class_name Shambler
 
 signal state_changed(state: StringName)
+signal attack_telegraph_started()
 
 @export var sight_range: float = 300.0
 @export var fov_degrees: float = 90.0
@@ -9,6 +10,7 @@ signal state_changed(state: StringName)
 @export var attack_range: float = 40.0
 @export var attack_damage: float = 10.0
 @export var attack_cooldown: float = 1.0
+@export var attack_telegraph_duration: float = 0.4
 @export var noise_memory_duration: float = 4.0
 @export var investigation_speed: float = 50.0
 
@@ -22,6 +24,7 @@ var _target: Node2D = null
 var _last_known_position: Vector2 = Vector2.ZERO
 var _noise_timer: float = 0.0
 var _attack_timer: float = 0.0
+var _telegraph_timer: float = 0.0
 var _stagger_timer: float = 0.0
 
 func _ready() -> void:
@@ -121,10 +124,22 @@ func _run_state(delta: float) -> void:
 				_approach(_target.global_position, chase_speed, delta)
 			else:
 				_set_state(&"investigate")
+		&"attack_telegraph":
+			velocity = Vector2.ZERO
+			_telegraph_timer -= delta
+			if _telegraph_timer <= 0.0:
+				_perform_attack()
+				_set_state(&"attack")
 		&"attack":
 			velocity = Vector2.ZERO
+			if _target and is_instance_valid(_target):
+				var dist: float = global_position.distance_to(_target.global_position)
+				if dist > attack_range:
+					_set_state(&"chase")
 			if _attack_timer <= 0.0:
-				_perform_attack()
+				_set_state(&"attack_telegraph")
+				_telegraph_timer = attack_telegraph_duration
+				attack_telegraph_started.emit()
 
 	move_and_slide()
 
@@ -171,6 +186,7 @@ func reset() -> void:
 	_last_known_position = Vector2.ZERO
 	_noise_timer = 0.0
 	_attack_timer = 0.0
+	_telegraph_timer = 0.0
 	_stagger_timer = 0.0
 	velocity = Vector2.ZERO
 	if health_component:
