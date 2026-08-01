@@ -3,11 +3,11 @@
 ## Current State
 
 - Active story: none
-- Last completed story: S01
+- Last completed story: S02
 - Validation baseline: established (godot-import and godot-startup pass)
 - Current build status: stable; project imports and starts headlessly
 - Current main scene: res://scenes/title_screen.tscn
-- Known repository state: GameFlow autoload manages scene transitions; placeholder level with basic player exists; pause menu implemented
+- Known repository state: MovementController component extracted; MovementConfig resource wired; player scene has horizontal locomotion with configurable ground/air acceleration and gravity
 
 This section should remain short. Update it at the end of each story.
 
@@ -127,6 +127,50 @@ Append one entry per story attempt. Do not rewrite or summarize away prior entri
 - Player scene at scenes/player/player.tscn with placeholder weapon
 - Placeholder level at scenes/levels/placeholder_level.tscn
 - run-story-loop.ps1 has unrelated pre-existing modifications (not committed as part of S01)
+
+## 2026-08-01 — S02 Implement basic player locomotion
+
+**Result:** done
+**Commit:** included in final story commit; see Git history
+**Files changed:**
+- project.godot
+- scripts/player/movement_controller.gd
+- scripts/player/player.gd
+- scenes/player/player.tscn
+
+**Implemented:**
+- Created MovementController component (scripts/player/movement_controller.gd) handling horizontal locomotion
+- Ground and air acceleration/deceleration are distinct and sourced from MovementConfig resource
+- Gravity and max_fall_speed applied when airborne
+- Facing direction updates via facing_changed signal; sprite scale.x flips accordingly
+- Added move_left, move_right, jump input map entries to project.godot
+- Player scene wired with MovementController node and MovementConfig resource
+
+**Validation:**
+- `powershell -ExecutionPolicy Bypass -File .\tools\validate.ps1` — pass
+- godot-import — pass
+- godot-startup — pass
+- Acceptance criteria — all 7 verified
+
+**Problems encountered:**
+- project.godot had pre-existing modification (M in git status); preserved without altering unrelated content
+- Initial scene export mismatch (movement_config vs movement_controller); corrected in player.tscn
+
+**Decisions:**
+- Movement logic extracted to dedicated MovementController node rather than keeping in player.gd
+- MovementConfig resource is the single source for all tunable locomotion values
+- Player.gd delegates _physics_process to MovementController and retains weapon/shoot behavior
+- Facing is communicated via signal to keep controller decoupled from sprite
+
+**Remaining work:**
+- S02B (advanced jumping): variable-height jump, coyote time, jump buffering
+- S02C (dodge, drop-through, knockback, respawn reset)
+
+**Context for next session:**
+- S02 done; S02B ready to start
+- MovementController at scripts/player/movement_controller.gd
+- MovementConfig resource at resources/movement/movement_config.tres
+- Player scene at scenes/player/player.tscn with MovementController child node
 
 ### Template
 

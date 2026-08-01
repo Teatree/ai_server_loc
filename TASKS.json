@@ -12,7 +12,7 @@
     "dependencies_must_be_done": true,
     "maximum_stories_per_session": 1
   },
-  "active_story_id": "S02",
+    "active_story_id": "",
   "status_values": [
     "open",
     "in_progress",
@@ -76,7 +76,7 @@
       "id": "S02",
       "priority": 20,
       "title": "Implement basic player locomotion",
-      "status": "in_progress",
+      "status": "done",
       "dependencies": [
         "S01"
       ],

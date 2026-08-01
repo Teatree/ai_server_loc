@@ -1,7 +1,9 @@
-[gd_scene load_steps=4 format=3 uid="uid://b_player"]
+[gd_scene load_steps=5 format=3 uid="uid://b_player"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_p"]
-[ext_resource type="Script" path="res://scripts/weapons/pistol_placeholder.gd" id="2_w"]
+[ext_resource type="Script" path="res://scripts/player/movement_controller.gd" id="2_m"]
+[ext_resource type="Script" path="res://scripts/weapons/pistol_placeholder.gd" id="3_w"]
+[ext_resource type="Resource" path="res://resources/movement/movement_config.tres" id="4_c"]
 
 [sub_resource type="RectangleShape2D" id="Rect2D_1"]
 size = Vector2(32, 48)
@@ -12,6 +14,11 @@ size = Vector2(32, 48)
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1_p")
 
+[node name="MovementController" type="Node" parent="."]
+script = ExtResource("2_m")
+config = ExtResource("4_c")
+body = NodePath("..")
+
 [node name="Sprite2D" type="Sprite2D" parent="."]
 texture = SubResource("PlaceholderTex_1")
 
@@ -20,7 +27,7 @@ shape = SubResource("Rect2D_1")
 
 [node name="WeaponPivot" type="Node2D" parent="."]
 position = Vector2(24, 0)
-script = ExtResource("2_w")
+script = ExtResource("3_w")
 
 [node name="Muzzle" type="Marker2D" parent="WeaponPivot"]
 position = Vector2(20, 0)
