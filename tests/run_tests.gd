@@ -10,6 +10,11 @@ func _ready() -> void:
 	_test_invulnerability_blocks_damage()
 	_test_entities_cannot_receive_damage_after_death()
 	_test_reset_clears_death_state()
+	_test_weapon_fire_rate_blocks_spam()
+	_test_ammo_never_negative()
+	_test_dry_fire_blocks_fire_when_ammo_zero()
+	_test_weapon_reset_restores_ammo()
+	_test_weapon_data_separate_from_movement()
 	_print_summary()
 	get_tree().quit(0 if _failed == 0 else 1)
 
@@ -76,3 +81,83 @@ func _assert(condition: bool, message: String) -> void:
 
 func _print_summary() -> void:
 	print("\nTests: ", _passed, " passed, ", _failed, " failed, ", _passed + _failed, " total")
+
+
+# --- S04 weapon tests ---
+
+var _weapon_fire_count: int = 0
+
+func _test_weapon_fire_rate_blocks_spam() -> void:
+	var data: WeaponData = WeaponData.new()
+	data.fire_rate = 0.3
+	data.max_ammo = -1
+	var weapon: WeaponBase = WeaponBase.new()
+	weapon.data = data
+	weapon.fired.connect(func(_w: WeaponBase, _o: Vector2, _d: Vector2): _weapon_fire_count += 1)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	_assert(weapon.can_fire() == false, "weapon should not fire immediately after shot")
+	weapon._process(0.2)
+	_assert(not weapon.can_fire(), "weapon should still be on cooldown at 0.2s")
+	weapon._process(0.15)
+	_assert(weapon.can_fire(), "weapon should be ready after fire_rate elapsed")
+	_assert(_weapon_fire_count == 1, "should have fired exactly once despite input spam")
+
+
+func _test_ammo_never_negative() -> void:
+	var data: WeaponData = WeaponData.new()
+	data.max_ammo = 5
+	data.ammo_per_shot = 1
+	data.fire_rate = 0.01
+	var weapon: WeaponBase = WeaponBase.new()
+	weapon.data = data
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	_assert(weapon.get_current_ammo() == 0, "ammo should be zero, not negative")
+	_assert(not weapon.can_fire(), "cannot fire with zero ammo")
+	weapon.add_ammo(3)
+	_assert(weapon.get_current_ammo() == 3, "add_ammo should restore ammo")
+
+
+func _test_dry_fire_blocks_fire_when_ammo_zero() -> void:
+	var data: WeaponData = WeaponData.new()
+	data.max_ammo = 2
+	data.ammo_per_shot = 1
+	data.fire_rate = 0.01
+	var weapon: WeaponBase = WeaponBase.new()
+	weapon.data = data
+	weapon._current_ammo = 0
+	var fired_count: int = 0
+	weapon.fired.connect(func(_w: WeaponBase, _o: Vector2, _d: Vector2): fired_count += 1)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	_assert(fired_count == 0, "should not fire when ammo is zero")
+	_assert(weapon.get_current_ammo() == 0, "ammo should remain at zero")
+
+
+func _test_weapon_reset_restores_ammo() -> void:
+	var data: WeaponData = WeaponData.new()
+	data.max_ammo = 10
+	data.fire_rate = 0.01
+	var weapon: WeaponBase = WeaponBase.new()
+	weapon.data = data
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.reset()
+	_assert(weapon.get_current_ammo() == 10, "reset should restore full ammo")
+	_assert(weapon.can_fire(), "weapon should be ready after reset")
+
+
+func _test_weapon_data_separate_from_movement() -> void:
+	var data: WeaponData = WeaponData.new()
+	_assert(data.weapon_id == "pistol", "weapon data has its own identity")
+	_assert(data.fire_rate > 0.0, "weapon data stores fire rate")
+	_assert(data.damage > 0.0, "weapon data stores damage")
+	_assert(data.max_ammo >= 0, "weapon data stores ammo cap")

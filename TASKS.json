@@ -12,7 +12,7 @@
     "dependencies_must_be_done": true,
     "maximum_stories_per_session": 1
   },
-    "active_story_id": null,
+    "active_story_id": "S04",
   "status_values": [
     "open",
     "in_progress",
@@ -188,7 +188,7 @@
       "id": "S04",
       "priority": 40,
       "title": "Implement the weapon framework and pistol",
-      "status": "open",
+      "status": "in_progress",
       "dependencies": [
         "S03"
       ],

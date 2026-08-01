@@ -1,10 +1,11 @@
-[gd_scene load_steps=5 format=3 uid="uid://b_player"]
+[gd_scene load_steps=7 format=3 uid="uid://b_player"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_p"]
 [ext_resource type="Script" path="res://scripts/player/movement_controller.gd" id="2_m"]
-[ext_resource type="Script" path="res://scripts/weapons/pistol_placeholder.gd" id="3_w"]
-[ext_resource type="Resource" path="res://resources/movement/movement_config.tres" id="4_c"]
-[ext_resource type="Script" path="res://scripts/core/health_component.gd" id="5_h"]
+[ext_resource type="Script" path="res://scripts/weapons/pistol.gd" id="3_w"]
+[ext_resource type="Script" path="res://scripts/weapons/aim_controller.gd" id="4_a"]
+[ext_resource type="Resource" path="res://resources/movement/movement_config.tres" id="5_c"]
+[ext_resource type="Script" path="res://scripts/core/health_component.gd" id="6_h"]
 
 [sub_resource type="RectangleShape2D" id="Rect2D_1"]
 size = Vector2(32, 48)
@@ -17,11 +18,11 @@ script = ExtResource("1_p")
 
 [node name="MovementController" type="Node" parent="."]
 script = ExtResource("2_m")
-config = ExtResource("4_c")
+config = ExtResource("5_c")
 body = NodePath("..")
 
 [node name="HealthComponent" type="Node" parent="."]
-script = ExtResource("5_h")
+script = ExtResource("6_h")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 texture = SubResource("PlaceholderTex_1")
@@ -29,9 +30,17 @@ texture = SubResource("PlaceholderTex_1")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("Rect2D_1")
 
+[node name="AimController" type="Node2D" parent="."]
+script = ExtResource("4_a")
+
 [node name="WeaponPivot" type="Node2D" parent="."]
 position = Vector2(24, 0)
 script = ExtResource("3_w")
 
 [node name="Muzzle" type="Marker2D" parent="WeaponPivot"]
 position = Vector2(20, 0)
+
+[node name="MuzzleRaycast" type="RayCast2D" parent="WeaponPivot"]
+enabled = true
+target_position = Vector2(50, 0)
+collision_mask = 1
