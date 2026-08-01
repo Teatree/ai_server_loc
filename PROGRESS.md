@@ -3,11 +3,11 @@
 ## Current State
 
 - Active story: none
-- Last completed story: S03
+- Last completed story: S04
 - Validation baseline: established (godot-import, godot-startup, and godot-tests pass)
 - Current build status: stable; project imports and starts headlessly
 - Current main scene: res://scenes/title_screen.tscn
-- Known repository state: HealthComponent and DamageInfo integrated into player; checkpoint/respawn system implemented; deterministic tests cover death-once and invulnerability
+- Known repository state: Weapon framework (WeaponData, WeaponBase, AimController, Pistol) implemented; projectile system added; player wired to fire via mouse/keyboard aim; deterministic tests cover fire-rate, ammo, and data separation
 
 This section should remain short. Update it at the end of each story.
 
@@ -306,6 +306,62 @@ Append one entry per story attempt. Do not rewrite or summarize away prior entri
 - Player has HealthComponent, MovementController, checkpoint respawn, and post-hit invulnerability
 - Checkpoint component at scripts/components/checkpoint.gd
 - Tests at tests/run_tests.gd run via scenes/tests/test_runner.tscn
+
+## 2026-08-01 — S04 Implement the weapon framework and pistol
+
+**Result:** done
+**Commit:** 8ff0577
+**Files changed:**
+- scripts/core/weapon_data.gd
+- scripts/weapons/weapon_base.gd
+- scripts/weapons/aim_controller.gd
+- scripts/weapons/pistol.gd
+- scripts/weapons/projectile.gd
+- scenes/player/player.tscn
+- scripts/player/player.gd
+- project.godot
+- tests/run_tests.gd
+- TASKS.json
+
+**Implemented:**
+- Created WeaponData resource class with typed parameters (fire_rate, ammo, damage, knockback, etc.)
+- Created WeaponBase abstract node with fire-rate cooldown, ammo tracking, state management, and reset
+- Created AimController supporting mouse aim, right-stick, and WASD keyboard fallback
+- Created Pistol concrete weapon replacing placeholder; supports horizontal, vertical, diagonal aiming
+- Muzzle obstruction check via RayCast2D before firing
+- Fire-rate enforced via _process timer; input spam cannot bypass
+- Ammo uses max(0, ...) to prevent negative values; dry-fire blocks firing when empty
+- Projectile is Area2D-based with configure() method for damage/knockback/velocity
+- Player scene wired with AimController and Pistol; fire input added to project.godot
+- player.gd delegates fire to weapon pivot with muzzle position and aim direction
+- 5 new deterministic tests added: fire-rate blocking, ammo non-negative, dry-fire blocking, reset restores ammo, data separation
+
+**Validation:**
+- `powershell -ExecutionPolicy Bypass -File .\tools\validate.ps1` — pass
+- godot-import — pass
+- godot-startup — pass
+- godot-tests — pass (22/22)
+- Acceptance criteria — all 6 verified
+
+**Problems encountered:**
+- `pistol_data.tres` parse error "Unrecognized file type 'resource'" — resolved by removing the resource file and creating data at runtime in pistol._ready()
+- `dry_fire` signal not emitting in test due to Node2D.new() not having _ready() called — resolved by testing the observable behavior (no fire, ammo stays at zero) instead of signal emission
+
+**Decisions:**
+- Weapon data created at runtime via WeaponData.new() rather than .tres file to avoid parse errors
+- Projectile instantiated by setting script on Node2D rather than PackedScene to keep data-driven without .tscn files
+- AimController is a Node2D child of player, updates aim every physics frame
+- MuzzleRaycast is RayCast2D child of WeaponPivot, checks 50 units forward for obstruction
+
+**Remaining work:**
+- S05 next: Shambler enemy, perception, and basic combat
+
+**Context for next session:**
+- S04 done; S05 ready to start
+- Weapon framework: WeaponData, WeaponBase, AimController, Pistol, Projectile
+- Player has AimController and Pistol as children of WeaponPivot
+- Fire input mapped in project.godot; aim_up/down/left/right for keyboard fallback
+- Tests at 22/22 passing
 
 ### Template
 
