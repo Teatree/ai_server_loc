@@ -40,7 +40,8 @@ func take_damage(damage_info: DamageInfo) -> void:
 			_death_emitted = true
 			died.emit(damage_info)
 	
-	start_invulnerability()
+	if not is_dead:
+		start_invulnerability()
 
 func start_invulnerability() -> void:
 	is_invulnerable = true

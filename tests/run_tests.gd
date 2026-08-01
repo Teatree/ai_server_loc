@@ -3,11 +3,14 @@ extends Node
 var _passed: int = 0
 var _failed: int = 0
 var _death_count: int = 0
+var _shambler_death_count: int = 0
+var _damaged_after_invulnerability: bool = false
+var _damaged_after_death: bool = false
 
 
 func _ready() -> void:
 	_test_death_emits_once()
-	_test_invulnerability_blocks_damage()
+	_test_damage_applies_after_invulnerability_expires()
 	_test_entities_cannot_receive_damage_after_death()
 	_test_reset_clears_death_state()
 	_test_weapon_fire_rate_blocks_spam()
@@ -40,17 +43,17 @@ func _test_death_emits_once() -> void:
 	_assert(_death_count == 1, "death should emit exactly once")
 
 
-func _test_invulnerability_blocks_damage() -> void:
+func _test_damage_applies_after_invulnerability_expires() -> void:
 	var health: HealthComponent = HealthComponent.new()
 	health.max_health = 10.0
 	health.current_health = 10.0
 	health.invulnerability_duration = 0.5
 	health.take_damage(DamageInfo.new(5.0))
 	health._process(0.6)
-	var damaged_after: bool = false
-	health.damaged.connect(func(_info: DamageInfo): damaged_after = true)
+	_damaged_after_invulnerability = false
+	health.damaged.connect(func(_info: DamageInfo): _damaged_after_invulnerability = true)
 	health.take_damage(DamageInfo.new(3.0))
-	_assert(not damaged_after, "damage should be blocked during invulnerability")
+	_assert(_damaged_after_invulnerability, "damage should apply after invulnerability expires")
 
 
 func _test_entities_cannot_receive_damage_after_death() -> void:
@@ -59,10 +62,10 @@ func _test_entities_cannot_receive_damage_after_death() -> void:
 	health.current_health = 10.0
 	health.take_damage(DamageInfo.new(15.0))
 	_assert(health.is_dead, "entity should be dead")
-	var damaged_after_death: bool = false
-	health.damaged.connect(func(_info: DamageInfo): damaged_after_death = true)
+	_damaged_after_death = false
+	health.damaged.connect(func(_info: DamageInfo): _damaged_after_death = true)
 	health.take_damage(DamageInfo.new(5.0))
-	_assert(not damaged_after_death, "damage should be ignored after death")
+	_assert(not _damaged_after_death, "damage should be ignored after death")
 
 
 func _test_reset_clears_death_state() -> void:
@@ -92,6 +95,7 @@ func _print_summary() -> void:
 # --- S04 weapon tests ---
 
 var _weapon_fire_count: int = 0
+var _weapon_fired_count: int = 0
 
 func _test_weapon_fire_rate_blocks_spam() -> void:
 	var data: WeaponData = WeaponData.new()
@@ -141,10 +145,10 @@ func _test_dry_fire_blocks_fire_when_ammo_zero() -> void:
 	var weapon: WeaponBase = WeaponBase.new()
 	weapon.data = data
 	weapon._current_ammo = 0
-	var fired_count: int = 0
-	weapon.fired.connect(func(_w: WeaponBase, _o: Vector2, _d: Vector2): fired_count += 1)
+	_weapon_fired_count = 0
+	weapon.fired.connect(func(_w: WeaponBase, _o: Vector2, _d: Vector2): _weapon_fired_count += 1)
 	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
-	_assert(fired_count == 0, "should not fire when ammo is zero")
+	_assert(_weapon_fired_count == 0, "should not fire when ammo is zero")
 	_assert(weapon.get_current_ammo() == 0, "ammo should remain at zero")
 
 
@@ -208,12 +212,12 @@ func _test_dead_enemy_ignores_noise() -> void:
 
 func _test_shambler_dies_once() -> void:
 	var shambler: Node = _load_shambler_scene()
-	var death_count: int = 0
-	shambler.health_component.died.connect(func(_info: DamageInfo): death_count += 1)
+	_shambler_death_count = 0
+	shambler.health_component.died.connect(func(_info: DamageInfo): _shambler_death_count += 1)
 	shambler.health_component.take_damage(DamageInfo.new(30.0))
 	shambler.health_component._process(0.3)
 	shambler.health_component.take_damage(DamageInfo.new(30.0))
-	_assert(death_count == 1, "death should emit exactly once")
+	_assert(_shambler_death_count == 1, "death should emit exactly once")
 	_assert(shambler._state == &"dead", "state should be dead")
 	shambler.queue_free()
 

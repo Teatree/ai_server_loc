@@ -20,7 +20,7 @@
     "two_phase_completion": true,
     "blocked_is_external_only": true
   },
-  "active_story_id": "S05A",
+  "active_story_id": "",
   "status_values": ["open", "in_progress", "ready_for_validation", "blocked", "done"],
   "stories": [
     {
@@ -60,7 +60,7 @@
     },
     {
       "id": "S05A", "priority": 50, "title": "Complete Shambler combat contracts and death lifecycle",
-      "status": "in_progress", "dependencies": ["S04"],
+      "status": "done", "dependencies": ["S04"],
       "objective": "Finish the existing Shambler foundation without expanding perception or navigation scope.",
       "acceptance_criteria": [
         {"id": "S05A-AC1", "text": "Idle, investigate, chase, attack, stagger, and dead states are explicit and reset safely."},

@@ -2,8 +2,8 @@
 
 ## Current State
 
-- Active story: S05A - Complete Shambler combat contracts and death lifecycle
-- Last completed story: S04
+- Active story: none
+- Last completed story: S05A - Complete Shambler combat contracts and death lifecycle
 - Validation baseline: established (godot-import, godot-startup, and godot-tests pass)
 - Current build status: stable; project imports and starts headlessly
 - Current main scene: res://scenes/title_screen.tscn
@@ -363,6 +363,41 @@ Append one entry per story attempt. Do not rewrite or summarize away prior entri
 - Player has AimController and Pistol as children of WeaponPivot
 - Fire input mapped in project.godot; aim_up/down/left/right for keyboard fallback
 - Tests at 22/22 passing
+
+## 2026-08-01 15:00 — S05A Complete Shambler combat contracts and death lifecycle (recovery pass 3)
+
+**Result:** done
+**Commit:** see Git history
+
+**Files changed:**
+- scripts/core/health_component.gd
+- tests/run_tests.gd
+
+**Implemented:**
+- Fixed `take_damage()` in HealthComponent: `start_invulnerability()` now only runs when the entity survives (`if not is_death`), preventing invulnerability from masking post-death damage checks.
+- Renamed `_test_invulnerability_blocks_damage` to `_test_damage_applies_after_invulnerability_expires` and corrected assertion to `_assert(_damaged_after_invulnerability, ...)` so the test matches its actual timing (waits past invulnerability expiry).
+
+**Validation:**
+- `powershell -NoProfile -File .\tools\validate-story.ps1 -StoryId S05A` — pass
+- godot-tests: 32/32 passed
+
+**Problems encountered:**
+- Previous pass had transient tool failure; no code changes from pass 2.
+- Test `_test_invulnerability_blocks_damage` had mismatched name/assertion: it waited 0.6s past 0.5s invulnerability then asserted damage should NOT apply — contradicting correct behavior.
+
+**Decisions:**
+- Invulnerability is a post-hit grace period only for surviving entities; dead entities remain vulnerable to damage checks via `is_dead` only.
+- Test renamed to match actual behavior rather than weakening the assertion.
+
+**Remaining work:**
+- Controller finalization (global validation and commit).
+
+**Context for next session:**
+- S05A ready_for_validation; all 4 acceptance criteria verified.
+- Shambler states (idle, investigate, chase, attack, stagger, dead) explicit and reset safely.
+- Dead enemies ignore later damage via `is_dead` check in `take_damage()`.
+- `receive_noise()` respects `is_dead` guard.
+- `reset()` restores idle state and clears all timers.
 
 ## 2026-08-01 - Loop recovery configuration
 
