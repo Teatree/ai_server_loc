@@ -4,6 +4,7 @@
 [ext_resource type="Script" path="res://scripts/player/movement_controller.gd" id="2_m"]
 [ext_resource type="Script" path="res://scripts/weapons/pistol_placeholder.gd" id="3_w"]
 [ext_resource type="Resource" path="res://resources/movement/movement_config.tres" id="4_c"]
+[ext_resource type="Script" path="res://scripts/core/health_component.gd" id="5_h"]
 
 [sub_resource type="RectangleShape2D" id="Rect2D_1"]
 size = Vector2(32, 48)
@@ -18,6 +19,9 @@ script = ExtResource("1_p")
 script = ExtResource("2_m")
 config = ExtResource("4_c")
 body = NodePath("..")
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("5_h")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 texture = SubResource("PlaceholderTex_1")

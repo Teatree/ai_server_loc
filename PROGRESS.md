@@ -3,11 +3,11 @@
 ## Current State
 
 - Active story: none
-- Last completed story: S02C
-- Validation baseline: established (godot-import and godot-startup pass)
+- Last completed story: S03
+- Validation baseline: established (godot-import, godot-startup, and godot-tests pass)
 - Current build status: stable; project imports and starts headlessly
 - Current main scene: res://scenes/title_screen.tscn
-- Known repository state: MovementController now implements dodge, drop-through, knockback, input locking, and complete respawn reset; dodge has duration/cooldown; knockback overrides movement temporarily
+- Known repository state: HealthComponent and DamageInfo integrated into player; checkpoint/respawn system implemented; deterministic tests cover death-once and invulnerability
 
 This section should remain short. Update it at the end of each story.
 
@@ -255,6 +255,57 @@ Append one entry per story attempt. Do not rewrite or summarize away prior entri
 - S02C done; S03 ready to start
 - MovementController supports full locomotion: ground/air movement, jumping, dodge, knockback, drop-through, input lock
 - MovementConfig now has `one_way_platform_layer` export
+
+## 2026-08-01 — S03 Implement health, damage, death, and checkpoint respawn
+
+**Result:** done
+**Commit:** included in final story commit; see Git history
+**Files changed:**
+- scripts/components/checkpoint.gd
+- scripts/core/damage_info.gd
+- scripts/player/player.gd
+- scenes/player/player.tscn
+- scenes/levels/placeholder_level.tscn
+- scenes/tests/test_runner.tscn
+- tests/run_tests.gd
+- scripts/game/placeholder_level.gd
+- tools/validate.ps1
+
+**Implemented:**
+- Created Checkpoint component (Area2D) that emits activated position when player enters
+- Integrated HealthComponent into player scene with `@onready` wiring
+- Player death triggers respawn at last activated checkpoint
+- `respawn()` restores position, health, movement state, and grants temporary invulnerability
+- `set_checkpoint()` updates respawn origin; placeholder_level wires checkpoint signal to player
+- Added deterministic unit tests: death-once, invulnerability blocks damage, post-death immunity, reset clears death state
+- Updated validate.ps1 to run tests via headless scene execution (`--quit-after 5`)
+
+**Validation:**
+- `powershell -ExecutionPolicy Bypass -File .\tools\validate.ps1` — pass
+- godot-import — pass
+- godot-startup — pass
+- godot-tests — pass (7/7)
+- Acceptance criteria — all 6 verified
+
+**Problems encountered:**
+- `--script` mode in headless Godot hangs without exiting; resolved by switching to `--scene` with `--quit-after`
+- `@export` on Resource-derived classes caused parse errors in headless mode; changed to plain `var` in DamageInfo
+- Lambda capture of local `int` counter failed in test signals; resolved by using class-member `_death_count`
+
+**Decisions:**
+- Checkpoint uses Area2D with group-based activation to stay decoupled from player type
+- Player uses `@onready` for child component references to avoid null checks and inspector assignments
+- Test runner is a minimal scene so `--quit-after` works reliably in headless validation
+- DamageInfo properties are plain vars instead of exports because Resource exports caused parse errors
+
+**Remaining work:**
+- S04 next: weapon framework and pistol
+
+**Context for next session:**
+- S03 done; S04 ready to start
+- Player has HealthComponent, MovementController, checkpoint respawn, and post-hit invulnerability
+- Checkpoint component at scripts/components/checkpoint.gd
+- Tests at tests/run_tests.gd run via scenes/tests/test_runner.tscn
 
 ### Template
 

@@ -86,15 +86,16 @@ Invoke-GodotCheck -Name "godot-startup" -Arguments @(
     "--quit-after", "$StartupFrames"
 )
 
-$testRunner = Join-Path $root "tests\run_tests.gd"
+$testRunner = Join-Path $root "scenes\tests\test_runner.tscn"
 if (Test-Path $testRunner) {
     Invoke-GodotCheck -Name "godot-tests" -Arguments @(
         "--headless",
         "--path", $root,
-        "--script", "res://tests/run_tests.gd"
+        "--scene", "res://scenes/tests/test_runner.tscn",
+        "--quit-after", "5"
     )
 } else {
-    Write-Host "`nNo tests\run_tests.gd found; automated logic tests skipped." -ForegroundColor Yellow
+    Write-Host "`nNo test runner scene found; automated logic tests skipped." -ForegroundColor Yellow
 }
 
 Write-Host "`nAll configured validation checks passed." -ForegroundColor Green

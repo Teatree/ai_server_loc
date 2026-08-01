@@ -12,7 +12,7 @@
     "dependencies_must_be_done": true,
     "maximum_stories_per_session": 1
   },
-    "active_story_id": "",
+    "active_story_id": null,
   "status_values": [
     "open",
     "in_progress",
@@ -160,7 +160,7 @@
       "id": "S03",
       "priority": 30,
       "title": "Implement health, damage, death, and checkpoint respawn",
-      "status": "open",
+      "status": "done",
       "dependencies": [
         "S02C"
       ],

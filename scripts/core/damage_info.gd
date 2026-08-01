@@ -8,13 +8,13 @@ enum DamageType {
 	ENVIRONMENTAL
 }
 
-@export var amount: float = 0.0
-@export var damage_type: DamageType = DamageType.BALLISTIC
-@export var source: Node = null
-@export var hit_position: Vector2 = Vector2.ZERO
-@export var hit_direction: Vector2 = Vector2.RIGHT
-@export var knockback: float = 0.0
-@export var is_critical: bool = false
+var amount: float = 0.0
+var damage_type: DamageType = DamageType.BALLISTIC
+var source: Node = null
+var hit_position: Vector2 = Vector2.ZERO
+var hit_direction: Vector2 = Vector2.RIGHT
+var knockback: float = 0.0
+var is_critical: bool = false
 func _init(
 	p_amount: float = 0.0,
 	p_type: DamageType = DamageType.BALLISTIC,
