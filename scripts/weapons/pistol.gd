@@ -47,6 +47,10 @@ func _spawn_projectile(origin: Vector2, direction: Vector2) -> void:
 	proj.global_position = origin
 	if proj.has_method("configure"):
 		proj.configure(data.damage, data.knockback, direction * data.projectile_speed, get_parent())
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	shape.shape = CircleShape2D.new()
+	shape.shape.radius = 2.0
+	proj.add_child(shape)
 	get_tree().root.add_child.call_deferred(proj)
 
 func _find_muzzle() -> Marker2D:

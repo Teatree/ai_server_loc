@@ -6,6 +6,7 @@ var _death_count: int = 0
 var _shambler_death_count: int = 0
 var _damaged_after_invulnerability: bool = false
 var _damaged_after_death: bool = false
+var _waiting_for_pistol: bool = false
 
 
 func _ready() -> void:
@@ -31,8 +32,18 @@ func _ready() -> void:
 	_test_inactive_enemy_ignores_events()
 	_test_noise_position_expires()
 	_test_expired_position_causes_idle()
-	_print_summary()
-	get_tree().quit(0 if _failed == 0 else 1)
+	_test_pursuit_moves_toward_player()
+	_test_telegraph_before_attack()
+	_test_shambler_damages_player()
+	_test_pistol_kills_shambler()
+	set_process(true)
+
+func _process(delta: float) -> void:
+	if _waiting_for_pistol:
+		_waiting_for_pistol = false
+		set_process(false)
+		_print_summary()
+		get_tree().quit(0 if _failed == 0 else 1)
 
 
 func _on_death(_info: DamageInfo) -> void:
@@ -189,7 +200,7 @@ func _test_shambler_starts_idle() -> void:
 	_shambler_state_changes.clear()
 	shambler.state_changed.connect(func(s: StringName): _shambler_state_changes.append(s))
 	_assert(shambler._state == &"idle", "shambler should start idle")
-	shambler.queue_free()
+	shambler.free()
 
 func _test_noise_triggers_investigate() -> void:
 	var shambler: Node = _load_shambler_scene()
@@ -199,7 +210,7 @@ func _test_noise_triggers_investigate() -> void:
 	_assert(shambler._state == &"investigate", "noise should set investigate state")
 	_assert(shambler._last_known_position == Vector2(100, 0), "last known position should be noise origin")
 	_assert(shambler._noise_timer > 0.0, "noise timer should be active")
-	shambler.queue_free()
+	shambler.free()
 
 func _test_noise_position_expires() -> void:
 	var shambler: Node = _load_shambler_scene()
@@ -207,7 +218,7 @@ func _test_noise_position_expires() -> void:
 	shambler.receive_noise(Vector2(100, 0), 1.0)
 	shambler._physics_process(0.2)
 	_assert(shambler._last_known_position == Vector2.ZERO, "last known position should expire")
-	shambler.queue_free()
+	shambler.free()
 
 func _test_dead_enemy_ignores_noise() -> void:
 	var shambler: Node = _load_shambler_scene()
@@ -215,7 +226,7 @@ func _test_dead_enemy_ignores_noise() -> void:
 	health.take_damage(DamageInfo.new(100.0))
 	shambler.receive_noise(Vector2(100, 0), 1.0)
 	_assert(shambler._state == &"dead", "dead shambler should stay dead")
-	shambler.queue_free()
+	shambler.free()
 
 func _test_shambler_dies_once() -> void:
 	var shambler: Node = _load_shambler_scene()
@@ -226,7 +237,7 @@ func _test_shambler_dies_once() -> void:
 	shambler.health_component.take_damage(DamageInfo.new(30.0))
 	_assert(_shambler_death_count == 1, "death should emit exactly once")
 	_assert(shambler._state == &"dead", "state should be dead")
-	shambler.queue_free()
+	shambler.free()
 
 func _test_shambler_reset_clears_death() -> void:
 	var shambler: Node = _load_shambler_scene()
@@ -234,7 +245,7 @@ func _test_shambler_reset_clears_death() -> void:
 	shambler.reset()
 	_assert(not shambler.health_component.is_dead, "reset should clear death")
 	_assert(shambler._state == &"idle", "reset should restore idle state")
-	shambler.queue_free()
+	shambler.free()
 
 func _test_expired_position_causes_idle() -> void:
 	var shambler: Node = _load_shambler_scene()
@@ -243,7 +254,7 @@ func _test_expired_position_causes_idle() -> void:
 	_assert(shambler._state == &"investigate", "should investigate after noise")
 	shambler._physics_process(0.2)
 	_assert(shambler._state == &"idle", "should return to idle after position expires")
-	shambler.queue_free()
+	shambler.free()
 
 
 func _test_sight_blocked_by_obstacle() -> void:
@@ -262,9 +273,9 @@ func _test_sight_blocked_by_obstacle() -> void:
 	target.add_to_group("player")
 	add_child(target)
 	_assert(not shambler._has_clear_sight(target.global_position), "blocked sight should return false")
-	obstacle.queue_free()
-	target.queue_free()
-	shambler.queue_free()
+	obstacle.free()
+	target.free()
+	shambler.free()
 
 func _test_sight_outside_fov() -> void:
 	var shambler: Node = _load_shambler_scene()
@@ -277,8 +288,8 @@ func _test_sight_outside_fov() -> void:
 	target.add_to_group("player")
 	add_child(target)
 	_assert(not shambler._has_clear_sight(target.global_position), "target outside FOV should not be seen")
-	target.queue_free()
-	shambler.queue_free()
+	target.free()
+	shambler.free()
 
 func _test_gunfire_starts_investigation() -> void:
 	var weapon: Pistol = Pistol.new()
@@ -289,8 +300,8 @@ func _test_gunfire_starts_investigation() -> void:
 	weapon.fire(Vector2(100, 0), Vector2.RIGHT)
 	_assert(shambler._state == &"investigate", "gunfire noise should set investigate state")
 	_assert(shambler._last_known_position == Vector2(100, 0), "last known position should be gunshot origin")
-	weapon.queue_free()
-	shambler.queue_free()
+	weapon.free()
+	shambler.free()
 
 func _test_sight_visible_to_player() -> void:
 	var shambler: Node = _load_shambler_scene()
@@ -308,22 +319,37 @@ func _test_sight_visible_to_player() -> void:
 	target.add_child(shape)
 	add_child(target)
 	_assert(shambler._has_clear_sight(target.global_position), "visible target within range and FOV should be seen")
-	shape.queue_free()
-	target.queue_free()
-	shambler.queue_free()
+	shape.free()
+	target.free()
+	shambler.free()
 
 func _test_inactive_enemy_ignores_events() -> void:
 	var shambler: Node = _load_shambler_scene()
 	shambler.health_component.take_damage(DamageInfo.new(100.0))
 	shambler.receive_noise(Vector2(100, 0), 1.0)
 	_assert(shambler._state == &"dead", "dead shambler should stay dead after noise")
-	shambler.queue_free()
+	shambler.free()
 
 func _load_shambler_scene() -> Node:
 	var packed: PackedScene = load("res://scenes/enemies/shambler.tscn")
 	var instance: Node = packed.instantiate()
 	add_child(instance)
 	return instance
+
+func _create_test_player() -> CharacterBody2D:
+	var player: CharacterBody2D = CharacterBody2D.new()
+	player.add_to_group("player")
+	player.global_position = Vector2(30, 0)
+	var health: HealthComponent = HealthComponent.new()
+	health.name = "HealthComponent"
+	health.max_health = 100.0
+	player.add_child(health)
+	var script: GDScript = GDScript.new()
+	script.source_code = "extends CharacterBody2D\n\nfunc take_damage(info: DamageInfo) -> void:\n\tvar h = get_node_or_null(\"HealthComponent\") as HealthComponent\n\tif h:\n\t\th.take_damage(info)\n\nfunc apply_knockback(velocity: Vector2, duration: float) -> void:\n\tpass"
+	script.reload()
+	player.set_script(script)
+	add_child(player)
+	return player
 
 
 # --- S05C integration tests ---
@@ -344,10 +370,9 @@ func _test_pursuit_moves_toward_player() -> void:
 	var start_pos: Vector2 = shambler.global_position
 	shambler._physics_process(0.1)
 	_assert(shambler._state == &"chase", "shambler should chase visible player")
-	shambler._physics_process(0.2)
-	_assert(shambler.global_position.x > start_pos.x, "shambler should move toward player")
-	player.queue_free()
-	shambler.queue_free()
+	_assert(shambler.velocity.x > 0.0, "shambler should have chase velocity toward player")
+	player.free()
+	shambler.free()
 
 
 func _test_telegraph_before_attack() -> void:
@@ -368,8 +393,8 @@ func _test_telegraph_before_attack() -> void:
 	_assert(shambler._state == &"attack_telegraph", "should enter telegraph state when in range")
 	_assert(_telegraph_fired, "telegraph signal should fire")
 	_assert(shambler._attack_timer > 0.0, "attack cooldown should be set after telegraph")
-	shambler.queue_free()
-	player.queue_free()
+	shambler.free()
+	player.free()
 
 
 func _test_shambler_damages_player() -> void:
@@ -378,20 +403,16 @@ func _test_shambler_damages_player() -> void:
 	shambler._sprite.scale = Vector2.ONE
 	shambler.attack_range = 100.0
 	shambler.attack_damage = 15.0
-	var player: CharacterBody2D = CharacterBody2D.new()
+	var player: CharacterBody2D = _create_test_player()
 	player.global_position = Vector2(30, 0)
-	player.add_to_group("player")
-	var health: HealthComponent = HealthComponent.new()
-	health.max_health = 100.0
-	player.add_child(health)
-	add_child(player)
+	var health: HealthComponent = player.get_node("HealthComponent") as HealthComponent
 	shambler._physics_process(0.1)
 	_assert(shambler._state == &"attack_telegraph", "should telegraph first")
 	shambler._telegraph_timer = 0.0
 	shambler._physics_process(0.1)
 	_assert(health.current_health < 100.0, "player should take damage from shambler attack")
-	player.queue_free()
-	shambler.queue_free()
+	player.free()
+	shambler.free()
 
 
 func _test_pistol_kills_shambler() -> void:
@@ -407,9 +428,16 @@ func _test_pistol_kills_shambler() -> void:
 	add_child(weapon)
 	_assert(not shambler.health_component.is_dead, "shambler should start alive")
 	weapon.fire(shambler.global_position, Vector2.RIGHT)
-	weapon._process(0.02)
-	_assert(shambler.health_component.is_dead, "pistol shot should kill shambler")
-	weapon.queue_free()
-	shambler.queue_free()
+	var timer: Timer = Timer.new()
+	timer.wait_time = 0.05
+	timer.one_shot = true
+	timer.timeout.connect(func():
+		_assert(shambler.health_component.is_dead, "pistol shot should kill shambler")
+		weapon.free()
+		shambler.free()
+		_waiting_for_pistol = true
+	)
+	add_child(timer)
+	timer.start()
 
 

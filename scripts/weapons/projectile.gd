@@ -8,6 +8,12 @@ var source: Node = null
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
+	area_entered.connect(_on_area_entered)
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	shape.shape = CircleShape2D.new()
+	shape.shape.radius = 2.0
+	add_child(shape)
+	_check_initial_overlaps()
 
 func _physics_process(delta: float) -> void:
 	global_position += velocity * delta
@@ -24,6 +30,23 @@ func _on_body_entered(body: Node2D) -> void:
 	if body.is_in_group("enemy") or body.is_in_group("player"):
 		_resolve_hit(body)
 	queue_free()
+
+func _on_area_entered(area: Node) -> void:
+	if area.is_in_group("enemy") or area.is_in_group("player"):
+		_resolve_hit(area)
+	queue_free()
+
+func _check_initial_overlaps() -> void:
+	for body: Node2D in get_overlapping_bodies():
+		if body.is_in_group("enemy") or body.is_in_group("player"):
+			_resolve_hit(body)
+			queue_free()
+			return
+	for area: Area2D in get_overlapping_areas():
+		if area.is_in_group("enemy") or area.is_in_group("player"):
+			_resolve_hit(area)
+			queue_free()
+			return
 
 func _resolve_hit(target: Node) -> void:
 	if target.has_method("take_damage"):

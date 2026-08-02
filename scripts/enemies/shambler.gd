@@ -73,10 +73,11 @@ func _update_perception() -> void:
 			if abs(angle_to_target) < deg_to_rad(fov_degrees * 0.5) and _has_clear_sight(_target.global_position):
 				_last_known_position = _target.global_position
 				_noise_timer = noise_memory_duration
-				if dist <= attack_range:
-					_set_state(&"attack")
-				else:
-					_set_state(&"chase")
+				if _state != &"attack_telegraph":
+					if dist <= attack_range:
+						_set_state(&"attack")
+					else:
+						_set_state(&"chase")
 				return
 
 	if _last_known_position != Vector2.ZERO and _noise_timer > 0.0:
@@ -139,6 +140,7 @@ func _run_state(delta: float) -> void:
 			if _attack_timer <= 0.0:
 				_set_state(&"attack_telegraph")
 				_telegraph_timer = attack_telegraph_duration
+				_attack_timer = attack_cooldown
 				attack_telegraph_started.emit()
 
 	move_and_slide()
@@ -170,9 +172,10 @@ func _on_damaged(info: DamageInfo) -> void:
 func _on_died(info: DamageInfo) -> void:
 	_set_state(&"dead")
 	velocity = Vector2.ZERO
-	_collision.disabled = true
+	if _collision:
+		_collision.set_deferred("disabled", true)
 	if _raycast:
-		_raycast.enabled = false
+		_raycast.set_deferred("enabled", false)
 
 func _set_state(new_state: StringName) -> void:
 	if _state == new_state:
@@ -202,6 +205,10 @@ func receive_noise(position: Vector2, strength: float) -> void:
 	_last_known_position = position
 	_noise_timer = noise_memory_duration * clamp(strength, 0.5, 1.0)
 	_set_state(&"investigate")
+
+func take_damage(info: DamageInfo) -> void:
+	if health_component:
+		health_component.take_damage(info)
 
 func is_active() -> bool:
 	return _state != &"dead"
