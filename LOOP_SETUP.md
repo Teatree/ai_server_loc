@@ -29,12 +29,12 @@ Run the unattended loop:
 .\run-full-story-loop.cmd
 ```
 
-Ralph owns PRD status, starts a fresh OpenCode session for every iteration, and
-reopens any story that omits the completion signal. The local completion patch also
-runs `tools/ralph-story-gate.ps1`; no-commit runs always leave the story open.
-Runtime logs are under `.ralph/runs/`. Regenerate the PRD only for an intentional
-migration with `tools/convert-tasks-to-ralph.ps1`; regeneration resets unfinished
-Ralph stories to `open`.
+Ralph owns PRD status and locks one story as `in_progress`. A normal model stop
+without a terminal signal triggers up to three continuations of the exact same
+OpenCode session before Ralph starts a recovery iteration. Completion still requires
+`tools/ralph-story-gate.ps1`; the model cannot mark a story done by assertion alone.
+Readable logs, raw OpenCode JSONL events, and run diagnostics are under
+`.ralph/runs/`. Regenerate the PRD only for an intentional migration.
 
 ## 1. Remove the globally installed Ralph CLI
 
@@ -140,16 +140,19 @@ Keep your existing provider configuration. Recommended compaction setting for th
 }
 ```
 
-The resolved `evox2/step-3.7-flash` model must expose at least:
+The resolved `evox2/step-3.7-flash` model should expose the context actually
+allocated by llama-server. Keep the two values consistent; do not change context as
+a recovery tactic for a prematurely ending worker. Example:
 
 ```json
 "limit": {
-  "context": 250000
+  "context": <your-server-context>
 }
 ```
 
-Keep llama-server at the same ceiling. The loop preflight rejects a lower OpenCode
-limit, but it cannot inspect the remote server allocation.
+The loop cannot inspect the remote server allocation. It now records structured
+OpenCode finish and tool-error events so context failures can be distinguished from
+ordinary model stops.
 
 A minimal project-level example is included as `opencode.project.example.json`. Merge it manually; do not overwrite your working provider configuration.
 

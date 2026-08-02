@@ -19,9 +19,12 @@ PROGRESS_PATH=".ralph/progress.md"
 # PRD_AGENT_CMD defaults are defined in agents.sh (interactive).
 # PRD_AGENT_CMD="codex --yolo --skip-git-repo-check {prompt}"
 # AGENT_CMD="claude -p --dangerously-skip-permissions \"\$(cat {prompt})\""
-AGENT_CMD="opencode run --pure --model evox2/step-3.7-flash --agent build --dir . --auto \"\$(cat {prompt})\""
+AGENT_CMD="opencode run --pure --format json --model evox2/step-3.7-flash --agent build --dir . --auto \"\$(cat {prompt})\""
+AGENT_CONTINUE_CMD="opencode run --pure --format json --model evox2/step-3.7-flash --agent build --dir . --auto --session {session} \"\$(cat {prompt})\""
+AGENT_OUTPUT_JSON=true
+SAME_SESSION_CONTINUATIONS=3
 AGENTS_PATH=".agents/ralph/AGENTS_RALPH.md"
 # PROMPT_BUILD=".agents/ralph/PROMPT_build.md"
 # NO_COMMIT=false
 MAX_ITERATIONS=500
-STALE_SECONDS=60
+STALE_SECONDS=0

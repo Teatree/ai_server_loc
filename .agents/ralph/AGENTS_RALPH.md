@@ -13,9 +13,12 @@
 - Limit each write/edit tool call to 60 lines and about 6,000 characters.
 - After malformed tool output, retry at one quarter of the payload size.
 - Run every selected-story validation command and every global quality gate.
-- A failed test is ordinary unfinished work: diagnose it and omit COMPLETE.
+- A failed test is ordinary unfinished work: diagnose it and continue using tools.
+- Never end immediately after a tool failure; correct the call or change strategy in the same session.
+- Never repeat an identical failed tool call when its error provides corrective evidence.
 - In recovery mode, do not end after reproducing an unchanged failure; follow the required diagnosis-and-edit procedure.
 - Only emit `<promise>COMPLETE</promise>` when all criteria and checks pass.
+- Emit `<promise>BLOCKED</promise>` only for a proven external condition that cannot be repaired in scope.
 - Never start a second story in the same OpenCode session.
 - In no-commit mode, leave all work uncommitted.
 - In normal mode, commit only selected-story files after validation.

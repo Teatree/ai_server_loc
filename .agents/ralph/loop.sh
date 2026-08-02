@@ -27,6 +27,7 @@ DEFAULT_RUNS_DIR=".ralph/runs"
 DEFAULT_GUARDRAILS_REF=".agents/ralph/references/GUARDRAILS.md"
 DEFAULT_CONTEXT_REF=".agents/ralph/references/CONTEXT_ENGINEERING.md"
 DEFAULT_ACTIVITY_CMD=".agents/ralph/log-activity.sh"
+DEFAULT_EVENT_RENDERER="tools/ralph-opencode-stream.py"
 if [[ -n "${RALPH_ROOT:-}" ]]; then
   agents_path="$RALPH_ROOT/.agents/ralph/agents.sh"
 else
@@ -40,6 +41,7 @@ fi
 DEFAULT_MAX_ITERATIONS=25
 DEFAULT_NO_COMMIT=false
 DEFAULT_STALE_SECONDS=0
+DEFAULT_SAME_SESSION_CONTINUATIONS=3
 PRD_REQUEST_PATH=""
 PRD_INLINE=""
 
@@ -83,7 +85,11 @@ RUNS_DIR="${RUNS_DIR:-$DEFAULT_RUNS_DIR}"
 GUARDRAILS_REF="${GUARDRAILS_REF:-$DEFAULT_GUARDRAILS_REF}"
 CONTEXT_REF="${CONTEXT_REF:-$DEFAULT_CONTEXT_REF}"
 ACTIVITY_CMD="${ACTIVITY_CMD:-$DEFAULT_ACTIVITY_CMD}"
+EVENT_RENDERER="${EVENT_RENDERER:-$DEFAULT_EVENT_RENDERER}"
 AGENT_CMD="${AGENT_CMD:-$DEFAULT_AGENT_CMD}"
+AGENT_CONTINUE_CMD="${AGENT_CONTINUE_CMD:-}"
+AGENT_OUTPUT_JSON="${AGENT_OUTPUT_JSON:-false}"
+SAME_SESSION_CONTINUATIONS="${SAME_SESSION_CONTINUATIONS:-$DEFAULT_SAME_SESSION_CONTINUATIONS}"
 MAX_ITERATIONS="${MAX_ITERATIONS:-$DEFAULT_MAX_ITERATIONS}"
 NO_COMMIT="${NO_COMMIT:-$DEFAULT_NO_COMMIT}"
 STALE_SECONDS="${STALE_SECONDS:-$DEFAULT_STALE_SECONDS}"
@@ -111,6 +117,7 @@ RUNS_DIR="$(abs_path "$RUNS_DIR")"
 GUARDRAILS_REF="$(abs_path "$GUARDRAILS_REF")"
 CONTEXT_REF="$(abs_path "$CONTEXT_REF")"
 ACTIVITY_CMD="$(abs_path "$ACTIVITY_CMD")"
+EVENT_RENDERER="$(abs_path "$EVENT_RENDERER")"
 
 require_agent() {
   local agent_cmd="${1:-$AGENT_CMD}"
@@ -153,6 +160,53 @@ run_agent() {
   fi
 }
 
+run_agent_continue() {
+  local prompt_file="$1"
+  local session_id="$2"
+  if [ -z "$AGENT_CONTINUE_CMD" ]; then
+    echo "AGENT_CONTINUE_CMD is not configured." >&2
+    return 2
+  fi
+  local escaped_prompt escaped_session cmd
+  escaped_prompt=$(printf '%q' "$prompt_file")
+  escaped_session=$(printf '%q' "$session_id")
+  cmd="${AGENT_CONTINUE_CMD//\{prompt\}/$escaped_prompt}"
+  cmd="${cmd//\{session\}/$escaped_session}"
+  eval "$cmd"
+}
+
+run_agent_logged() {
+  local prompt_file="$1"
+  local log_file="$2"
+  local raw_log="$3"
+  local append="${4:-false}"
+  local session_id="${5:-}"
+  local -a render_args=(--raw-log "$raw_log")
+  local -a tee_args=()
+  if [ "$append" = "true" ]; then
+    render_args+=(--append)
+    tee_args+=(-a)
+  fi
+  if [ "$AGENT_OUTPUT_JSON" = "true" ]; then
+    if [ -n "$session_id" ]; then
+      run_agent_continue "$prompt_file" "$session_id" 2>&1 |
+        python3 "$EVENT_RENDERER" "${render_args[@]}" | tee "${tee_args[@]}" "$log_file"
+    else
+      run_agent "$prompt_file" 2>&1 |
+        python3 "$EVENT_RENDERER" "${render_args[@]}" | tee "${tee_args[@]}" "$log_file"
+    fi
+    local status=${PIPESTATUS[0]}
+    return "$status"
+  fi
+  if [ -n "$session_id" ]; then
+    run_agent_continue "$prompt_file" "$session_id" 2>&1 | tee "${tee_args[@]}" "$log_file"
+  else
+    run_agent "$prompt_file" 2>&1 | tee "${tee_args[@]}" "$log_file"
+  fi
+  local status=${PIPESTATUS[0]}
+  return "$status"
+}
+
 run_agent_inline() {
   local prompt_file="$1"
   local prompt_content
@@ -166,6 +220,53 @@ run_agent_inline() {
     cmd="$cmd '$escaped'"
   fi
   eval "$cmd"
+}
+
+session_id_from_log() {
+  python3 - "$1" <<'PY'
+import json, sys
+from pathlib import Path
+path = Path(sys.argv[1])
+if path.exists():
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            value = json.loads(line).get("sessionID", "")
+        except Exception:
+            continue
+        if value:
+            print(value)
+            break
+PY
+}
+
+workspace_signature() {
+  {
+    git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || true
+    git -C "$ROOT_DIR" status --porcelain=v1 2>/dev/null || true
+    git -C "$ROOT_DIR" diff --binary HEAD -- 2>/dev/null || true
+  } | sha256sum | awk '{print $1}'
+}
+
+write_continuation_prompt() {
+  local path="$1"
+  local story_id="$2"
+  local attempt="$3"
+  local progress_note="$4"
+  cat > "$path" <<EOF
+Continue work on $story_id in this same session. You ended your previous response
+before the story passed its required validation. This is continuation $attempt.
+
+$progress_note
+
+Do not summarize, apologize, or merely reread the same files. Resume the unfinished
+implementation now. If a tool failed, use its error to correct the arguments or use
+discovery to find the exact path; never repeat an identical failed call. Make a
+targeted story-scoped edit, run the smallest relevant check, then run all required
+validation. Continue using tools until the story is verified complete or a genuine
+external blocker is proven. A failing test, uncertain diagnosis, or edit error is not
+a blocker. Emit <promise>COMPLETE</promise> only after validation passes. Emit
+<promise>BLOCKED</promise> only for an external condition you cannot repair.
+EOF
 }
 
 MODE="build"
@@ -514,18 +615,24 @@ with prd_path.open("r+", encoding="utf-8") as fh:
                     story["completedAt"] = None
                     story["updatedAt"] = now_iso()
 
-        candidate = None
-        for story in stories:
-            if not isinstance(story, dict):
-                continue
-            if normalize_status(story.get("status")) != "open":
-                continue
-            deps = story.get("dependsOn") or []
-            if not isinstance(deps, list):
-                deps = []
-            if all(is_done(dep) for dep in deps):
-                candidate = story
-                break
+        active = [
+            story for story in stories
+            if isinstance(story, dict)
+            and normalize_status(story.get("status")) == "in_progress"
+        ]
+        candidate = active[0] if active else None
+        if candidate is None:
+            for story in stories:
+                if not isinstance(story, dict):
+                    continue
+                if normalize_status(story.get("status")) != "open":
+                    continue
+                deps = story.get("dependsOn") or []
+                if not isinstance(deps, list):
+                    deps = []
+                if all(is_done(dep) for dep in deps):
+                    candidate = story
+                    break
 
         remaining = sum(
             1 for story in stories
@@ -758,7 +865,7 @@ handle_interrupt() {
   trap - INT TERM
   if [ -n "$CURRENT_STORY_ID" ]; then
     recovery_action "Interrupt" "$CURRENT_STORY_ID" "" "$RUN_TAG" "$CURRENT_ITERATION" 0 >/dev/null || true
-    update_story_status "$CURRENT_STORY_ID" "open" || true
+    update_story_status "$CURRENT_STORY_ID" "in_progress" || true
     log_error "ITERATION $CURRENT_ITERATION interrupted; recovery state preserved for $CURRENT_STORY_ID"
     log_activity "ITERATION $CURRENT_ITERATION interrupted (story=$CURRENT_STORY_ID)"
   fi
@@ -863,6 +970,55 @@ write_run_meta() {
   } > "$path"
 }
 
+append_agent_diagnostics() {
+  local run_meta="$1"
+  local raw_log="$2"
+  local continuations="$3"
+  python3 - "$run_meta" "$raw_log" "$continuations" <<'PY'
+import json, sys
+from pathlib import Path
+meta, raw = Path(sys.argv[1]), Path(sys.argv[2])
+events = []
+if raw.exists():
+    for line in raw.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            events.append(json.loads(line))
+        except Exception:
+            pass
+sessions = []
+tools = errors = text_events = 0
+finish = "not reported"
+for event in events:
+    sid = event.get("sessionID")
+    if sid and sid not in sessions:
+        sessions.append(sid)
+    kind = event.get("type")
+    if kind == "tool_use":
+        tools += 1
+        if ((event.get("part") or {}).get("state") or {}).get("status") == "error":
+            errors += 1
+    elif kind == "text":
+        text_events += 1
+    elif kind == "error":
+        errors += 1
+    elif kind == "step_finish":
+        part = event.get("part") or {}
+        finish = str(part.get("reason") or part.get("finish") or finish)
+lines = [
+    "", "## Agent Diagnostics",
+    f"- Raw events: {raw}",
+    f"- Session: {sessions[0] if sessions else '(not captured)'}",
+    f"- Same-session continuations: {sys.argv[3]}",
+    f"- Tool results: {tools}",
+    f"- Tool/session errors: {errors}",
+    f"- Text responses: {text_events}",
+    f"- Last finish reason: {finish}", "",
+]
+with meta.open("a", encoding="utf-8", newline="\n") as handle:
+    handle.write("\n".join(lines))
+PY
+}
+
 git_head() {
   if git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || true
@@ -943,7 +1099,9 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   HEAD_BEFORE="$(git_head)"
   PROMPT_RENDERED="$TMP_DIR/prompt-$RUN_TAG-$i.md"
   LOG_FILE="$RUNS_DIR/run-$RUN_TAG-iter-$i.log"
+  RAW_LOG_FILE="$RUNS_DIR/run-$RUN_TAG-iter-$i.jsonl"
   RUN_META="$RUNS_DIR/run-$RUN_TAG-iter-$i.md"
+  CONTINUATIONS_USED=0
   RECOVERY_PACKET=""
   if [ "$MODE" = "build" ]; then
     RECOVERY_PACKET="$(recovery_action "Prepare" "$STORY_ID" "" "$RUN_TAG" "$i" 0)"
@@ -960,12 +1118,48 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     echo "[RALPH_DRY_RUN] Skipping agent execution." | tee "$LOG_FILE"
     CMD_STATUS=0
   else
-    run_agent "$PROMPT_RENDERED" 2>&1 | tee "$LOG_FILE"
+    run_agent_logged "$PROMPT_RENDERED" "$LOG_FILE" "$RAW_LOG_FILE" false ""
     CMD_STATUS=$?
   fi
   set -e
   if [ "$CMD_STATUS" -eq 130 ] || [ "$CMD_STATUS" -eq 143 ]; then
     handle_interrupt "$CMD_STATUS"
+  fi
+  if [ "$MODE" = "build" ] && [ "$CMD_STATUS" -eq 0 ] &&
+     ! grep -qE '<promise>(COMPLETE|BLOCKED)</promise>' "$LOG_FILE" &&
+     [ "$SAME_SESSION_CONTINUATIONS" -gt 0 ] && [ "${RALPH_DRY_RUN:-}" != "1" ]; then
+    SESSION_ID="$(session_id_from_log "$RAW_LOG_FILE")"
+    if [ -z "$SESSION_ID" ]; then
+      log_error "ITERATION $i could not capture an OpenCode session ID; continuation skipped"
+    else
+      PREVIOUS_SIGNATURE="$(workspace_signature)"
+      PROGRESS_NOTE="No terminal signal was produced. Continue the current implementation."
+      for continuation in $(seq 1 "$SAME_SESSION_CONTINUATIONS"); do
+        CONT_PROMPT="$TMP_DIR/continue-$RUN_TAG-$i-$continuation.md"
+        write_continuation_prompt "$CONT_PROMPT" "$STORY_ID" "$continuation" "$PROGRESS_NOTE"
+        log_activity "ITERATION $i continuation $continuation (session=$SESSION_ID)"
+        set +e
+        run_agent_logged "$CONT_PROMPT" "$LOG_FILE" "$RAW_LOG_FILE" true "$SESSION_ID"
+        CONT_STATUS=$?
+        set -e
+        CONTINUATIONS_USED=$continuation
+        if [ "$CONT_STATUS" -ne 0 ]; then
+          CMD_STATUS=$CONT_STATUS
+          log_error "ITERATION $i continuation $continuation failed (status=$CONT_STATUS)"
+          break
+        fi
+        if grep -qE '<promise>(COMPLETE|BLOCKED)</promise>' "$LOG_FILE"; then
+          break
+        fi
+        CURRENT_SIGNATURE="$(workspace_signature)"
+        if [ "$CURRENT_SIGNATURE" = "$PREVIOUS_SIGNATURE" ]; then
+          PROGRESS_NOTE="The previous continuation made no workspace change. Diagnose the earliest failing assertion and make a targeted edit before ending again."
+        else
+          PROGRESS_NOTE="The workspace changed, but the story is still unverified. Inspect the diff and validation result, then continue repairing it."
+        fi
+        PREVIOUS_SIGNATURE="$CURRENT_SIGNATURE"
+      done
+    fi
   fi
   ITER_END=$(date +%s)
   ITER_END_FMT=$(date '+%Y-%m-%d %H:%M:%S')
@@ -994,14 +1188,14 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       log_error "ITERATION $i exited non-zero; review $LOG_FILE"
       RECOVERY_RESULT="$(recovery_action "Record" "$STORY_ID" "$LOG_FILE" "$RUN_TAG" "$i" 0)"
       log_error "ITERATION $i recovery: $RECOVERY_RESULT"
-      update_story_status "$STORY_ID" "open"
-      echo "Iteration failed; story reset to open."
+      update_story_status "$STORY_ID" "in_progress"
+      echo "Iteration failed; active story remains in progress."
     elif grep -q "<promise>COMPLETE</promise>" "$LOG_FILE"; then
       if powershell -NoProfile -File ./tools/ralph-story-gate.ps1 -PrdPath "$PRD_PATH" -StoryId "$STORY_ID" -StartCommit "$HEAD_BEFORE" 2>&1 | tee -a "$LOG_FILE"; then
         if [ "$NO_COMMIT" = "true" ]; then
           STATUS_LABEL="validated_no_commit"
-          update_story_status "$STORY_ID" "open"
-          echo "Validated no-commit run; story left open."
+          update_story_status "$STORY_ID" "in_progress"
+          echo "Validated no-commit run; active story remains in progress."
         else
           STATUS_LABEL="complete"
           update_story_status "$STORY_ID" "done"
@@ -1013,17 +1207,24 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
         HAS_ERROR="true"
         RECOVERY_RESULT="$(recovery_action "Record" "$STORY_ID" "$LOG_FILE" "$RUN_TAG" "$i" 0)"
         log_error "ITERATION $i gate failure recovery: $RECOVERY_RESULT"
-        update_story_status "$STORY_ID" "open"
-        echo "Independent gate failed; story reset to open."
+        update_story_status "$STORY_ID" "in_progress"
+        echo "Independent gate failed; active story remains in progress."
       fi
+    elif grep -q "<promise>BLOCKED</promise>" "$LOG_FILE"; then
+      STATUS_LABEL="blocked_reported"
+      RECOVERY_RESULT="$(recovery_action "Record" "$STORY_ID" "$LOG_FILE" "$RUN_TAG" "$i" 3)"
+      log_error "ITERATION $i model reported blocked; independent recovery required: $RECOVERY_RESULT"
+      update_story_status "$STORY_ID" "in_progress"
+      echo "Model reported a blocker; active story remains in progress for recovery."
     else
       STATUS_LABEL="incomplete"
       RECOVERY_RESULT="$(recovery_action "Record" "$STORY_ID" "$LOG_FILE" "$RUN_TAG" "$i" 0)"
       log_error "ITERATION $i incomplete: $RECOVERY_RESULT"
-      update_story_status "$STORY_ID" "open"
-      echo "No completion signal; recovery state recorded and story reset to open."
+      update_story_status "$STORY_ID" "in_progress"
+      echo "No completion signal after continuations; recovery recorded and active story retained."
     fi
     write_run_meta "$RUN_META" "$MODE" "$i" "$RUN_TAG" "$STORY_ID" "$STORY_TITLE" "$ITER_START_FMT" "$ITER_END_FMT" "$ITER_DURATION" "$STATUS_LABEL" "$LOG_FILE" "$HEAD_BEFORE" "$HEAD_AFTER" "$COMMIT_LIST" "$CHANGED_FILES" "$DIRTY_FILES" "$RECOVERY_RESULT"
+    append_agent_diagnostics "$RUN_META" "$RAW_LOG_FILE" "$CONTINUATIONS_USED"
     append_run_summary "$(date '+%Y-%m-%d %H:%M:%S') | run=$RUN_TAG | iter=$i | mode=$MODE | story=$STORY_ID | duration=${ITER_DURATION}s | status=$STATUS_LABEL"
     REMAINING="$(remaining_from_prd)"
     echo "Iteration $i complete. Remaining stories: $REMAINING"

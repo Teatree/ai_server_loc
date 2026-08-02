@@ -44,6 +44,10 @@ If the story details are empty or missing, STOP and report that the PRD story fo
 - Implement completely; no placeholders or stubs.
 - If No-commit is true, do NOT commit or push changes.
 - Do NOT edit the PRD JSON (status is handled by the loop).
+- Do not voluntarily end the response while the story is incomplete. Continue with tools.
+- A failed test, failed edit, bad path, or uncertain diagnosis is not a blocker.
+- After a tool error, correct its arguments or change discovery strategy in this same run.
+- Never repeat an identical failed tool call; use its error output as new evidence.
 - All story-owned changes must be committed, including valid same-story carryover from earlier iterations.
 - Before committing, perform a final **security**, **performance**, and **regression** review of your changes.
 
@@ -104,12 +108,19 @@ Only output the completion signal when the **selected story** is fully complete 
 When the selected story is complete, output:
 <promise>COMPLETE</promise>
 
-Otherwise, end normally without the signal.
+If a genuine external condition makes further progress impossible, record the exact
+evidence and smallest required outside action, then output:
+<promise>BLOCKED</promise>
 
-An incomplete run must still make useful progress. Do not merely reread files and reproduce
-an already-recorded validation failure. When recovery mode is active, follow its mandatory
-procedure and make a targeted story-scoped change unless evidence proves the existing test
-or acceptance criterion is incorrect; record that evidence when this exception applies.
+Do not output an ordinary terminal response while neither signal is justified. Keep
+working with tools. Inspection, reproducing a known failure, or making an unverified
+edit is not a valid stopping point.
+
+Before any terminal response, the run must have produced a targeted edit plus focused
+validation, eliminated a failing assertion, demonstrated a new root cause with concrete
+evidence, or proven a genuine external blocker. When recovery mode is active, follow its
+mandatory procedure and make a targeted story-scoped change unless evidence proves the
+test or acceptance criterion is incorrect; record that evidence when this applies.
 
 ## Additional Guardrails
 - When authoring documentation, capture the why (tests + implementation intent).
