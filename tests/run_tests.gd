@@ -36,6 +36,11 @@ func _ready() -> void:
 	_test_telegraph_before_attack()
 	_test_shambler_damages_player()
 	_test_pistol_kills_shambler()
+	_test_exit_zone_exists_in_level()
+	_test_platforms_are_physically_distinct()
+	_test_platforms_are_visually_distinct()
+	_test_checkpoint_activates_and_respawns()
+	_test_entry_to_exit_route_is_traversable()
 	set_process(true)
 
 func _process(delta: float) -> void:
@@ -419,12 +424,13 @@ func _test_pistol_kills_shambler() -> void:
 	var shambler: Node = _load_shambler_scene()
 	shambler.global_position = Vector2(0, 0)
 	shambler._sprite.scale = Vector2.ONE
+	var data: WeaponData = WeaponData.new()
+	data.damage = 100.0
+	data.fire_rate = 0.01
+	data.max_ammo = -1
 	var weapon: Pistol = Pistol.new()
 	weapon.add_to_group("weapon")
-	weapon.data = WeaponData.new()
-	weapon.data.damage = 100.0
-	weapon.data.fire_rate = 0.01
-	weapon.data.max_ammo = -1
+	weapon.data = data
 	add_child(weapon)
 	_assert(not shambler.health_component.is_dead, "shambler should start alive")
 	weapon.fire(shambler.global_position, Vector2.RIGHT)
@@ -439,5 +445,129 @@ func _test_pistol_kills_shambler() -> void:
 	)
 	add_child(timer)
 	timer.start()
+
+
+# --- S06A arena traversal and checkpoint tests ---
+
+func _test_exit_zone_exists_in_level() -> void:
+	var level: Node2D = _load_level_scene()
+	var exit_zone: Area2D = level.get_node_or_null("ExitZone") as Area2D
+	_assert(exit_zone != null, "level should contain an ExitZone node")
+	var shape: CollisionShape2D = exit_zone.get_node_or_null("CollisionShape2D") as CollisionShape2D if exit_zone else null
+	_assert(shape != null and shape.shape is RectangleShape2D, "ExitZone should have a RectangleShape2D")
+	level.free()
+
+
+func _test_platforms_are_physically_distinct() -> void:
+	var level: Node2D = _load_level_scene()
+	var static_bodies: Array[Node] = _find_nodes_by_type(level, "StaticBody2D")
+	var one_way_areas: Array[Node] = _find_nodes_by_type(level, "Area2D")
+	_assert(static_bodies.size() > 0, "level should have static body platforms")
+	_assert(one_way_areas.size() > 0, "level should have one-way platform areas")
+	var has_platform_layer: bool = false
+	for area in one_way_areas:
+		if area.name.begins_with("OneWay"):
+			has_platform_layer = has_platform_layer or (area.collision_layer & 7) != 0
+			var shapes: Array = _find_nodes_by_type(area, "CollisionShape2D")
+			_assert(shapes.size() > 0, "one-way platform %s should have CollisionShape2D" % area.name)
+	_assert(has_platform_layer, "one-way platforms should use the platforms physics layer (7)")
+	for body in static_bodies:
+		if body.name.begins_with("Ground") or body.name.begins_with("Elevated"):
+			_assert(body.collision_layer == 1, "static platform %s should use world layer (1)" % body.name)
+	level.free()
+
+
+func _test_platforms_are_visually_distinct() -> void:
+	var level: Node2D = _load_level_scene()
+	var static_platforms: Array[Node] = []
+	var one_way_platforms: Array[Node] = []
+	for child in level.get_children():
+		if child is StaticBody2D:
+			static_platforms.append(child)
+		elif child is Area2D and child.name.begins_with("OneWay"):
+			one_way_platforms.append(child)
+	_assert(static_platforms.size() > 0, "should have static platforms")
+	_assert(one_way_platforms.size() > 0, "should have one-way platforms")
+	var static_colors: Array[Color] = []
+	for plat in static_platforms:
+		var rect: ColorRect = plat.get_node_or_null("ColorRect") as ColorRect
+		if rect:
+			static_colors.append(rect.color)
+	var one_way_colors: Array[Color] = []
+	for plat in one_way_platforms:
+		var rect: ColorRect = plat.get_node_or_null("ColorRect") as ColorRect
+		if rect:
+			one_way_colors.append(rect.color)
+	_assert(static_colors.size() > 0 and one_way_colors.size() > 0, "both platform types should have color rects")
+	var all_different: bool = true
+	for sc in static_colors:
+		for oc in one_way_colors:
+			if sc == oc:
+				all_different = false
+	_assert(all_different, "static and one-way platform colors should be visually distinct")
+	level.free()
+
+
+func _test_checkpoint_activates_and_respawns() -> void:
+	var level: Node2D = _load_level_scene()
+	var checkpoint: Checkpoint = level.get_node_or_null("Checkpoint") as Checkpoint
+	_assert(checkpoint != null, "level should contain a Checkpoint node")
+	var player: CharacterBody2D = level.get_node_or_null("Player") as CharacterBody2D
+	_assert(player != null, "level should contain a Player node")
+	_assert(player.has_method("set_checkpoint"), "player should expose set_checkpoint")
+	_assert(player.has_method("respawn"), "player should expose respawn")
+	checkpoint.activated.emit(checkpoint.global_position)
+	_assert(player._last_checkpoint == checkpoint.global_position, "checkpoint activation should update player respawn position")
+	player.global_position = Vector2(9999, 9999)
+	var mc: MovementController = MovementController.new()
+	mc.body = player
+	player.movement_controller = mc
+	player.respawn()
+	_assert(player.global_position == checkpoint.global_position, "respawn should teleport to checkpoint position")
+	_assert(player._respawn_invulnerability > 0.0, "respawn should grant invulnerability")
+	level.free()
+
+
+func _test_entry_to_exit_route_is_traversable() -> void:
+	var level: Node2D = _load_level_scene()
+	var ground1: StaticBody2D = level.get_node_or_null("Ground1") as StaticBody2D
+	var ground2: StaticBody2D = level.get_node_or_null("Ground2") as StaticBody2D
+	var elev1: StaticBody2D = level.get_node_or_null("ElevatedPlatform1") as StaticBody2D
+	var elev2: StaticBody2D = level.get_node_or_null("ElevatedPlatform2") as StaticBody2D
+	var elev3: StaticBody2D = level.get_node_or_null("ElevatedPlatform3") as StaticBody2D
+	var exit_zone: Area2D = level.get_node_or_null("ExitZone") as Area2D
+	_assert(ground1 != null, "entry ground platform should exist")
+	_assert(ground2 != null, "exit ground platform should exist")
+	_assert(elev1 != null, "first elevated platform should exist")
+	_assert(elev2 != null, "second elevated platform should exist")
+	_assert(elev3 != null, "third elevated platform should exist")
+	_assert(exit_zone != null, "exit zone should exist")
+	var elev1_right := elev1.position.x + 100.0
+	var elev2_right := elev2.position.x + 100.0
+	var elev3_right := elev3.position.x + 100.0
+	_assert(elev1_right <= elev2.position.x or elev2.position.y < elev1.position.y, "route should progress via elevation or rightward")
+	_assert(elev2_right <= elev3.position.x or elev3.position.y < elev2.position.y, "route should progress via elevation or rightward")
+	_assert(elev3.position.x < exit_zone.position.x, "exit should be reachable from final platform")
+	level.free()
+
+
+func _load_level_scene() -> Node2D:
+	var packed: PackedScene = load("res://scenes/levels/placeholder_level.tscn")
+	var instance: Node2D = packed.instantiate()
+	add_child(instance)
+	return instance
+
+
+func _find_nodes_by_type(parent: Node, type_name: String) -> Array[Node]:
+	var result: Array[Node] = []
+	_collect_nodes_by_type(parent, type_name, result)
+	return result
+
+
+func _collect_nodes_by_type(parent: Node, type_name: String, out: Array[Node]) -> void:
+	for child in parent.get_children():
+		if child.get_class() == type_name:
+			out.append(child)
+		_collect_nodes_by_type(child, type_name, out)
 
 

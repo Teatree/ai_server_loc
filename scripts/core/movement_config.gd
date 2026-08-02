@@ -34,7 +34,7 @@ class_name MovementConfig
 @export_group("Platforms")
 @export var drop_through_speed: float = 50.0
 @export var moving_platform_lerp: float = 15.0
-@export var one_way_platform_layer: int = 3
+@export var one_way_platform_layer: int = 7
 
 @export_group("Hit Stun")
 @export var hit_stun_duration: float = 0.25

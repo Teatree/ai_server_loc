@@ -4,37 +4,158 @@
 [ext_resource type="Script" path="res://scripts/game/placeholder_level.gd" id="2_l"]
 [ext_resource type="Script" path="res://scripts/components/checkpoint.gd" id="3_c"]
 
-[sub_resource type="RectangleShape2D" id="Rect2D_ground"]
-size = Vector2(1400, 40)
+[sub_resource type="RectangleShape2D" id="Rect2D_ground1"]
+size = Vector2(500, 40)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_ground2"]
+size = Vector2(580, 40)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_elevated1"]
+size = Vector2(200, 20)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_elevated2"]
+size = Vector2(200, 20)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_elevated3"]
+size = Vector2(200, 20)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_oneway1"]
+size = Vector2(170, 10)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_oneway2"]
+size = Vector2(200, 10)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_oneway3"]
+size = Vector2(200, 10)
 
 [sub_resource type="RectangleShape2D" id="Rect2D_checkpoint"]
 size = Vector2(40, 40)
 
+[sub_resource type="RectangleShape2D" id="Rect2D_exit"]
+size = Vector2(120, 80)
+
 [node name="PlaceholderLevel" type="Node2D"]
 script = ExtResource("2_l")
 
-[node name="Ground" type="StaticBody2D" parent="."]
-position = Vector2(640, 680)
+[node name="Ground1" type="StaticBody2D" parent="."]
+position = Vector2(300, 680)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
-shape = SubResource("Rect2D_ground")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground1"]
+shape = SubResource("Rect2D_ground1")
 
-[node name="ColorRect" type="ColorRect" parent="Ground"]
-offset_left = -700.0
+[node name="ColorRect" type="ColorRect" parent="Ground1"]
+offset_left = -250.0
 offset_top = -20.0
-offset_right = 700.0
+offset_right = 250.0
 offset_bottom = 20.0
 color = Color(0.2, 0.2, 0.25, 1)
 
-[node name="PlayerSpawn" type="Marker2D" parent="."]
-position = Vector2(200, 600)
+[node name="Ground2" type="StaticBody2D" parent="."]
+position = Vector2(990, 680)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground2"]
+shape = SubResource("Rect2D_ground2")
+
+[node name="ColorRect" type="ColorRect" parent="Ground2"]
+offset_left = -290.0
+offset_top = -20.0
+offset_right = 290.0
+offset_bottom = 20.0
+color = Color(0.2, 0.2, 0.25, 1)
+
+[node name="ElevatedPlatform1" type="StaticBody2D" parent="."]
+position = Vector2(300, 520)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ElevatedPlatform1"]
+shape = SubResource("Rect2D_elevated1")
+
+[node name="ColorRect" type="ColorRect" parent="ElevatedPlatform1"]
+offset_left = -100.0
+offset_top = -10.0
+offset_right = 100.0
+offset_bottom = 10.0
+color = Color(0.35, 0.25, 0.15, 1)
+
+[node name="ElevatedPlatform2" type="StaticBody2D" parent="."]
+position = Vector2(730, 400)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ElevatedPlatform2"]
+shape = SubResource("Rect2D_elevated2")
+
+[node name="ColorRect" type="ColorRect" parent="ElevatedPlatform2"]
+offset_left = -100.0
+offset_top = -10.0
+offset_right = 100.0
+offset_bottom = 10.0
+color = Color(0.35, 0.25, 0.15, 1)
+
+[node name="ElevatedPlatform3" type="StaticBody2D" parent="."]
+position = Vector2(1100, 280)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ElevatedPlatform3"]
+shape = SubResource("Rect2D_elevated3")
+
+[node name="ColorRect" type="ColorRect" parent="ElevatedPlatform3"]
+offset_left = -100.0
+offset_top = -10.0
+offset_right = 100.0
+offset_bottom = 10.0
+color = Color(0.35, 0.25, 0.15, 1)
+
+[node name="OneWayPlatform1" type="Area2D" parent="."]
+position = Vector2(565, 600)
+collision_layer = 7
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="OneWayPlatform1"]
+shape = SubResource("Rect2D_oneway1")
+
+[node name="ColorRect" type="ColorRect" parent="OneWayPlatform1"]
+offset_left = -85.0
+offset_top = -5.0
+offset_right = 85.0
+offset_bottom = 5.0
+color = Color(0.2, 0.5, 0.9, 0.7)
+
+[node name="OneWayPlatform2" type="Area2D" parent="."]
+position = Vector2(730, 480)
+collision_layer = 7
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="OneWayPlatform2"]
+shape = SubResource("Rect2D_oneway2")
+
+[node name="ColorRect" type="ColorRect" parent="OneWayPlatform2"]
+offset_left = -100.0
+offset_top = -5.0
+offset_right = 100.0
+offset_bottom = 5.0
+color = Color(0.2, 0.5, 0.9, 0.7)
+
+[node name="OneWayPlatform3" type="Area2D" parent="."]
+position = Vector2(1100, 360)
+collision_layer = 7
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="OneWayPlatform3"]
+shape = SubResource("Rect2D_oneway3")
+
+[node name="ColorRect" type="ColorRect" parent="OneWayPlatform3"]
+offset_left = -100.0
+offset_top = -5.0
+offset_right = 100.0
+offset_bottom = 5.0
+color = Color(0.2, 0.5, 0.9, 0.7)
 
 [node name="Checkpoint" type="Area2D" parent="."]
-position = Vector2(600, 600)
+position = Vector2(300, 500)
 script = ExtResource("3_c")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Checkpoint"]
 shape = SubResource("Rect2D_checkpoint")
+
+[node name="PlayerSpawn" type="Marker2D" parent="."]
+position = Vector2(200, 600)
 
 [node name="Player" parent="." instance=ExtResource("1_p")]
 position = Vector2(200, 600)
@@ -52,3 +173,12 @@ offset_top = -60.0
 offset_right = 140.0
 offset_bottom = -20.0
 text = "Return to Title"
+
+[node name="ExitZone" type="Area2D" parent="."]
+position = Vector2(1220, 300)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ExitZone"]
+shape = SubResource("Rect2D_exit")
+
+[node name="ExitMarker" type="Marker2D" parent="."]
+position = Vector2(1220, 260)
