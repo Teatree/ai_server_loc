@@ -1,5 +1,8 @@
 extends Node
 
+const RIFLE_DATA_SCRIPT = preload("res://scripts/weapons/rifle_data.gd")
+const AUTOMATIC_RIFLE_SCRIPT = preload("res://scripts/weapons/automatic_rifle.gd")
+
 var _passed: int = 0
 var _failed: int = 0
 var _death_count: int = 0
@@ -22,6 +25,9 @@ func _ready() -> void:
 	_test_shotgun_emits_configured_pellet_count_and_spread()
 	_test_shotgun_damage_knockback_ammo_cooldown_bounded()
 	_test_shotgun_empty_magazine_behavior()
+	_test_automatic_rifle_fires_at_cadence_when_held()
+	_test_rifle_recoil_accumulates_and_recovers()
+	_test_rifle_reload_and_switching_preserve_ammo()
 	_test_shambler_starts_idle()
 	_test_noise_triggers_investigate()
 	_test_noise_position_expires()
@@ -293,6 +299,128 @@ func _test_shotgun_empty_magazine_behavior() -> void:
 	_assert(weapon.get_current_ammo() == 0, "ammo should remain zero")
 
 	weapon.free()
+
+
+# --- S07C Automatic Rifle tests ---
+
+func _test_automatic_rifle_fires_at_cadence_when_held() -> void:
+	var data: WeaponData = RIFLE_DATA_SCRIPT.new()
+	data.fire_rate = 0.1
+	data.max_ammo = 10
+	data.reserve_ammo = 20
+	data.automatic = true
+	var weapon: WeaponBase = AUTOMATIC_RIFLE_SCRIPT.new()
+	weapon.data = data
+	add_child(weapon)
+
+	_assert(data.automatic, "rifle data should be marked automatic")
+
+	var initial_ammo: int = weapon.get_current_ammo()
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.1)
+	_assert(weapon.get_current_ammo() == initial_ammo - 1, "rifle should fire once after fire_rate")
+
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.1)
+	_assert(weapon.get_current_ammo() == initial_ammo - 2, "rifle should fire twice at cadence")
+
+	weapon._process(0.05)
+	_assert(weapon.get_current_ammo() == initial_ammo - 2, "rifle should not fire before cooldown expires")
+
+	weapon.free()
+
+
+func _test_rifle_recoil_accumulates_and_recovers() -> void:
+	var data: WeaponData = RIFLE_DATA_SCRIPT.new()
+	data.fire_rate = 0.01
+	data.max_ammo = -1
+	data.recoil_kick = 5.0
+	data.recoil_recovery = 10.0
+	var weapon: WeaponBase = AUTOMATIC_RIFLE_SCRIPT.new()
+	weapon.data = data
+	add_child(weapon)
+
+	_assert(weapon.get_recoil() == 0.0, "recoil should start at zero")
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	_assert(weapon.get_recoil() == 5.0, "recoil should increase by kick after first shot")
+	weapon._process(0.1)
+	_assert(weapon.get_recoil() == 4.0, "recoil should recover over time")
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	_assert(weapon.get_recoil() == 9.0, "recoil should accumulate with second shot")
+	weapon._process(0.5)
+	_assert(weapon.get_recoil() == 4.0, "recoil should recover over longer time")
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	_assert(weapon.get_recoil() >= 0.0, "recoil should remain non-negative")
+	var limit: float = data.recoil_kick * 10.0
+	_assert(weapon.get_recoil() <= limit, "recoil should not exceed configured limit")
+
+	weapon._process(6.0)
+	_assert(weapon.get_recoil() == 0.0, "recoil should fully recover after enough time")
+
+	weapon.free()
+
+
+func _test_rifle_reload_and_switching_preserve_ammo() -> void:
+	var data: WeaponData = RIFLE_DATA_SCRIPT.new()
+	data.max_ammo = 30
+	data.reserve_ammo = 60
+	data.fire_rate = 0.01
+	var data_b: WeaponData = RIFLE_DATA_SCRIPT.new()
+	data_b.weapon_id = "rifle_2"
+	data_b.display_name = "Rifle 2"
+	data_b.max_ammo = 20
+	data_b.reserve_ammo = 40
+	data_b.fire_rate = 0.01
+	var player: CharacterBody2D = _create_inventory_player([data, data_b])
+	var original_weapon: WeaponBase = player._weapon_pivot as WeaponBase
+	var rifle: WeaponBase = AUTOMATIC_RIFLE_SCRIPT.new()
+	rifle.name = "WeaponPivot"
+	add_child(rifle)
+	player._weapon_pivot = rifle
+	rifle.data = data
+	rifle.reset()
+
+	for i in range(5):
+		rifle.fire(Vector2.ZERO, Vector2.RIGHT)
+		rifle._process(0.02)
+	_assert(rifle.get_current_ammo() == 25, "rifle should have 25 rounds after 5 shots")
+	_assert(rifle.get_reserve_ammo() == 60, "reserve should be untouched before reload")
+
+	rifle.reload()
+	_assert(rifle.get_current_ammo() == 30, "reload should refill magazine")
+	_assert(rifle.get_reserve_ammo() == 55, "reload should transfer 5 rounds")
+
+	var switched: bool = player._try_switch_weapon()
+	_assert(switched, "switch should work when not reloading or on cooldown")
+	_assert(player._current_weapon_index == 1, "weapon index should change")
+	_assert(rifle.get_current_ammo() >= 0, "rifle ammo should remain valid after switch")
+	_assert(rifle.get_reserve_ammo() >= 0, "rifle reserve should remain valid after switch")
+
+	original_weapon.free()
+	rifle.free()
+	player.free()
 
 
 # --- S05 Shambler tests ---

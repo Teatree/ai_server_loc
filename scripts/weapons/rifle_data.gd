@@ -1,0 +1,2 @@
+extends WeaponData
+class_name RifleData

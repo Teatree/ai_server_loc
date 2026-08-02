@@ -19,6 +19,7 @@ var _cooldown_remaining: float = 0.0
 var _state: StringName = &"idle"
 var _can_fire: bool = true
 var _reloading: bool = false
+var _current_recoil: float = 0.0
 
 func _ready() -> void:
 	_apply_data()
@@ -30,6 +31,8 @@ func _process(delta: float) -> void:
 		if _cooldown_remaining <= 0.0:
 			_can_fire = true
 			_set_state(&"idle")
+	if data and data.recoil_recovery > 0.0:
+		_current_recoil = max(0.0, _current_recoil - data.recoil_recovery * delta)
 
 func can_fire() -> bool:
 	if not _can_fire or _reloading:
@@ -84,6 +87,9 @@ func get_reserve_ammo() -> int:
 func get_max_ammo() -> int:
 	return data.max_ammo if data else -1
 
+func get_recoil() -> float:
+	return _current_recoil
+
 func can_reload() -> bool:
 	if not data or data.max_ammo < 0:
 		return false
@@ -113,6 +119,7 @@ func reset() -> void:
 	_can_fire = true
 	_cooldown_remaining = 0.0
 	_reloading = false
+	_current_recoil = 0.0
 	if data and data.max_ammo >= 0:
 		_current_ammo = data.max_ammo
 		_reserve_ammo = data.reserve_ammo
@@ -128,7 +135,10 @@ func _apply_data() -> void:
 		ammo_changed.emit(_current_ammo, data.max_ammo)
 
 func _apply_recoil(direction: Vector2) -> void:
-	pass
+	if not data:
+		return
+	var limit: float = data.recoil_kick * 10.0
+	_current_recoil = min(_current_recoil + data.recoil_kick, limit)
 
 func _set_state(new_state: StringName) -> void:
 	_state = new_state
