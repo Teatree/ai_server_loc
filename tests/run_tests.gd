@@ -654,6 +654,116 @@ func _test_integrated_arena_playability() -> void:
 	level.free()
 
 
+# --- S07A inventory, reload, and switching tests ---
+
+func _test_reload_completes_once_and_transfers_bounded_ammo() -> void:
+	var data: WeaponData = WeaponData.new()
+	data.max_ammo = 10
+	data.reserve_ammo = 20
+	data.fire_rate = 0.01
+	var weapon: WeaponBase = WeaponBase.new()
+	weapon.data = data
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	_assert(weapon.get_current_ammo() == 9, "should have consumed one round")
+	_assert(weapon.get_reserve_ammo() == 20, "reserve should be untouched before reload")
+	weapon.reload()
+	_assert(weapon.get_current_ammo() == 10, "reload should refill magazine")
+	_assert(weapon.get_reserve_ammo() == 19, "reload should transfer exactly one round from reserve")
+	weapon.reload()
+	_assert(weapon.get_current_ammo() == 10, "reload should not run when magazine full")
+	_assert(weapon.get_reserve_ammo() == 19, "reserve should not change when magazine full")
+
+
+func _test_switching_blocks_during_reload() -> void:
+	var data_a: WeaponData = WeaponData.new()
+	data_a.max_ammo = 10
+	data_a.reserve_ammo = 10
+	data_a.fire_rate = 0.01
+	var data_b: WeaponData = WeaponData.new()
+	data_b.weapon_id = "rifle"
+	data_b.display_name = "Rifle"
+	data_b.max_ammo = 20
+	data_b.reserve_ammo = 40
+	data_b.fire_rate = 0.01
+	var player: CharacterBody2D = _create_inventory_player([data_a, data_b])
+	var weapon: WeaponBase = player._weapon_pivot as WeaponBase
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.reload()
+	_assert(weapon._reloading, "weapon should be reloading")
+	var switched: bool = player._try_switch_weapon()
+	_assert(not switched, "switch should be blocked during reload")
+	_assert(player._current_weapon_index == 0, "weapon index should not change")
+
+
+func _test_switching_blocks_during_cooldown() -> void:
+	var data_a: WeaponData = WeaponData.new()
+	data_a.max_ammo = 10
+	data_a.reserve_ammo = 10
+	data_a.fire_rate = 0.3
+	var data_b: WeaponData = WeaponData.new()
+	data_b.weapon_id = "rifle"
+	data_b.display_name = "Rifle"
+	data_b.max_ammo = 20
+	data_b.reserve_ammo = 40
+	data_b.fire_rate = 0.3
+	var player: CharacterBody2D = _create_inventory_player([data_a, data_b])
+	var weapon: WeaponBase = player._weapon_pivot as WeaponBase
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	_assert(not weapon.can_fire(), "weapon should be on cooldown")
+	var switched: bool = player._try_switch_weapon()
+	_assert(not switched, "switch should be blocked during cooldown")
+	_assert(player._current_weapon_index == 0, "weapon index should not change")
+
+
+func _test_weapon_state_correct_after_respawn() -> void:
+	var data: WeaponData = WeaponData.new()
+	data.max_ammo = 12
+	data.reserve_ammo = 60
+	data.fire_rate = 0.01
+	var player: CharacterBody2D = _create_inventory_player([data])
+	var weapon: WeaponBase = player._weapon_pivot as WeaponBase
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.reload()
+	_assert(weapon.get_current_ammo() == 11, "ammo should be reduced before respawn")
+	_assert(weapon.get_reserve_ammo() == 59, "reserve should be reduced before respawn")
+	player.global_position = Vector2(9999, 9999)
+	var mc: MovementController = MovementController.new()
+	mc.body = player
+	player.movement_controller = mc
+	player.respawn()
+	_assert(weapon.get_current_ammo() == data.max_ammo, "current ammo should reset to max after respawn")
+	_assert(weapon.get_reserve_ammo() == data.reserve_ammo, "reserve ammo should reset after respawn")
+	_assert(weapon.can_fire(), "weapon should be ready after respawn")
+
+
+func _create_inventory_player(inventory: Array[WeaponData]) -> CharacterBody2D:
+	var player: CharacterBody2D = CharacterBody2D.new()
+	player.add_to_group("player")
+	player.global_position = Vector2(0, 0)
+	var health: HealthComponent = HealthComponent.new()
+	health.name = "HealthComponent"
+	health.max_health = 100.0
+	player.add_child(health)
+	var pivot: Node2D = Node2D.new()
+	pivot.name = "WeaponPivot"
+	var pistol: Pistol = Pistol.new()
+	pivot.add_child(pistol)
+	player.add_child(pivot)
+	player._weapon_pivot = pivot
+	player._weapon_inventory = inventory
+	player._current_weapon_index = 0
+	if inventory.size() > 0:
+		pivot.data = inventory[0]
+		pivot.reset()
+	add_child(player)
+	return player
+
+
 func _load_level_scene() -> Node2D:
 	var packed: PackedScene = load("res://scenes/levels/placeholder_level.tscn")
 	var instance: Node2D = packed.instantiate()

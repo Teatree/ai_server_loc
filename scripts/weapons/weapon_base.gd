@@ -6,6 +6,7 @@ signal dry_fire(weapon: WeaponBase)
 signal ammo_changed(current: int, maximum: int)
 signal state_changed(state: StringName)
 signal noise_emitted(position: Vector2, strength: float)
+signal reload_completed()
 
 @export var data: WeaponData :
 	set(value):
@@ -15,9 +16,11 @@ signal noise_emitted(position: Vector2, strength: float)
 		_apply_data()
 
 var _current_ammo: int = 0
+var _reserve_ammo: int = 0
 var _cooldown_remaining: float = 0.0
 var _state: StringName = &"idle"
 var _can_fire: bool = true
+var _reloading: bool = false
 
 func _ready() -> void:
 	_apply_data()
@@ -31,7 +34,7 @@ func _process(delta: float) -> void:
 			_set_state(&"idle")
 
 func can_fire() -> bool:
-	if not _can_fire:
+	if not _can_fire or _reloading:
 		return false
 	if data.max_ammo >= 0 and _current_ammo <= 0:
 		return false
@@ -77,14 +80,44 @@ func set_ammo_full() -> void:
 func get_current_ammo() -> int:
 	return _current_ammo
 
+func get_reserve_ammo() -> int:
+	return _reserve_ammo
+
 func get_max_ammo() -> int:
 	return data.max_ammo if data else -1
+
+func can_reload() -> bool:
+	if not data or data.max_ammo < 0:
+		return false
+	if _reloading:
+		return false
+	if _current_ammo >= data.max_ammo:
+		return false
+	if _reserve_ammo <= 0:
+		return false
+	return true
+
+func reload() -> void:
+	if not can_reload():
+		return
+	_reloading = true
+	_set_state(&"reloading")
+	var needed: int = data.max_ammo - _current_ammo
+	var transfer: int = min(needed, _reserve_ammo)
+	_reserve_ammo -= transfer
+	_current_ammo += transfer
+	ammo_changed.emit(_current_ammo, data.max_ammo)
+	_reloading = false
+	_set_state(&"idle")
+	reload_completed.emit()
 
 func reset() -> void:
 	_can_fire = true
 	_cooldown_remaining = 0.0
+	_reloading = false
 	if data and data.max_ammo >= 0:
 		_current_ammo = data.max_ammo
+		_reserve_ammo = data.reserve_ammo
 		ammo_changed.emit(_current_ammo, data.max_ammo)
 	_set_state(&"idle")
 
@@ -93,6 +126,7 @@ func _apply_data() -> void:
 		return
 	if data.max_ammo >= 0:
 		_current_ammo = data.max_ammo
+		_reserve_ammo = data.reserve_ammo
 		ammo_changed.emit(_current_ammo, data.max_ammo)
 
 func _apply_recoil(direction: Vector2) -> void:

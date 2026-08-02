@@ -1,6 +1,7 @@
 extends CharacterBody2D
 
 @export var _weapon_pivot: Node2D
+@export var _weapon_inventory: Array[WeaponData] = []
 @onready var movement_controller: MovementController = $MovementController
 @onready var health_component: HealthComponent = $HealthComponent
 @onready var _sprite: Sprite2D = $Sprite2D
@@ -10,6 +11,7 @@ extends CharacterBody2D
 var _last_checkpoint: Vector2 = Vector2(200, 600)
 var _respawn_invulnerability: float = 0.0
 var _facing: int = 1
+var _current_weapon_index: int = 0
 
 
 func _ready() -> void:
@@ -21,6 +23,9 @@ func _ready() -> void:
 	_last_checkpoint = global_position
 	if _aim:
 		_aim.target_node = self
+	if _weapon_pivot and _weapon_inventory.size() > 0:
+		_weapon_pivot.data = _weapon_inventory[0]
+		_weapon_pivot.reset()
 
 
 func _physics_process(delta: float) -> void:
@@ -35,6 +40,10 @@ func _physics_process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("fire"):
 		_try_fire()
+	if event.is_action_pressed("reload"):
+		_try_reload()
+	if event.is_action_pressed("switch_weapon"):
+		_try_switch_weapon()
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		GameFlow.request_pause()
 
@@ -46,6 +55,28 @@ func _try_fire() -> void:
 		if _weapon_pivot.get_node_or_null("Muzzle"):
 			muzzle = _weapon_pivot.get_node("Muzzle").global_position
 		_weapon_pivot.fire(muzzle, dir)
+
+
+func _try_reload() -> void:
+	if _weapon_pivot and _weapon_pivot.has_method("reload"):
+		_weapon_pivot.reload()
+
+
+func _try_switch_weapon() -> bool:
+	if _weapon_inventory.size() <= 1:
+		return false
+	if not _weapon_pivot or not _weapon_pivot.has_method("can_fire") or not _weapon_pivot.has_method("reset"):
+		return false
+	var weapon: WeaponBase = _weapon_pivot as WeaponBase
+	if not weapon.can_fire():
+		return false
+	if weapon._reloading:
+		return false
+	var next_index: int = (_current_weapon_index + 1) % _weapon_inventory.size()
+	_current_weapon_index = next_index
+	_weapon_pivot.data = _weapon_inventory[_current_weapon_index]
+	_weapon_pivot.reset()
+	return true
 
 
 func take_damage(info: DamageInfo) -> void:
@@ -74,6 +105,10 @@ func respawn() -> void:
 	if movement_controller:
 		movement_controller.reset()
 	if _weapon_pivot and _weapon_pivot.has_method("reset"):
+		_weapon_pivot.reset()
+	_current_weapon_index = 0
+	if _weapon_pivot and _weapon_inventory.size() > 0:
+		_weapon_pivot.data = _weapon_inventory[0]
 		_weapon_pivot.reset()
 	_respawn_invulnerability = 1.0
 
