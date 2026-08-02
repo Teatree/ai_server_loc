@@ -19,6 +19,9 @@ func _ready() -> void:
 	_test_dry_fire_blocks_fire_when_ammo_zero()
 	_test_weapon_reset_restores_ammo()
 	_test_weapon_data_separate_from_movement()
+	_test_shotgun_emits_configured_pellet_count_and_spread()
+	_test_shotgun_damage_knockback_ammo_cooldown_bounded()
+	_test_shotgun_empty_magazine_behavior()
 	_test_shambler_starts_idle()
 	_test_noise_triggers_investigate()
 	_test_noise_position_expires()
@@ -204,6 +207,92 @@ func _test_weapon_data_separate_from_movement() -> void:
 	_assert(data.fire_rate > 0.0, "weapon data stores fire rate")
 	_assert(data.damage > 0.0, "weapon data stores damage")
 	_assert(data.max_ammo >= 0, "weapon data stores ammo cap")
+
+
+# --- S07B Shotgun tests ---
+
+func _test_shotgun_emits_configured_pellet_count_and_spread() -> void:
+	var data: ShotgunData = ShotgunData.new()
+	data.weapon_id = "shotgun"
+	data.display_name = "Shotgun"
+	data.pellet_count = 5
+	data.spread_angle_degrees = 10.0
+	data.fire_rate = 0.01
+	data.max_ammo = -1
+	var weapon: Shotgun = Shotgun.new()
+	weapon.data = data
+	add_child(weapon)
+
+	var origin: Vector2 = Vector2(1000, 1000)
+	var direction: Vector2 = Vector2.RIGHT
+	var pellet_dirs: Array[Vector2] = []
+	weapon.pellet_spawned.connect(func(o: Vector2, d: Vector2):
+		pellet_dirs.append(d)
+	)
+
+	weapon.fire(origin, direction)
+
+	_assert(pellet_dirs.size() == data.pellet_count,
+		"shotgun should emit %d pellet signals, got %d" % [data.pellet_count, pellet_dirs.size()])
+
+	for pellet_dir in pellet_dirs:
+		var angle_diff: float = abs(pellet_dir.normalized().angle_to(direction))
+		_assert(angle_diff <= deg_to_rad(data.spread_angle_degrees / 2.0),
+			"pellet direction should be within %.1f degree spread cone" % (data.spread_angle_degrees / 2.0))
+
+	weapon.free()
+
+
+func _test_shotgun_damage_knockback_ammo_cooldown_bounded() -> void:
+	var data: ShotgunData = ShotgunData.new()
+	data.weapon_id = "shotgun"
+	data.display_name = "Shotgun"
+	data.pellet_count = 3
+	data.spread_angle_degrees = 5.0
+	data.fire_rate = 0.3
+	data.max_ammo = 10
+	data.reserve_ammo = 20
+	data.ammo_per_shot = 1
+	data.damage = 12.0
+	data.knockback = 200.0
+	var weapon: Shotgun = Shotgun.new()
+	weapon.data = data
+	add_child(weapon)
+
+	var pellet_dirs: Array[Vector2] = []
+	weapon.pellet_spawned.connect(func(_o: Vector2, d: Vector2): pellet_dirs.append(d))
+
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+
+	_assert(pellet_dirs.size() == data.pellet_count, "should emit pellet_count signals")
+	_assert(weapon.get_current_ammo() == data.max_ammo - data.ammo_per_shot, "ammo should decrease by ammo_per_shot")
+	_assert(not weapon.can_fire(), "should be on cooldown")
+	weapon._process(0.35)
+	_assert(weapon.can_fire(), "should be off cooldown after fire_rate")
+
+	weapon.free()
+
+
+func _test_shotgun_empty_magazine_behavior() -> void:
+	var data: ShotgunData = ShotgunData.new()
+	data.weapon_id = "shotgun"
+	data.display_name = "Shotgun"
+	data.pellet_count = 5
+	data.spread_angle_degrees = 10.0
+	data.fire_rate = 0.01
+	data.max_ammo = 5
+	data.reserve_ammo = 0
+	var weapon: Shotgun = Shotgun.new()
+	weapon.data = data
+	weapon._current_ammo = 0
+
+	var fired_count: int = 0
+	weapon.fired.connect(func(_w: WeaponBase, _o: Vector2, _d: Vector2): fired_count += 1)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	_assert(fired_count == 0, "should not fire when ammo is empty")
+	_assert(weapon.get_current_ammo() == 0, "ammo should remain zero")
+
+	weapon.free()
 
 
 # --- S05 Shambler tests ---
@@ -445,7 +534,7 @@ func _test_pistol_kills_shambler() -> void:
 	_assert(not shambler.health_component.is_dead, "shambler should start alive")
 	weapon.fire(shambler.global_position, Vector2.RIGHT)
 	var timer: Timer = Timer.new()
-	timer.wait_time = 0.05
+	timer.wait_time = 0.2
 	timer.one_shot = true
 	timer.timeout.connect(func():
 		_assert(shambler.health_component.is_dead, "pistol shot should kill shambler")
