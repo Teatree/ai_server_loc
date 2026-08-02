@@ -10,8 +10,6 @@ signal reload_completed()
 
 @export var data: WeaponData :
 	set(value):
-		if data and data.weapon_id == value.weapon_id:
-			return
 		data = value
 		_apply_data()
 

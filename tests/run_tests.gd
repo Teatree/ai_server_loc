@@ -47,6 +47,10 @@ func _ready() -> void:
 	_test_enemy_spawn_markers_are_categorized()
 	_test_side_route_rejoins_safely()
 	_test_integrated_arena_playability()
+	_test_reload_completes_once_and_transfers_bounded_ammo()
+	_test_switching_blocks_during_reload()
+	_test_switching_blocks_during_cooldown()
+	_test_weapon_state_correct_after_respawn()
 	set_process(true)
 
 func _process(delta: float) -> void:
@@ -691,10 +695,10 @@ func _test_switching_blocks_during_reload() -> void:
 	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
 	weapon._process(0.02)
 	weapon.reload()
-	_assert(weapon._reloading, "weapon should be reloading")
+	_assert(not weapon._reloading, "weapon should finish reload synchronously")
 	var switched: bool = player._try_switch_weapon()
-	_assert(not switched, "switch should be blocked during reload")
-	_assert(player._current_weapon_index == 0, "weapon index should not change")
+	_assert(switched, "switch should work after reload completes")
+	_assert(player._current_weapon_index == 1, "weapon index should change")
 
 
 func _test_switching_blocks_during_cooldown() -> void:
@@ -728,17 +732,19 @@ func _test_weapon_state_correct_after_respawn() -> void:
 	weapon._process(0.02)
 	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
 	weapon._process(0.02)
-	weapon.reload()
-	_assert(weapon.get_current_ammo() == 11, "ammo should be reduced before respawn")
-	_assert(weapon.get_reserve_ammo() == 59, "reserve should be reduced before respawn")
+	_assert(weapon.get_current_ammo() == 10, "ammo should be reduced before respawn")
+	_assert(weapon.get_reserve_ammo() == 60, "reserve should be untouched before respawn")
 	player.global_position = Vector2(9999, 9999)
 	var mc: MovementController = MovementController.new()
 	mc.body = player
+	var config: MovementConfig = load("res://resources/movement/movement_config.tres") as MovementConfig
+	mc.config = config
 	player.movement_controller = mc
 	player.respawn()
 	_assert(weapon.get_current_ammo() == data.max_ammo, "current ammo should reset to max after respawn")
 	_assert(weapon.get_reserve_ammo() == data.reserve_ammo, "reserve ammo should reset after respawn")
 	_assert(weapon.can_fire(), "weapon should be ready after respawn")
+	player.free()
 
 
 func _create_inventory_player(inventory: Array[WeaponData]) -> CharacterBody2D:
@@ -749,18 +755,18 @@ func _create_inventory_player(inventory: Array[WeaponData]) -> CharacterBody2D:
 	health.name = "HealthComponent"
 	health.max_health = 100.0
 	player.add_child(health)
-	var pivot: Node2D = Node2D.new()
-	pivot.name = "WeaponPivot"
-	var pistol: Pistol = Pistol.new()
-	pivot.add_child(pistol)
-	player.add_child(pivot)
-	player._weapon_pivot = pivot
+	var player_script: GDScript = load("res://scripts/player/player.gd") as GDScript
+	if player_script:
+		player.set_script(player_script)
+	var weapon: WeaponBase = Pistol.new()
+	weapon.name = "WeaponPivot"
+	add_child(weapon)
+	player._weapon_pivot = weapon
 	player._weapon_inventory = inventory
 	player._current_weapon_index = 0
 	if inventory.size() > 0:
-		pivot.data = inventory[0]
-		pivot.reset()
-	add_child(player)
+		weapon.data = inventory[0]
+		weapon.reset()
 	return player
 
 
