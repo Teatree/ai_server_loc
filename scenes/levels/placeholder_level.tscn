@@ -3,6 +3,9 @@
 [ext_resource type="PackedScene" uid="uid://b_player" path="res://scenes/player/player.tscn" id="1_p"]
 [ext_resource type="Script" path="res://scripts/game/placeholder_level.gd" id="2_l"]
 [ext_resource type="Script" path="res://scripts/components/checkpoint.gd" id="3_c"]
+[ext_resource type="Script" path="res://scripts/components/moving_platform.gd" id="4_m"]
+[ext_resource type="Script" path="res://scripts/components/hazard.gd" id="5_h"]
+[ext_resource type="Script" path="res://scripts/components/pickup.gd" id="6_p"]
 
 [sub_resource type="RectangleShape2D" id="Rect2D_ground1"]
 size = Vector2(500, 40)
@@ -33,6 +36,15 @@ size = Vector2(40, 40)
 
 [sub_resource type="RectangleShape2D" id="Rect2D_exit"]
 size = Vector2(120, 80)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_moving_platform"]
+size = Vector2(200, 20)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_hazard"]
+size = Vector2(80, 40)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_pickup"]
+size = Vector2(30, 30)
 
 [node name="PlaceholderLevel" type="Node2D"]
 script = ExtResource("2_l")
@@ -146,6 +158,55 @@ offset_top = -5.0
 offset_right = 100.0
 offset_bottom = 5.0
 color = Color(0.2, 0.5, 0.9, 0.7)
+
+[node name="MovingPlatform" type="Node2D" parent="."]
+position = Vector2(650, 600)
+script = ExtResource("4_m")
+waypoints = [Vector2(400, 600), Vector2(850, 600)]
+
+[node name="PlatformBody" type="StaticBody2D" parent="MovingPlatform"]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MovingPlatform/PlatformBody"]
+shape = SubResource("Rect2D_moving_platform")
+
+[node name="ColorRect" type="ColorRect" parent="MovingPlatform"]
+offset_left = -100.0
+offset_top = -10.0
+offset_right = 100.0
+offset_bottom = 10.0
+color = Color(0.8, 0.4, 0.1, 1)
+
+[node name="Hazard" type="Area2D" parent="."]
+position = Vector2(1050, 680)
+script = ExtResource("5_h")
+collision_layer = 5
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hazard"]
+shape = SubResource("Rect2D_hazard")
+
+[node name="ColorRect" type="ColorRect" parent="Hazard"]
+offset_left = -40.0
+offset_top = -20.0
+offset_right = 40.0
+offset_bottom = 20.0
+color = Color(0.9, 0.1, 0.1, 0.8)
+
+[node name="HealthPickup" type="Area2D" parent="."]
+position = Vector2(730, 400)
+script = ExtResource("6_p")
+collision_layer = 6
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HealthPickup"]
+shape = SubResource("Rect2D_pickup")
+
+[node name="ColorRect" type="ColorRect" parent="HealthPickup"]
+offset_left = -15.0
+offset_top = -15.0
+offset_right = 15.0
+offset_bottom = 15.0
+color = Color(0.1, 0.9, 0.1, 0.8)
 
 [node name="Checkpoint" type="Area2D" parent="."]
 position = Vector2(300, 500)

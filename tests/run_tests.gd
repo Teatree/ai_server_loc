@@ -41,6 +41,9 @@ func _ready() -> void:
 	_test_platforms_are_visually_distinct()
 	_test_checkpoint_activates_and_respawns()
 	_test_entry_to_exit_route_is_traversable()
+	_test_moving_platform_follows_path()
+	_test_hazard_damages_player_through_contract()
+	_test_pickup_applies_once_and_cleans_up()
 	set_process(true)
 
 func _process(delta: float) -> void:
@@ -549,6 +552,47 @@ func _test_entry_to_exit_route_is_traversable() -> void:
 	_assert(elev2_right <= elev3.position.x or elev3.position.y < elev2.position.y, "route should progress via elevation or rightward")
 	_assert(elev3.position.x < exit_zone.position.x, "exit should be reachable from final platform")
 	level.free()
+
+
+func _test_moving_platform_follows_path() -> void:
+	var level: Node2D = _load_level_scene()
+	var platform: MovingPlatform = level.get_node_or_null("MovingPlatform") as MovingPlatform
+	_assert(platform != null, "level should contain a MovingPlatform")
+	_assert(platform.waypoints.size() >= 2, "moving platform should have at least two waypoints")
+	var start_pos: Vector2 = platform.position
+	platform._physics_process(0.5)
+	_assert(platform.position.distance_to(start_pos) > 0.0, "moving platform should change position")
+	level.free()
+
+
+func _test_hazard_damages_player_through_contract() -> void:
+	var level: Node2D = _load_level_scene()
+	var hazard: Hazard = level.get_node_or_null("Hazard") as Hazard
+	_assert(hazard != null, "level should contain a Hazard")
+	var player: CharacterBody2D = _create_test_player()
+	player.global_position = hazard.global_position
+	var health: HealthComponent = player.get_node("HealthComponent") as HealthComponent
+	var initial_health: float = health.current_health
+	hazard.body_entered.emit(player)
+	_assert(health.current_health < initial_health, "hazard should reduce player health through DamageInfo")
+	level.free()
+	player.free()
+
+
+func _test_pickup_applies_once_and_cleans_up() -> void:
+	var level: Node2D = _load_level_scene()
+	var pickup: Pickup = level.get_node_or_null("HealthPickup") as Pickup
+	_assert(pickup != null, "level should contain a Pickup")
+	var player: CharacterBody2D = _create_test_player()
+	player.global_position = pickup.global_position
+	var health: HealthComponent = player.get_node("HealthComponent") as HealthComponent
+	health.take_damage(DamageInfo.new(30.0))
+	var health_after_damage: float = health.current_health
+	pickup.body_entered.emit(player)
+	_assert(health.current_health > health_after_damage, "pickup should restore health")
+	_assert(pickup._collected, "pickup should be marked collected")
+	level.free()
+	player.free()
 
 
 func _load_level_scene() -> Node2D:
