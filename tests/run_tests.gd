@@ -44,6 +44,9 @@ func _ready() -> void:
 	_test_moving_platform_follows_path()
 	_test_hazard_damages_player_through_contract()
 	_test_pickup_applies_once_and_cleans_up()
+	_test_enemy_spawn_markers_are_categorized()
+	_test_side_route_rejoins_safely()
+	_test_integrated_arena_playability()
 	set_process(true)
 
 func _process(delta: float) -> void:
@@ -593,6 +596,62 @@ func _test_pickup_applies_once_and_cleans_up() -> void:
 	_assert(pickup._collected, "pickup should be marked collected")
 	level.free()
 	player.free()
+
+
+func _test_enemy_spawn_markers_are_categorized() -> void:
+	var level: Node2D = _load_level_scene()
+	var shambler_a: Marker2D = level.get_node_or_null("EnemySpawnShambler_A") as Marker2D
+	var shambler_b: Marker2D = level.get_node_or_null("EnemySpawnShambler_B") as Marker2D
+	var ranged_a: Marker2D = level.get_node_or_null("EnemySpawnRanged_A") as Marker2D
+	var shambler_c: Marker2D = level.get_node_or_null("EnemySpawnShambler_C") as Marker2D
+	_assert(shambler_a != null, "level should have shambler spawn A")
+	_assert(shambler_b != null, "level should have shambler spawn B")
+	_assert(ranged_a != null, "level should have ranged spawn A")
+	_assert(shambler_c != null, "level should have shambler spawn C")
+	_assert(shambler_a.category == &"shambler", "shambler spawn A should be categorized")
+	_assert(ranged_a.category == &"ranged", "ranged spawn A should be categorized")
+	level.free()
+
+
+func _test_side_route_rejoins_safely() -> void:
+	var level: Node2D = _load_level_scene()
+	var side_start: StaticBody2D = level.get_node_or_null("SideRouteStart") as StaticBody2D
+	var side_mid: StaticBody2D = level.get_node_or_null("SideRouteMid") as StaticBody2D
+	var side_rejoin: StaticBody2D = level.get_node_or_null("SideRouteRejoin") as StaticBody2D
+	var exit_zone: Area2D = level.get_node_or_null("ExitZone") as Area2D
+	_assert(side_start != null, "side route should have an entrance")
+	_assert(side_mid != null, "side route should have a middle platform")
+	_assert(side_rejoin != null, "side route should have a rejoin point")
+	_assert(side_rejoin.position.y > exit_zone.position.y - 100.0, "rejoin should be above exit for safe descent")
+	_assert(side_rejoin.position.x < exit_zone.position.x + 100.0, "rejoin should be within exit reach")
+	level.free()
+
+
+func _test_integrated_arena_playability() -> void:
+	var level: Node2D = _load_level_scene()
+	var player: CharacterBody2D = level.get_node_or_null("Player") as CharacterBody2D
+	var checkpoint: Checkpoint = level.get_node_or_null("Checkpoint") as Checkpoint
+	var hazard: Hazard = level.get_node_or_null("Hazard") as Hazard
+	var pickup: Pickup = level.get_node_or_null("HealthPickup") as Pickup
+	var exit_zone: Area2D = level.get_node_or_null("ExitZone") as Area2D
+	var side_rejoin: StaticBody2D = level.get_node_or_null("SideRouteRejoin") as StaticBody2D
+	_assert(player != null, "player should exist")
+	_assert(checkpoint != null, "checkpoint should exist")
+	_assert(hazard != null, "hazard should exist")
+	_assert(pickup != null, "pickup should exist")
+	_assert(exit_zone != null, "exit should exist")
+	_assert(side_rejoin != null, "side route should rejoin critical path")
+	_assert(player.has_method("respawn"), "player should support respawn")
+	checkpoint.activated.emit(checkpoint.global_position)
+	_assert(player._last_checkpoint == checkpoint.global_position, "checkpoint activation should set respawn point")
+	player.global_position = Vector2(9999, 9999)
+	var mc: MovementController = MovementController.new()
+	mc.body = player
+	player.movement_controller = mc
+	player.respawn()
+	_assert(player.global_position == checkpoint.global_position, "respawn should work after checkpoint")
+	_assert(player._respawn_invulnerability > 0.0, "respawn should grant invulnerability")
+	level.free()
 
 
 func _load_level_scene() -> Node2D:

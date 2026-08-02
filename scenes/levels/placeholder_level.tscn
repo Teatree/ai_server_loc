@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/components/moving_platform.gd" id="4_m"]
 [ext_resource type="Script" path="res://scripts/components/hazard.gd" id="5_h"]
 [ext_resource type="Script" path="res://scripts/components/pickup.gd" id="6_p"]
+[ext_resource type="Script" path="res://scripts/enemies/spawn_marker.gd" id="7_s"]
 
 [sub_resource type="RectangleShape2D" id="Rect2D_ground1"]
 size = Vector2(500, 40)
@@ -44,6 +45,18 @@ size = Vector2(200, 20)
 size = Vector2(80, 40)
 
 [sub_resource type="RectangleShape2D" id="Rect2D_pickup"]
+size = Vector2(30, 30)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_side_start"]
+size = Vector2(160, 20)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_side_mid"]
+size = Vector2(160, 20)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_side_rejoin"]
+size = Vector2(160, 20)
+
+[sub_resource type="RectangleShape2D" id="Rect2D_side_pickup"]
 size = Vector2(30, 30)
 
 [node name="PlaceholderLevel" type="Node2D"]
@@ -235,6 +248,61 @@ offset_right = 140.0
 offset_bottom = -20.0
 text = "Return to Title"
 
+[node name="SideRouteStart" type="StaticBody2D" parent="."]
+position = Vector2(1050, 640)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="SideRouteStart"]
+shape = SubResource("Rect2D_side_start")
+
+[node name="ColorRect" type="ColorRect" parent="SideRouteStart"]
+offset_left = -80.0
+offset_top = -10.0
+offset_right = 80.0
+offset_bottom = 10.0
+color = Color(0.3, 0.35, 0.3, 1)
+
+[node name="SideRouteMid" type="StaticBody2D" parent="."]
+position = Vector2(1150, 520)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="SideRouteMid"]
+shape = SubResource("Rect2D_side_mid")
+
+[node name="ColorRect" type="ColorRect" parent="SideRouteMid"]
+offset_left = -80.0
+offset_top = -10.0
+offset_right = 80.0
+offset_bottom = 10.0
+color = Color(0.3, 0.35, 0.3, 1)
+
+[node name="SideRouteRejoin" type="StaticBody2D" parent="."]
+position = Vector2(1200, 380)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="SideRouteRejoin"]
+shape = SubResource("Rect2D_side_rejoin")
+
+[node name="ColorRect" type="ColorRect" parent="SideRouteRejoin"]
+offset_left = -80.0
+offset_top = -10.0
+offset_right = 80.0
+offset_bottom = 10.0
+color = Color(0.3, 0.35, 0.3, 1)
+
+[node name="SideRoutePickup" type="Area2D" parent="."]
+position = Vector2(1150, 500)
+script = ExtResource("6_p")
+collision_layer = 6
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="SideRoutePickup"]
+shape = SubResource("Rect2D_side_pickup")
+
+[node name="ColorRect" type="ColorRect" parent="SideRoutePickup"]
+offset_left = -15.0
+offset_top = -15.0
+offset_right = 15.0
+offset_bottom = 15.0
+color = Color(0.1, 0.9, 0.1, 0.8)
+
 [node name="ExitZone" type="Area2D" parent="."]
 position = Vector2(1220, 300)
 
@@ -243,3 +311,21 @@ shape = SubResource("Rect2D_exit")
 
 [node name="ExitMarker" type="Marker2D" parent="."]
 position = Vector2(1220, 260)
+
+[node name="EnemySpawnShambler_A" type="Marker2D" parent="."]
+position = Vector2(300, 640)
+script = ExtResource("7_s")
+
+[node name="EnemySpawnShambler_B" type="Marker2D" parent="."]
+position = Vector2(900, 640)
+script = ExtResource("7_s")
+
+[node name="EnemySpawnRanged_A" type="Marker2D" parent="."]
+position = Vector2(730, 380)
+script = ExtResource("7_s")
+category = "ranged"
+enemy_type = "ranged"
+
+[node name="EnemySpawnShambler_C" type="Marker2D" parent="."]
+position = Vector2(1100, 260)
+script = ExtResource("7_s")
