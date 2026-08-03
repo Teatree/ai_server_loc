@@ -61,7 +61,21 @@ func _physics_process(delta: float) -> void:
 	_update_telegraph_visual(delta)
 	_update_perception()
 	_run_state(delta)
+	_apply_crowd_separation(delta)
 	move_and_slide()
+
+func _apply_crowd_separation(delta: float) -> void:
+	var enemies: Array[Node] = get_tree().get_nodes_in_group("enemy")
+	for other: Node in enemies:
+		if other == self or not is_instance_valid(other):
+			continue
+		if not other is CharacterBody2D:
+			continue
+		var other_body: CharacterBody2D = other as CharacterBody2D
+		var dir: Vector2 = global_position - other_body.global_position
+		var dist: float = dir.length()
+		if dist < 30.0 and dist > 0.01:
+			velocity += dir.normalized() * 60.0 * delta
 
 func _update_telegraph_visual(delta: float) -> void:
 	if _state == &"telegraph":

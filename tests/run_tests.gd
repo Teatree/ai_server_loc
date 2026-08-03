@@ -74,6 +74,15 @@ func _ready() -> void:
 	_test_navigation_classifies_blocked_and_unreachable()
 	_test_enemy_traverses_jump_and_drop_links()
 	_test_failed_links_trigger_bounded_stuck_recovery()
+	_test_brute_starts_idle()
+	_test_brute_telegraph_has_visible_pulse()
+	_test_brute_stagger_resistance_reduces_knockback()
+	_test_brute_attack_deals_heavy_damage()
+	_test_brute_dies_once_using_shared_contract()
+	_test_brute_reset_clears_death_and_state()
+	_test_crowd_separation_prevents_exact_stacking()
+	_test_crowd_separation_uses_gentle_impulse()
+	_test_mixed_archetypes_retain_navigation_and_attack()
 	set_process(true)
 
 
@@ -1527,6 +1536,139 @@ func _test_spitter_blocked_los_prevents_ranged_damage() -> void:
 	_assert(spitter._state == &"chase", "blocked LOS should prevent attack, spitter should chase instead")
 	obstacle.free()
 	player.free()
+	spitter.free()
+
+# --- S08D Brute and crowd separation tests ---
+
+func _load_brute_scene() -> Node:
+	var packed: PackedScene = load("res://scenes/enemies/brute.tscn")
+	var instance: Node = packed.instantiate()
+	add_child(instance)
+	return instance
+
+func _test_brute_starts_idle() -> void:
+	var brute: Node = _load_brute_scene()
+	_assert(brute._state == &"idle", "brute should start idle")
+	brute.free()
+
+func _test_brute_telegraph_has_visible_pulse() -> void:
+	var brute: Node = _load_brute_scene()
+	brute.global_position = Vector2(0, 0)
+	brute._sprite.scale = Vector2.ONE
+	brute.attack_range = 100.0
+	brute.attack_telegraph_duration = 0.2
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(30, 0)
+	player.add_to_group("player")
+	add_child(player)
+	brute._physics_process(0.1)
+	_assert(brute._state == &"attack_telegraph", "brute should enter telegraph when in range")
+	_assert(brute._attack_timer > 0.0, "telegraph should set attack cooldown")
+	_assert(brute._sprite.modulate != brute._base_modulate, "brute sprite should flash during telegraph")
+	player.free()
+	brute.free()
+
+
+func _test_brute_stagger_resistance_reduces_knockback() -> void:
+	var brute: Node = _load_brute_scene()
+	brute.global_position = Vector2(0, 0)
+	brute._sprite.scale = Vector2.ONE
+	var info: DamageInfo = DamageInfo.new(10.0, DamageInfo.DamageType.BALLISTIC, null, Vector2.ZERO, Vector2.RIGHT, 200.0)
+	brute._on_damaged(info)
+	_assert(brute._state == &"stagger", "brute should stagger when hit")
+	_assert(brute.velocity.x < 5.0, "brute knockback should be heavily resisted")
+	brute.free()
+
+func _test_brute_attack_deals_heavy_damage() -> void:
+	var brute: Node = _load_brute_scene()
+	brute.global_position = Vector2(0, 0)
+	brute._sprite.scale = Vector2.ONE
+	brute.attack_range = 100.0
+	brute.attack_damage = 30.0
+	var player: CharacterBody2D = _create_test_player()
+	player.global_position = Vector2(30, 0)
+	var health: HealthComponent = player.get_node("HealthComponent") as HealthComponent
+	brute._physics_process(0.1)
+	_assert(brute._state == &"attack_telegraph", "brute should telegraph first")
+	brute._telegraph_timer = 0.0
+	brute._physics_process(0.1)
+	_assert(brute._attack_timer > 0.0, "attack cooldown should be set after brute attack")
+	_assert(brute._target == player, "brute target should be the player")
+	brute._perform_attack()
+	_assert(health.current_health < 100.0, "brute attack should deal damage, got health %.1f" % health.current_health)
+	player.free()
+	brute.free()
+
+
+func _test_brute_dies_once_using_shared_contract() -> void:
+	var brute: Node = _load_brute_scene()
+	brute.health_component.take_damage(DamageInfo.new(120.0))
+	_assert(brute.health_component.is_dead, "brute should be dead after lethal damage")
+	_assert(brute._state == &"dead", "brute state should be dead")
+	brute.free()
+
+func _test_brute_reset_clears_death_and_state() -> void:
+	var brute: Node = _load_brute_scene()
+	brute.health_component.take_damage(DamageInfo.new(120.0))
+	brute.reset()
+	_assert(not brute.health_component.is_dead, "reset should clear death via HealthComponent")
+	_assert(brute._state == &"idle", "reset should restore idle state")
+	brute.free()
+
+func _test_crowd_separation_prevents_exact_stacking() -> void:
+	var brute: Node = _load_brute_scene()
+	var shambler: Node = _load_shambler_scene()
+	brute.global_position = Vector2(0, 0)
+	shambler.global_position = Vector2(5, 0)
+	brute._physics_process(0.1)
+	shambler._physics_process(0.1)
+	_assert(brute.global_position.x <= -5.0 or shambler.global_position.x >= 10.0,
+		"enemies should separate when close, brute=%.1f shambler=%.1f" % [brute.global_position.x, shambler.global_position.x])
+	brute.free()
+	shambler.free()
+
+func _test_crowd_separation_uses_gentle_impulse() -> void:
+	var brute: Node = _load_brute_scene()
+	var shambler: Node = _load_shambler_scene()
+	brute.global_position = Vector2(0, 0)
+	shambler.global_position = Vector2(10, 0)
+	var initial_brute_vx: float = brute.velocity.x
+	var initial_shambler_vx: float = shambler.velocity.x
+	brute._physics_process(0.1)
+	shambler._physics_process(0.1)
+	var brute_delta: float = abs(brute.velocity.x - initial_brute_vx)
+	var shambler_delta: float = abs(shambler.velocity.x - initial_shambler_vx)
+	_assert(brute_delta < 15.0, "brute separation impulse should stay gentle, got %.1f" % brute_delta)
+	_assert(shambler_delta < 15.0, "shambler separation impulse should stay gentle, got %.1f" % shambler_delta)
+	brute.free()
+	shambler.free()
+
+func _test_mixed_archetypes_retain_navigation_and_attack() -> void:
+	var brute: Node = _load_brute_scene()
+	var runner: Node = _load_runner_scene()
+	var spitter: Node = _load_spitter_scene()
+	brute.global_position = Vector2(0, 0)
+	runner.global_position = Vector2(50, 0)
+	spitter.global_position = Vector2(100, 0)
+	_assert(brute.has_method("set_navigation_graph"), "brute should support navigation graph")
+	_assert(runner.has_method("set_navigation_graph"), "runner should support navigation graph")
+	_assert(spitter.has_method("set_navigation_graph"), "spitter should support navigation graph")
+	_assert(brute._state == &"idle", "brute should retain idle state")
+	_assert(runner._state == &"idle", "runner should retain idle state")
+	_assert(spitter._state == &"idle", "spitter should retain idle state")
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(150, 0)
+	player.add_to_group("player")
+	add_child(player)
+	brute._physics_process(0.1)
+	runner._physics_process(0.1)
+	spitter._physics_process(0.1)
+	_assert(brute._state == &"attack_telegraph" or brute._state == &"chase", "brute should transition to attack or chase")
+	_assert(runner._state == &"telegraph" or runner._state == &"chase", "runner should transition to telegraph or chase")
+	_assert(spitter._state == &"telegraph" or spitter._state == &"chase" or spitter._state == &"attack_cooldown", "spitter should transition to telegraph, chase, or cooldown")
+	player.free()
+	brute.free()
+	runner.free()
 	spitter.free()
 
 
