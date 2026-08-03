@@ -163,13 +163,12 @@ func _run_state(delta: float) -> void:
 				_set_state(&"attack")
 		&"attack":
 			velocity = Vector2.ZERO
-			_perform_attack()
-			if _attack_timer > 0.0:
-				_attack_timer -= delta
 			if _target and is_instance_valid(_target):
 				var dist: float = global_position.distance_to(_target.global_position)
 				if dist > attack_range:
 					_set_state(&"chase")
+			if _attack_timer > 0.0:
+				_attack_timer -= delta
 			if _attack_timer <= 0.0:
 				_set_state(&"attack_telegraph")
 				_telegraph_timer = attack_telegraph_duration
@@ -229,8 +228,6 @@ func _set_state(new_state: StringName) -> void:
 	if _state != &"attack_telegraph":
 		if _sprite and _sprite.modulate != _base_modulate:
 			_sprite.modulate = _base_modulate
-		if _sprite and _sprite.scale != Vector2.ONE:
-			_sprite.scale = Vector2.ONE
 
 func reset() -> void:
 	_set_state(&"idle")
