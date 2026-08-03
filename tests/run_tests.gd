@@ -1382,3 +1382,151 @@ func _test_failed_links_trigger_bounded_stuck_recovery() -> void:
 	graph.free()
 
 
+# --- S08C Spitter tests ---
+
+func _load_spitter_scene() -> Node:
+	var packed: PackedScene = load("res://scenes/enemies/spitter.tscn")
+	var instance: Node = packed.instantiate()
+	add_child(instance)
+	return instance
+
+func _test_spitter_starts_idle() -> void:
+	var spitter: Node = _load_spitter_scene()
+	_assert(spitter._state == &"idle", "spitter should start idle")
+	spitter.free()
+
+func _test_spitter_telegraphs_before_attack() -> void:
+	var spitter: Node = _load_spitter_scene()
+	spitter.global_position = Vector2(0, 0)
+	spitter._sprite.scale = Vector2.ONE
+	spitter.attack_range = 200.0
+	spitter.attack_telegraph_duration = 0.2
+	var signal_fired: bool = false
+	spitter.attack_telegraph_started.connect(func(): signal_fired = true)
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(30, 0)
+	player.add_to_group("player")
+	add_child(player)
+	spitter._physics_process(0.1)
+	_assert(spitter._state == &"telegraph", "spitter should enter telegraph when in range")
+	_assert(signal_fired, "telegraph signal should fire")
+	spitter.free()
+	player.free()
+
+func _test_spitter_maintains_range() -> void:
+	var spitter: Node = _load_spitter_scene()
+	spitter.global_position = Vector2(0, 0)
+	spitter._sprite.scale = Vector2.ONE
+	spitter.attack_range = 100.0
+	spitter.attack_cooldown = 0.01
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(150, 0)
+	player.add_to_group("player")
+	add_child(player)
+	spitter._physics_process(0.1)
+	_assert(spitter._state == &"chase", "spitter should chase when player is outside attack range")
+	spitter.free()
+	player.free()
+
+func _test_spitter_attack_cooldown_prevents_spam() -> void:
+	var spitter: Node = _load_spitter_scene()
+	spitter.global_position = Vector2(0, 0)
+	spitter._sprite.scale = Vector2.ONE
+	spitter.attack_range = 200.0
+	spitter.attack_cooldown = 0.5
+	spitter.attack_telegraph_duration = 0.1
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(30, 0)
+	player.add_to_group("player")
+	add_child(player)
+	spitter._physics_process(0.1)
+	_assert(spitter._state == &"telegraph", "should telegraph first")
+	spitter._telegraph_timer = 0.0
+	spitter._physics_process(0.1)
+	_assert(spitter._state == &"attack_cooldown", "should enter cooldown after attack")
+	spitter._attack_timer = 0.3
+	spitter._physics_process(0.1)
+	_assert(spitter._state == &"attack_cooldown", "should remain in cooldown while timer active")
+	spitter.free()
+	player.free()
+
+func _test_spitter_projectile_has_shared_damage_ownership() -> void:
+	var spitter: Node = _load_spitter_scene()
+	spitter.global_position = Vector2(0, 0)
+	spitter._sprite.scale = Vector2.ONE
+	spitter.attack_range = 200.0
+	spitter.attack_telegraph_duration = 0.1
+	spitter.attack_damage = 15.0
+	spitter.projectile_speed = 300.0
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(30, 0)
+	player.add_to_group("player")
+	add_child(player)
+	spitter._physics_process(0.1)
+	_assert(spitter._state == &"telegraph", "should telegraph first")
+	spitter._telegraph_timer = 0.0
+	spitter._physics_process(0.1)
+	var projectiles: Array[Node] = get_tree().get_nodes_in_group("projectile")
+	var enemy_projectile: Projectile = null
+	for p in projectiles:
+		if p.source == spitter:
+			enemy_projectile = p as Projectile
+			break
+	_assert(enemy_projectile != null, "spitter projectile should exist with spitter as source")
+	_assert(enemy_projectile.damage == 15.0, "projectile should carry spitter damage value")
+	if enemy_projectile:
+		enemy_projectile.queue_free()
+	spitter.free()
+	player.free()
+
+func _test_spitter_projectile_cleans_up_after_hit() -> void:
+	var spitter: Node = _load_spitter_scene()
+	spitter.global_position = Vector2(0, 0)
+	spitter._sprite.scale = Vector2.ONE
+	spitter.attack_range = 200.0
+	spitter.attack_telegraph_duration = 0.1
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(30, 0)
+	player.add_to_group("player")
+	add_child(player)
+	spitter._physics_process(0.1)
+	spitter._telegraph_timer = 0.0
+	spitter._physics_process(0.1)
+	var projectiles: Array[Node] = get_tree().get_nodes_in_group("projectile")
+	var enemy_projectile: Projectile = null
+	for p in projectiles:
+		if p.source == spitter:
+			enemy_projectile = p as Projectile
+			break
+	_assert(enemy_projectile != null, "projectile should be spawned")
+	var was_alive: bool = is_instance_valid(enemy_projectile)
+	enemy_projectile.body_entered.emit(player)
+	await get_tree().process_frame
+	_assert(not is_instance_valid(enemy_projectile), "projectile should queue_free after hitting body")
+	spitter.free()
+	player.free()
+
+func _test_spitter_blocked_los_prevents_ranged_damage() -> void:
+	var spitter: Node = _load_spitter_scene()
+	spitter.global_position = Vector2(0, 0)
+	spitter._sprite.scale = Vector2.ONE
+	spitter.attack_range = 300.0
+	spitter.attack_telegraph_duration = 0.1
+	var obstacle: StaticBody2D = StaticBody2D.new()
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	shape.shape = RectangleShape2D.new()
+	shape.shape.size = Vector2(10, 40)
+	obstacle.add_child(shape)
+	obstacle.global_position = Vector2(25, 0)
+	add_child(obstacle)
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(50, 0)
+	player.add_to_group("player")
+	add_child(player)
+	spitter._physics_process(0.1)
+	_assert(spitter._state == &"chase", "blocked LOS should prevent attack, spitter should chase instead")
+	obstacle.free()
+	player.free()
+	spitter.free()
+
+

@@ -1,0 +1,34 @@
+[gd_scene load_steps=4 format=3 uid="uid://spitter_base"]
+
+[ext_resource type="Script" path="res://scripts/enemies/spitter.gd" id="1_spitter"]
+[ext_resource type="Script" path="res://scripts/core/health_component.gd" id="2_health"]
+[ext_resource type="Script" path="res://scripts/navigation/enemy_navigator.gd" id="3_nav"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(24, 40)
+
+[node name="Spitter" type="CharacterBody2D"]
+script = ExtResource("1_spitter")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+modulate = Color(0.7, 0.2, 0.8, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_1")
+collision_layer = 4
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("2_health")
+max_health = 40.0
+invulnerability_duration = 0.1
+
+[node name="RayCast2D" type="RayCast2D" parent="."]
+target_position = Vector2(250, 0)
+collision_mask = 3
+
+[node name="AttackCooldown" type="Timer" parent="."]
+wait_time = 2.0
+one_shot = true
+
+[node name="EnemyNavigator" type="Node2D" parent="."]
+script = ExtResource("3_nav")
