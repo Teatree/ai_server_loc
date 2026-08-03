@@ -12,6 +12,7 @@ var _last_checkpoint: Vector2 = Vector2(200, 600)
 var _respawn_invulnerability: float = 0.0
 var _facing: int = 1
 var _current_weapon_index: int = 0
+var _melee_attack = null
 
 
 func _ready() -> void:
@@ -26,7 +27,14 @@ func _ready() -> void:
 	if _weapon_pivot and _weapon_inventory.size() > 0:
 		_weapon_pivot.data = _weapon_inventory[0]
 		_weapon_pivot.reset()
+	if _weapon_pivot and _weapon_pivot.has_signal("equipped"):
+		_weapon_pivot.equipped.emit(_weapon_pivot)
+	_melee_attack = load("res://scripts/weapons/melee_attack.gd").new()
+	_melee_attack.collision_mask = 2
+	add_child(_melee_attack)
 
+
+var _melee_swing_timer: float = 0.0
 
 func _physics_process(delta: float) -> void:
 	if movement_controller:
@@ -35,6 +43,10 @@ func _physics_process(delta: float) -> void:
 		_aim.update_aim(global_position, _facing)
 	if _respawn_invulnerability > 0.0:
 		_respawn_invulnerability -= delta
+	if _melee_swing_timer > 0.0:
+		_melee_swing_timer -= delta
+		if _melee_swing_timer <= 0.0 and _melee_attack:
+			_melee_attack.end_swing()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -44,6 +56,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_reload()
 	if event.is_action_pressed("switch_weapon"):
 		_try_switch_weapon()
+	if event.is_action_pressed("melee"):
+		_try_melee()
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		GameFlow.request_pause()
 
@@ -76,7 +90,22 @@ func _try_switch_weapon() -> bool:
 	_current_weapon_index = next_index
 	_weapon_pivot.data = _weapon_inventory[_current_weapon_index]
 	_weapon_pivot.reset()
+	if _weapon_pivot.has_signal("equipped"):
+		_weapon_pivot.equipped.emit(_weapon_pivot)
 	return true
+
+
+func _try_melee() -> void:
+	if not _melee_attack or not _weapon_pivot:
+		return
+	var origin: Vector2 = global_position
+	var data: WeaponData = null
+	if _weapon_pivot.has_method("data"):
+		data = _weapon_pivot.data
+	if not data or data.melee_range <= 0.0:
+		return
+	_melee_attack.attack(origin, _facing, data)
+	_melee_swing_timer = 0.15
 
 
 func take_damage(info: DamageInfo) -> void:
@@ -110,6 +139,11 @@ func respawn() -> void:
 	if _weapon_pivot and _weapon_inventory.size() > 0:
 		_weapon_pivot.data = _weapon_inventory[0]
 		_weapon_pivot.reset()
+	if _weapon_pivot and _weapon_pivot.has_signal("equipped"):
+		_weapon_pivot.equipped.emit(_weapon_pivot)
+	if _melee_attack:
+		_melee_attack.reset()
+	_melee_swing_timer = 0.0
 	_respawn_invulnerability = 1.0
 
 

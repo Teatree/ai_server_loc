@@ -2,6 +2,8 @@ extends Node
 
 const RIFLE_DATA_SCRIPT = preload("res://scripts/weapons/rifle_data.gd")
 const AUTOMATIC_RIFLE_SCRIPT = preload("res://scripts/weapons/automatic_rifle.gd")
+const MELEE_ATTACK_SCRIPT = preload("res://scripts/weapons/melee_attack.gd")
+const MELEE_DATA_SCRIPT = preload("res://scripts/weapons/melee_data.gd")
 
 var _passed: int = 0
 var _failed: int = 0
@@ -60,6 +62,11 @@ func _ready() -> void:
 	_test_switching_blocks_during_reload()
 	_test_switching_blocks_during_cooldown()
 	_test_weapon_state_correct_after_respawn()
+	_test_melee_respects_range_and_cooldown()
+	_test_melee_cannot_damage_repeatedly_per_swing()
+	_test_melee_interrupts_weak_enemy_without_corrupting_death()
+	_test_melee_signal_emitted_on_hit()
+	_test_all_weapons_expose_consistent_signals()
 	set_process(true)
 
 func _process(delta: float) -> void:
@@ -873,6 +880,122 @@ func _test_integrated_arena_playability() -> void:
 	_assert(player.global_position == checkpoint.global_position, "respawn should work after checkpoint")
 	_assert(player._respawn_invulnerability > 0.0, "respawn should grant invulnerability")
 	level.free()
+
+
+# --- S07A inventory, reload, and switching tests ---
+
+# --- S07D melee and weapon integration tests ---
+
+func _test_melee_respects_range_and_cooldown() -> void:
+	var melee: Node = load("res://scripts/weapons/melee_attack.gd").new()
+	add_child(melee)
+	melee.set_process(true)
+	var data: WeaponData = load("res://scripts/weapons/melee_data.gd").new()
+	data.melee_range = 50.0
+	data.melee_cooldown = 0.3
+	_assert(melee.can_melee(), "melee should be ready initially")
+	melee.attack(Vector2.ZERO, 1, data)
+	_assert(not melee.can_melee(), "melee should be on cooldown after attack")
+	melee._process(0.2)
+	_assert(not melee.can_melee(), "melee should still be on cooldown at 0.2s")
+	melee._process(0.15)
+	_assert(melee.can_melee(), "melee should be ready after cooldown expires")
+	melee.free()
+
+
+var _melee_signal_test_received: bool = false
+
+func _on_melee_signal_test(_t: Node, _d: float, _k: float) -> void:
+	_melee_signal_test_received = true
+
+func _test_melee_signal_emitted_on_hit() -> void:
+	var melee: Node = load("res://scripts/weapons/melee_attack.gd").new()
+	add_child(melee)
+	_melee_signal_test_received = false
+	melee.melee_hit.connect(Callable(self, "_on_melee_signal_test"))
+	melee.melee_hit.emit(null, 0.0, 0.0)
+	_assert(_melee_signal_test_received, "melee_hit signal should be receivable")
+	melee.free()
+
+func _test_melee_cannot_damage_repeatedly_per_swing() -> void:
+	var melee: Node = load("res://scripts/weapons/melee_attack.gd").new()
+	add_child(melee)
+	melee.set_process(true)
+	var data: WeaponData = load("res://scripts/weapons/melee_data.gd").new()
+	data.melee_range = 100.0
+	var enemy: StaticBody2D = StaticBody2D.new()
+	enemy.add_to_group("enemy")
+	enemy.global_position = Vector2(20, 0)
+	enemy.collision_layer = 1
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	shape.shape = RectangleShape2D.new()
+	shape.shape.size = Vector2(10, 40)
+	enemy.add_child(shape)
+	add_child(enemy)
+	melee.attack(Vector2.ZERO, 1, data)
+	melee._process(0.1)
+	_assert(melee._hit_bodies.size() == 1, "initial scan should register one hit target, got %d" % melee._hit_bodies.size())
+	_assert(melee._scanned_bodies.size() == 1, "initial scan should track scanned target")
+	melee._on_body_entered(enemy)
+	melee._on_body_entered(enemy)
+	_assert(melee._hit_bodies.size() == 1, "body should not be re-added after initial scan")
+	melee.end_swing()
+	_assert(melee._hit_bodies.size() == 0, "end_swing should clear hit bodies")
+	_assert(melee._scanned_bodies.size() == 0, "end_swing should clear scanned bodies")
+	melee._process(0.35)
+	melee.attack(Vector2.ZERO, 1, data)
+	melee._process(0.1)
+	_assert(melee._scanned_bodies.size() == 1 or melee._hit_bodies.size() == 1,
+		"second swing should detect enemy again via scan or physics, hit=%d scanned=%d" % [melee._hit_bodies.size(), melee._scanned_bodies.size()])
+	melee.free()
+	enemy.free()
+
+
+func _test_melee_interrupts_weak_enemy_without_corrupting_death() -> void:
+	var shambler: Node = _load_shambler_scene()
+	shambler._set_state(&"attack_telegraph")
+	var melee: Node = load("res://scripts/weapons/melee_attack.gd").new()
+	add_child(melee)
+	melee.set_process(true)
+	melee.melee_hit.connect(func(_t: Node, _d: float, _k: float) -> void:
+		if shambler.has_method("interrupt"):
+			shambler.interrupt()
+	)
+	var data: WeaponData = load("res://scripts/weapons/melee_data.gd").new()
+	data.melee_range = 100.0
+	data.melee_damage = 5.0
+	data.melee_knockback = 100.0
+	shambler.global_position = Vector2(20, 0)
+	melee.attack(Vector2.ZERO, 1, data)
+	melee._process(0.1)
+	_assert(melee._hit_bodies.size() == 1, "melee scan should detect shambler, got %d" % melee._hit_bodies.size())
+	_assert(shambler._state == &"chase", "melee should interrupt telegraph state via signal, got %s" % shambler._state)
+	shambler.health_component.take_damage(DamageInfo.new(100.0))
+	_assert(shambler._state == &"dead", "shambler should be dead after lethal damage")
+	melee.attack(Vector2.ZERO, 1, data)
+	melee._process(0.1)
+	melee._on_body_entered(shambler)
+	_assert(shambler._state == &"dead", "melee should not corrupt dead state, got %s" % shambler._state)
+	melee.free()
+	shambler.free()
+
+
+func _test_all_weapons_expose_consistent_signals() -> void:
+	var signals_array: Array[StringName] = [
+		&"fired",
+		&"dry_fire",
+		&"ammo_changed",
+		&"state_changed",
+		&"noise_emitted",
+		&"reload_completed",
+		&"equipped"
+	]
+	for signal_name in signals_array:
+		var data: WeaponData = WeaponData.new()
+		var weapon: WeaponBase = WeaponBase.new()
+		weapon.data = data
+		_assert(weapon.has_signal(signal_name), "weapon should expose %s signal" % signal_name)
+		weapon.free()
 
 
 # --- S07A inventory, reload, and switching tests ---

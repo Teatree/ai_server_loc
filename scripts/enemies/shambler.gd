@@ -169,6 +169,16 @@ func _on_damaged(info: DamageInfo) -> void:
 			velocity = info.hit_direction * info.knockback * 0.05
 			move_and_slide()
 
+
+func interrupt() -> void:
+	if _state == &"dead":
+		return
+	if _state == &"attack_telegraph" or _state == &"stagger":
+		_stagger_timer = 0.0
+		_telegraph_timer = 0.0
+		_attack_timer = 0.0
+		_set_state(&"chase")
+
 func _on_died(info: DamageInfo) -> void:
 	_set_state(&"dead")
 	velocity = Vector2.ZERO

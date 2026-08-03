@@ -7,6 +7,7 @@ signal ammo_changed(current: int, maximum: int)
 signal state_changed(state: StringName)
 signal noise_emitted(position: Vector2, strength: float)
 signal reload_completed()
+signal equipped(weapon: WeaponBase)
 
 @export var data: WeaponData :
 	set(value):
@@ -133,6 +134,7 @@ func _apply_data() -> void:
 		_current_ammo = data.max_ammo
 		_reserve_ammo = data.reserve_ammo
 		ammo_changed.emit(_current_ammo, data.max_ammo)
+	equipped.emit(self)
 
 func _apply_recoil(direction: Vector2) -> void:
 	if not data:
