@@ -1140,6 +1140,126 @@ func _collect_nodes_by_type(parent: Node, type_name: String, out: Array[Node]) -
 		_collect_nodes_by_type(child, type_name, out)
 
 
+# --- S08B Runner tests ---
+
+var _runner_state_changes: Array[StringName] = []
+
+func _load_runner_scene() -> Node:
+	var packed: PackedScene = load("res://scenes/enemies/runner.tscn")
+	var instance: Node = packed.instantiate()
+	add_child(instance)
+	return instance
+
+func _test_runner_starts_idle() -> void:
+	var runner: Node = _load_runner_scene()
+	_assert(runner._state == &"idle", "runner should start idle")
+	runner.free()
+
+func _test_runner_chase_speed_is_faster_than_shambler() -> void:
+	var runner: Node = _load_runner_scene()
+	_assert(runner.chase_speed > 150.0, "runner chase speed should be faster than shambler baseline, got %f" % runner.chase_speed)
+	runner.free()
+
+func _test_runner_has_distinct_states() -> void:
+	var runner: Node = _load_runner_scene()
+	var has_telegraph: bool = runner.has_method("_start_lunge")
+	_assert(has_telegraph, "runner should have distinct lunge attack path")
+	runner.free()
+
+func _test_runner_telegraph_has_visible_flash() -> void:
+	var runner: Node = _load_runner_scene()
+	runner.global_position = Vector2(0, 0)
+	runner._sprite.scale = Vector2.ONE
+	runner.lunge_damage_radius = 100.0
+	runner.attack_cooldown = 0.01
+	runner.telegraph_duration = 0.2
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(20, 0)
+	player.add_to_group("player")
+	add_child(player)
+	runner._physics_process(0.1)
+	_assert(runner._state == &"telegraph", "runner should enter telegraph state when in lunge range")
+	_assert(runner._sprite.modulate != runner._base_modulate, "runner sprite should flash during telegraph")
+	player.free()
+	runner.free()
+
+func _test_runner_telegraph_signal_fires() -> void:
+	var runner: Node = _load_runner_scene()
+	runner.global_position = Vector2(0, 0)
+	runner._sprite.scale = Vector2.ONE
+	runner.lunge_damage_radius = 100.0
+	runner.attack_cooldown = 0.01
+	runner.telegraph_duration = 0.2
+	var signal_fired: bool = false
+	runner.attack_telegraph_started.connect(func(): signal_fired = true)
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(20, 0)
+	player.add_to_group("player")
+	add_child(player)
+	runner._physics_process(0.1)
+	_assert(signal_fired, "attack_telegraph_started signal should fire in telegraph state")
+	player.free()
+	runner.free()
+
+func _test_runner_lunge_deals_damage() -> void:
+	var runner: Node = _load_runner_scene()
+	runner.global_position = Vector2(0, 0)
+	runner._sprite.scale = Vector2.ONE
+	runner.lunge_damage_radius = 200.0
+	runner.attack_cooldown = 0.01
+	runner.telegraph_duration = 0.1
+	runner.lunge_duration = 0.2
+	runner.lunge_speed = 500.0
+	runner.attack_damage = 15.0
+	var player: CharacterBody2D = _create_test_player()
+	player.global_position = Vector2(30, 0)
+	var health: HealthComponent = player.get_node("HealthComponent") as HealthComponent
+	runner._physics_process(0.1)
+	_assert(runner._state == &"telegraph", "runner should telegraph first")
+	runner._telegraph_timer = 0.0
+	runner._physics_process(0.1)
+	_assert(runner._state == &"lunge", "runner should enter lunge state after telegraph")
+	runner._lunge_timer = 0.0
+	runner._physics_process(0.1)
+	_assert(health.current_health < 100.0, "lunge should damage player")
+	player.free()
+	runner.free()
+
+func _test_runner_dies_once_using_shared_contract() -> void:
+	var runner: Node = _load_runner_scene()
+	var death_count: int = 0
+	runner.health_component.died.connect(func(_info: DamageInfo): death_count += 1)
+	runner.health_component.take_damage(DamageInfo.new(50.0))
+	runner.health_component.take_damage(DamageInfo.new(10.0))
+	_assert(death_count == 1, "runner death should emit exactly once via HealthComponent")
+	_assert(runner._state == &"dead", "runner state should be dead")
+	runner.free()
+
+func _test_runner_reset_clears_death_and_state() -> void:
+	var runner: Node = _load_runner_scene()
+	runner.health_component.take_damage(DamageInfo.new(50.0))
+	runner.reset()
+	_assert(not runner.health_component.is_dead, "reset should clear death via HealthComponent")
+	_assert(runner._state == &"idle", "reset should restore idle state")
+	runner.free()
+
+func _test_runner_perception_reuses_noise_contract() -> void:
+	var runner: Node = _load_runner_scene()
+	runner.noise_memory_duration = 0.1
+	runner.receive_noise(Vector2(100, 0), 1.0)
+	_assert(runner._state == &"investigate", "runner should investigate on noise")
+	_assert(runner._last_known_position == Vector2(100, 0), "runner should store noise origin")
+	runner._physics_process(0.2)
+	_assert(runner._last_known_position == Vector2.ZERO, "runner noise position should expire")
+	runner.free()
+
+func _test_runner_navigation_uses_enemy_navigator() -> void:
+	var runner: Node = _load_runner_scene()
+	var navigator: Node = runner.get_node("EnemyNavigator")
+	_assert(navigator != null, "runner should have EnemyNavigator node")
+	_assert(navigator is Node2D, "navigator should be Node2D")
+	runner.free()
+
 # --- S08A authored platform navigation tests ---
 
 func _test_navigation_classifies_reachable() -> void:
