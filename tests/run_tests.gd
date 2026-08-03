@@ -68,6 +68,12 @@ func _ready() -> void:
 	_test_melee_interrupts_weak_enemy_without_corrupting_death()
 	_test_melee_signal_emitted_on_hit()
 	_test_all_weapons_expose_consistent_signals()
+	_test_navigation_classifies_reachable()
+	_test_navigation_classifies_jump()
+	_test_navigation_classifies_drop()
+	_test_navigation_classifies_blocked_and_unreachable()
+	_test_enemy_traverses_jump_and_drop_links()
+	_test_failed_links_trigger_bounded_stuck_recovery()
 	set_process(true)
 
 
@@ -1132,5 +1138,127 @@ func _collect_nodes_by_type(parent: Node, type_name: String, out: Array[Node]) -
 		if child.get_class() == type_name:
 			out.append(child)
 		_collect_nodes_by_type(child, type_name, out)
+
+
+# --- S08A authored platform navigation tests ---
+
+func _test_navigation_classifies_reachable() -> void:
+	var PlatformGraph = load("res://scripts/navigation/platform_graph.gd")
+	var PlatformNode = load("res://scripts/navigation/platform_node.gd")
+	var PlatformLink = load("res://scripts/navigation/platform_link.gd")
+	var graph = PlatformGraph.new()
+	var a = PlatformNode.new(&"plat_a", Vector2(0, 100))
+	var b = PlatformNode.new(&"plat_b", Vector2(60, 100))
+	graph.add_node(a)
+	graph.add_node(b)
+	graph.add_link(a, b, PlatformLink.LinkType.REACHABLE)
+	_assert(graph.classify_target(a, b) == PlatformLink.LinkType.REACHABLE,
+		"close same-level nodes should be reachable")
+	graph.free()
+
+func _test_navigation_classifies_jump() -> void:
+	var PlatformGraph = load("res://scripts/navigation/platform_graph.gd")
+	var PlatformNode = load("res://scripts/navigation/platform_node.gd")
+	var PlatformLink = load("res://scripts/navigation/platform_link.gd")
+	var graph = PlatformGraph.new()
+	var a = PlatformNode.new(&"plat_a", Vector2(0, 200))
+	var b = PlatformNode.new(&"plat_b", Vector2(50, 120))
+	graph.add_node(a)
+	graph.add_node(b)
+	graph.add_link(a, b, PlatformLink.LinkType.JUMP)
+	_assert(graph.classify_target(a, b) == PlatformLink.LinkType.JUMP,
+		"higher target should classify as jump")
+	graph.free()
+
+func _test_navigation_classifies_drop() -> void:
+	var PlatformGraph = load("res://scripts/navigation/platform_graph.gd")
+	var PlatformNode = load("res://scripts/navigation/platform_node.gd")
+	var PlatformLink = load("res://scripts/navigation/platform_link.gd")
+	var graph = PlatformGraph.new()
+	var a = PlatformNode.new(&"plat_a", Vector2(0, 100))
+	var b = PlatformNode.new(&"plat_b", Vector2(50, 200))
+	graph.add_node(a)
+	graph.add_node(b)
+	graph.add_link(a, b, PlatformLink.LinkType.DROP)
+	_assert(graph.classify_target(a, b) == PlatformLink.LinkType.DROP,
+		"lower target should classify as drop")
+	graph.free()
+
+func _test_navigation_classifies_blocked_and_unreachable() -> void:
+	var PlatformGraph = load("res://scripts/navigation/platform_graph.gd")
+	var PlatformNode = load("res://scripts/navigation/platform_node.gd")
+	var PlatformLink = load("res://scripts/navigation/platform_link.gd")
+	var graph = PlatformGraph.new()
+	var a = PlatformNode.new(&"plat_a", Vector2(0, 100))
+	var b = PlatformNode.new(&"plat_b", Vector2(300, 100))
+	var c = PlatformNode.new(&"plat_c", Vector2(50, 350))
+	graph.add_node(a)
+	graph.add_node(b)
+	graph.add_node(c)
+	graph.add_link(a, b, PlatformLink.LinkType.BLOCKED)
+	_assert(graph.classify_target(a, b) == PlatformLink.LinkType.BLOCKED,
+		"far same-level target should be blocked")
+	_assert(graph.classify_target(a, c) == PlatformLink.LinkType.UNREACHABLE,
+		"excessive vertical gap should be unreachable")
+	graph.free()
+
+func _test_enemy_traverses_jump_and_drop_links() -> void:
+	var PlatformGraph = load("res://scripts/navigation/platform_graph.gd")
+	var PlatformNode = load("res://scripts/navigation/platform_node.gd")
+	var PlatformLink = load("res://scripts/navigation/platform_link.gd")
+	var EnemyNavigator = load("res://scripts/navigation/enemy_navigator.gd")
+	var graph = PlatformGraph.new()
+	var ground = PlatformNode.new(&"ground", Vector2(0, 200))
+	var mid = PlatformNode.new(&"mid", Vector2(80, 120))
+	var low = PlatformNode.new(&"low", Vector2(80, 220))
+	graph.add_node(ground)
+	graph.add_node(mid)
+	graph.add_node(low)
+	graph.add_link(ground, mid, PlatformLink.LinkType.JUMP)
+	graph.add_link(mid, low, PlatformLink.LinkType.DROP)
+	var body: CharacterBody2D = CharacterBody2D.new()
+	body.global_position = ground.position
+	add_child(body)
+	var navigator = EnemyNavigator.new()
+	navigator.set_graph(graph)
+	navigator.set_body(body)
+	add_child(navigator)
+	_assert(navigator.request_jump_to(mid), "jump request should succeed")
+	_assert(navigator.is_navigating(), "navigator should be traversing after jump request")
+	_assert(navigator.get_state() == &"traversing", "state should be traversing")
+	_assert(navigator.get_target_node() == mid, "target should be mid platform")
+	_assert(navigator.request_drop_to(low), "drop request should succeed after reaching mid")
+	_assert(navigator.get_target_node() == low, "target should be low platform")
+	navigator.free()
+	body.free()
+	graph.free()
+
+func _test_failed_links_trigger_bounded_stuck_recovery() -> void:
+	var PlatformGraph = load("res://scripts/navigation/platform_graph.gd")
+	var PlatformNode = load("res://scripts/navigation/platform_node.gd")
+	var PlatformLink = load("res://scripts/navigation/platform_link.gd")
+	var EnemyNavigator = load("res://scripts/navigation/enemy_navigator.gd")
+	var graph = PlatformGraph.new()
+	graph.max_stuck_retries = 2
+	var ground = PlatformNode.new(&"ground", Vector2(0, 200))
+	var blocked = PlatformNode.new(&"blocked", Vector2(500, 200))
+	graph.add_node(ground)
+	graph.add_node(blocked)
+	graph.add_link(ground, blocked, PlatformLink.LinkType.BLOCKED)
+	var body: CharacterBody2D = CharacterBody2D.new()
+	body.global_position = ground.position
+	add_child(body)
+	var navigator = EnemyNavigator.new()
+	navigator.set_graph(graph)
+	navigator.set_body(body)
+	add_child(navigator)
+	_assert(not navigator.request_jump_to(blocked), "first jump to blocked node should fail")
+	_assert(navigator.get_state() == &"stuck", "navigator should be stuck after failed traversal")
+	navigator.request_recovery()
+	_assert(navigator.get_state() == &"idle", "recovery should reset state to idle without infinite retries")
+	_assert(graph._stuck_count == 0, "graph stuck count should be zero after bounded recovery")
+	navigator.free()
+	body.free()
+	graph.free()
 
 

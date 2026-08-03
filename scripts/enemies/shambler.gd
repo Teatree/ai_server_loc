@@ -18,6 +18,7 @@ signal attack_telegraph_started()
 @onready var _raycast: RayCast2D = $RayCast2D
 @onready var _collision: CollisionShape2D = $CollisionShape2D
 @onready var _sprite: Sprite2D = $Sprite2D
+@onready var _navigator: Node2D = $EnemyNavigator
 
 var _state: StringName = &"idle"
 var _target: Node2D = null
@@ -38,6 +39,8 @@ func _ready() -> void:
 			weapon.noise_emitted.connect(receive_noise)
 	if _raycast:
 		_raycast.add_exception(self)
+	if _navigator:
+		_navigator.set_body(self)
 
 func _physics_process(delta: float) -> void:
 	if health_component and health_component.is_dead:
@@ -208,6 +211,12 @@ func reset() -> void:
 		_collision.disabled = false
 	if _raycast:
 		_raycast.enabled = true
+	if _navigator:
+		_navigator.reset()
+
+func set_navigation_graph(graph: PlatformGraph) -> void:
+	if _navigator and _navigator.has_method("set_graph"):
+		_navigator.set_graph(graph)
 
 func receive_noise(position: Vector2, strength: float) -> void:
 	if not is_active():
