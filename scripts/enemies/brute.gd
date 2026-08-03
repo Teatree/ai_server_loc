@@ -138,7 +138,10 @@ func _has_clear_sight(target_pos: Vector2) -> bool:
 		if collider and collider.is_in_group("player"):
 			return true
 		return false
-	return true
+	for node: Node in get_tree().get_nodes_in_group("player"):
+		if node.global_position.distance_to(target_pos) < 5.0:
+			return true
+	return false
 
 func _run_state(delta: float) -> void:
 	match _state:
@@ -160,6 +163,7 @@ func _run_state(delta: float) -> void:
 				_set_state(&"attack")
 		&"attack":
 			velocity = Vector2.ZERO
+			_perform_attack()
 			if _attack_timer > 0.0:
 				_attack_timer -= delta
 			if _target and is_instance_valid(_target):
@@ -170,7 +174,6 @@ func _run_state(delta: float) -> void:
 				_set_state(&"attack_telegraph")
 				_telegraph_timer = attack_telegraph_duration
 				_attack_timer = attack_cooldown
-				attack_telegraph_started.emit()
 
 	_apply_crowd_separation(delta)
 
@@ -221,6 +224,8 @@ func _set_state(new_state: StringName) -> void:
 		return
 	_state = new_state
 	state_changed.emit(_state)
+	if _state == &"attack_telegraph":
+		attack_telegraph_started.emit()
 	if _state != &"attack_telegraph":
 		if _sprite and _sprite.modulate != _base_modulate:
 			_sprite.modulate = _base_modulate
@@ -277,4 +282,7 @@ func _apply_crowd_separation(delta: float) -> void:
 		var dir: Vector2 = global_position - other_body.global_position
 		var dist: float = dir.length()
 		if dist < separation_radius and dist > 0.01:
-			velocity += dir.normalized() * separation_force * delta
+			var push: Vector2 = dir.normalized() * separation_force * delta
+			velocity += push
+			if other_body is CharacterBody2D:
+				other_body.velocity -= push

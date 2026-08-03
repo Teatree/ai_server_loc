@@ -75,7 +75,9 @@ func _apply_crowd_separation(delta: float) -> void:
 		var dir: Vector2 = global_position - other_body.global_position
 		var dist: float = dir.length()
 		if dist < 30.0 and dist > 0.01:
-			velocity += dir.normalized() * 60.0 * delta
+			var push: Vector2 = dir.normalized() * 60.0 * delta
+			velocity += push
+			other_body.velocity -= push
 
 func _update_telegraph_visual(delta: float) -> void:
 	if _state == &"telegraph":
@@ -140,7 +142,10 @@ func _has_clear_sight(target_pos: Vector2) -> bool:
 		if collider and collider.is_in_group("player"):
 			return true
 		return false
-	return true
+	for node: Node in get_tree().get_nodes_in_group("player"):
+		if node.global_position.distance_to(target_pos) < 5.0:
+			return true
+	return false
 
 func _run_state(delta: float) -> void:
 	match _state:
@@ -153,6 +158,8 @@ func _run_state(delta: float) -> void:
 				var dist: float = global_position.distance_to(_target.global_position)
 				if dist <= attack_range:
 					_approach(_target.global_position, chase_speed * 0.5, delta)
+					if _has_clear_sight(_target.global_position) and _attack_timer <= 0.0:
+						_set_state(&"telegraph")
 				else:
 					_approach(_target.global_position, chase_speed, delta)
 			else:
