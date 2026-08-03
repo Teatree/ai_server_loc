@@ -1401,19 +1401,15 @@ func _test_failed_links_trigger_bounded_stuck_recovery() -> void:
 
 # --- S08C Spitter tests ---
 
-func _load_spitter_scene() -> Node:
-	var packed: PackedScene = load("res://scenes/enemies/spitter.tscn")
-	var instance: Node = packed.instantiate()
-	add_child(instance)
-	return instance
-
 func _test_spitter_starts_idle() -> void:
-	var spitter: Node = _load_spitter_scene()
+	var spitter: Node = load("res://scenes/enemies/spitter.tscn").instantiate()
+	add_child(spitter)
 	_assert(spitter._state == &"idle", "spitter should start idle")
 	spitter.free()
 
 func _test_spitter_telegraphs_before_attack() -> void:
-	var spitter: Node = _load_spitter_scene()
+	var spitter: Node = load("res://scenes/enemies/spitter.tscn").instantiate()
+	add_child(spitter)
 	spitter.global_position = Vector2(0, 0)
 	spitter._sprite.scale = Vector2.ONE
 	spitter.attack_range = 200.0
@@ -1431,7 +1427,8 @@ func _test_spitter_telegraphs_before_attack() -> void:
 	player.free()
 
 func _test_spitter_maintains_range() -> void:
-	var spitter: Node = _load_spitter_scene()
+	var spitter: Node = load("res://scenes/enemies/spitter.tscn").instantiate()
+	add_child(spitter)
 	spitter.global_position = Vector2(0, 0)
 	spitter._sprite.scale = Vector2.ONE
 	spitter.attack_range = 100.0
@@ -1446,7 +1443,8 @@ func _test_spitter_maintains_range() -> void:
 	player.free()
 
 func _test_spitter_attack_cooldown_prevents_spam() -> void:
-	var spitter: Node = _load_spitter_scene()
+	var spitter: Node = load("res://scenes/enemies/spitter.tscn").instantiate()
+	add_child(spitter)
 	spitter.global_position = Vector2(0, 0)
 	spitter._sprite.scale = Vector2.ONE
 	spitter.attack_range = 200.0
@@ -1468,7 +1466,8 @@ func _test_spitter_attack_cooldown_prevents_spam() -> void:
 	player.free()
 
 func _test_spitter_projectile_has_shared_damage_ownership() -> void:
-	var spitter: Node = _load_spitter_scene()
+	var spitter: Node = load("res://scenes/enemies/spitter.tscn").instantiate()
+	add_child(spitter)
 	spitter.global_position = Vector2(0, 0)
 	spitter._sprite.scale = Vector2.ONE
 	spitter.attack_range = 200.0
@@ -1497,7 +1496,8 @@ func _test_spitter_projectile_has_shared_damage_ownership() -> void:
 	player.free()
 
 func _test_spitter_projectile_cleans_up_after_hit() -> void:
-	var spitter: Node = _load_spitter_scene()
+	var spitter: Node = load("res://scenes/enemies/spitter.tscn").instantiate()
+	add_child(spitter)
 	spitter.global_position = Vector2(0, 0)
 	spitter._sprite.scale = Vector2.ONE
 	spitter.attack_range = 200.0
@@ -1524,7 +1524,8 @@ func _test_spitter_projectile_cleans_up_after_hit() -> void:
 	player.free()
 
 func _test_spitter_blocked_los_prevents_ranged_damage() -> void:
-	var spitter: Node = _load_spitter_scene()
+	var spitter: Node = load("res://scenes/enemies/spitter.tscn").instantiate()
+	add_child(spitter)
 	spitter.global_position = Vector2(0, 0)
 	spitter._sprite.scale = Vector2.ONE
 	spitter.attack_range = 300.0
@@ -1651,7 +1652,8 @@ func _test_crowd_separation_uses_gentle_impulse() -> void:
 func _test_mixed_archetypes_retain_navigation_and_attack() -> void:
 	var brute: Node = _load_brute_scene()
 	var runner: Node = _load_runner_scene()
-	var spitter: Node = _load_spitter_scene()
+	var spitter: Node = load("res://scenes/enemies/spitter.tscn").instantiate()
+	add_child(spitter)
 	brute.global_position = Vector2(0, 0)
 	runner.global_position = Vector2(50, 0)
 	spitter.global_position = Vector2(100, 0)

@@ -160,7 +160,8 @@ func _run_state(delta: float) -> void:
 				_set_state(&"attack")
 		&"attack":
 			velocity = Vector2.ZERO
-			_attack_timer -= delta
+			if _attack_timer > 0.0:
+				_attack_timer -= delta
 			if _target and is_instance_valid(_target):
 				var dist: float = global_position.distance_to(_target.global_position)
 				if dist > attack_range:
@@ -170,6 +171,8 @@ func _run_state(delta: float) -> void:
 				_telegraph_timer = attack_telegraph_duration
 				_attack_timer = attack_cooldown
 				attack_telegraph_started.emit()
+
+	_apply_crowd_separation(delta)
 
 
 func _approach(target: Vector2, speed: float, delta: float) -> void:
