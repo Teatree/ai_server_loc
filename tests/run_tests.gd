@@ -83,6 +83,10 @@ func _ready() -> void:
 	_test_crowd_separation_prevents_exact_stacking()
 	_test_crowd_separation_uses_gentle_impulse()
 	_test_mixed_archetypes_retain_navigation_and_attack()
+	_test_director_fixed_seed_reproduces_selection()
+	_test_director_respects_threat_budget_cap()
+	_test_director_respects_living_enemy_cap()
+	_test_director_select_spawn_respects_caps()
 	set_process(true)
 
 
@@ -1648,6 +1652,106 @@ func _test_crowd_separation_uses_gentle_impulse() -> void:
 	_assert(shambler_delta < 15.0, "shambler separation impulse should stay gentle, got %.1f" % shambler_delta)
 	brute.free()
 	shambler.free()
+
+# --- S09A Director tests ---
+
+func _test_director_fixed_seed_reproduces_selection() -> void:
+	var marker_a: SpawnMarker = SpawnMarker.new()
+	marker_a.global_position = Vector2(100, 0)
+	marker_a.enemy_type = &"shambler"
+	marker_a.active = true
+	add_child(marker_a)
+
+	var marker_b: SpawnMarker = SpawnMarker.new()
+	marker_b.global_position = Vector2(200, 0)
+	marker_b.enemy_type = &"runner"
+	marker_b.active = true
+	add_child(marker_b)
+
+	var director_a: Director = Director.new()
+	director_a.configure(42, [marker_a, marker_b], Vector2.ZERO)
+	var result_a: Dictionary = director_a.select_spawn()
+
+	var director_b: Director = Director.new()
+	director_b.configure(42, [marker_a, marker_b], Vector2.ZERO)
+	var result_b: Dictionary = director_b.select_spawn()
+
+	_assert(result_a.has("enemy_type"), "first run should select an enemy")
+	_assert(result_b.has("enemy_type"), "second run should select an enemy")
+	_assert(result_a.enemy_type == result_b.enemy_type, "same seed should produce same selection")
+
+	marker_a.free()
+	marker_b.free()
+	director_a.free()
+	director_b.free()
+
+
+func _test_director_respects_threat_budget_cap() -> void:
+	var marker: SpawnMarker = SpawnMarker.new()
+	marker.global_position = Vector2(100, 0)
+	marker.enemy_type = &"brute"
+	marker.active = true
+	add_child(marker)
+
+	var director: Director = Director.new()
+	director.max_threat_budget = 30.0
+	director.configure(1, [marker], Vector2.ZERO)
+
+	var first: bool = director.register_spawn(30.0)
+	_assert(first, "first spawn within budget should succeed")
+	_assert(director.get_remaining_threat() == 0.0, "budget should be exhausted")
+
+	var second: bool = director.register_spawn(10.0)
+	_assert(not second, "spawn exceeding remaining budget should fail")
+	_assert(director.get_remaining_threat() == 0.0, "budget should remain at zero")
+
+	marker.free()
+	director.free()
+
+
+func _test_director_respects_living_enemy_cap() -> void:
+	var marker: SpawnMarker = SpawnMarker.new()
+	marker.global_position = Vector2(100, 0)
+	marker.enemy_type = &"shambler"
+	marker.active = true
+	add_child(marker)
+
+	var director: Director = Director.new()
+	director.max_living_enemies = 2
+	director.configure(1, [marker], Vector2.ZERO)
+
+	var first: bool = director.register_spawn(10.0)
+	_assert(first, "first spawn within cap should succeed")
+	var second: bool = director.register_spawn(10.0)
+	_assert(second, "second spawn within cap should succeed")
+	_assert(director.get_remaining_slots() == 0, "slots should be exhausted")
+
+	var third: bool = director.register_spawn(10.0)
+	_assert(not third, "spawn exceeding living cap should fail")
+	_assert(director.get_remaining_slots() == 0, "slots should remain at zero")
+
+	marker.free()
+	director.free()
+
+
+func _test_director_select_spawn_respects_caps() -> void:
+	var marker: SpawnMarker = SpawnMarker.new()
+	marker.global_position = Vector2(100, 0)
+	marker.enemy_type = &"brute"
+	marker.active = true
+	add_child(marker)
+
+	var director: Director = Director.new()
+	director.max_threat_budget = 20.0
+	director.max_living_enemies = 1
+	director.configure(1, [marker], Vector2.ZERO)
+
+	var result: Dictionary = director.select_spawn()
+	_assert(result.is_empty(), "selection should fail when brute threat exceeds remaining budget")
+
+	marker.free()
+	director.free()
+
 
 func _test_mixed_archetypes_retain_navigation_and_attack() -> void:
 	var brute: Node = _load_brute_scene()
