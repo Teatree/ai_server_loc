@@ -87,6 +87,10 @@ func _ready() -> void:
 	_test_director_respects_threat_budget_cap()
 	_test_director_respects_living_enemy_cap()
 	_test_director_select_spawn_respects_caps()
+	_test_director_rejects_too_close_spawn_to_player()
+	_test_director_rejects_too_close_spawn_to_recent()
+	_test_director_pressure_escalates_through_phases()
+	_test_director_phase_and_spawn_reproduce_from_seed()
 	set_process(true)
 
 
@@ -1670,11 +1674,11 @@ func _test_director_fixed_seed_reproduces_selection() -> void:
 
 	var director_a: Director = Director.new()
 	director_a.configure(42, [marker_a, marker_b], Vector2.ZERO)
-	var result_a: Dictionary = director_a.select_spawn()
+	var result_a: Dictionary = director_a.select_spawn(0.0)
 
 	var director_b: Director = Director.new()
 	director_b.configure(42, [marker_a, marker_b], Vector2.ZERO)
-	var result_b: Dictionary = director_b.select_spawn()
+	var result_b: Dictionary = director_b.select_spawn(0.0)
 
 	_assert(result_a.has("enemy_type"), "first run should select an enemy")
 	_assert(result_b.has("enemy_type"), "second run should select an enemy")
@@ -1746,11 +1750,124 @@ func _test_director_select_spawn_respects_caps() -> void:
 	director.max_living_enemies = 1
 	director.configure(1, [marker], Vector2.ZERO)
 
-	var result: Dictionary = director.select_spawn()
+	var result: Dictionary = director.select_spawn(0.0)
 	_assert(result.is_empty(), "selection should fail when brute threat exceeds remaining budget")
 
 	marker.free()
 	director.free()
+
+
+func _test_director_rejects_too_close_spawn_to_player() -> void:
+	var marker: SpawnMarker = SpawnMarker.new()
+	marker.global_position = Vector2(30, 0)
+	marker.enemy_type = &"shambler"
+	marker.active = true
+	add_child(marker)
+
+	var player: Node2D = Node2D.new()
+	player.global_position = Vector2(0, 0)
+	add_child(player)
+
+	var director: Director = Director.new()
+	director.min_spawn_distance = 50.0
+	director.configure(1, [marker], player.global_position)
+
+	var result: Dictionary = director.select_spawn(0.0)
+	_assert(result.is_empty(), "spawn too close to player should be rejected")
+
+	marker.free()
+	player.free()
+	director.free()
+
+
+func _test_director_rejects_too_close_spawn_to_recent() -> void:
+	var marker_a: SpawnMarker = SpawnMarker.new()
+	marker_a.global_position = Vector2(100, 0)
+	marker_a.enemy_type = &"shambler"
+	marker_a.active = true
+	add_child(marker_a)
+
+	var marker_b: SpawnMarker = SpawnMarker.new()
+	marker_b.global_position = Vector2(120, 0)
+	marker_b.enemy_type = &"shambler"
+	marker_b.active = true
+	add_child(marker_b)
+
+	var director: Director = Director.new()
+	director.min_spawn_distance = 50.0
+	director.configure(1, [marker_a, marker_b], Vector2(0, 100))
+
+	var first: Dictionary = director.select_spawn(0.0)
+	_assert(first.has("enemy_type"), "first spawn should succeed")
+
+	var second: Dictionary = director.select_spawn(0.0)
+	_assert(second.is_empty(), "spawn too close to recently used position should be rejected")
+
+	marker_a.free()
+	marker_b.free()
+	director.free()
+
+
+func _test_director_pressure_escalates_through_phases() -> void:
+	var marker: SpawnMarker = SpawnMarker.new()
+	marker.global_position = Vector2(100, 0)
+	marker.enemy_type = &"shambler"
+	marker.active = true
+	add_child(marker)
+
+	var director: Director = Director.new()
+	director.recovery_duration = 2.0
+	director.pressure_duration = 2.0
+	director.escalation_duration = 2.0
+	director.configure(1, [marker], Vector2(0, 100))
+
+	_assert(director._phase == Director.Phase.RECOVERY, "should start in recovery")
+
+	director._step_phase(2.1)
+	_assert(director._phase == Director.Phase.PRESSURE, "should escalate to pressure after recovery")
+
+	director.register_spawn(10.0)
+	director._step_phase(2.1)
+	_assert(director._phase == Director.Phase.ESCALATION, "should escalate after pressure duration")
+
+	director._step_phase(2.1)
+	_assert(director._phase == Director.Phase.PEAK, "should peak after escalation duration")
+
+	marker.free()
+	director.free()
+
+
+func _test_director_phase_and_spawn_reproduce_from_seed() -> void:
+	var marker_a: SpawnMarker = SpawnMarker.new()
+	marker_a.global_position = Vector2(100, 0)
+	marker_a.enemy_type = &"shambler"
+	marker_a.active = true
+	add_child(marker_a)
+
+	var marker_b: SpawnMarker = SpawnMarker.new()
+	marker_b.global_position = Vector2(200, 0)
+	marker_b.enemy_type = &"runner"
+	marker_b.active = true
+	add_child(marker_b)
+
+	var director_a: Director = Director.new()
+	director_a.configure(99, [marker_a, marker_b], Vector2(0, 100))
+	director_a._step_phase(1.0)
+	var spawn_a: Dictionary = director_a.select_spawn(0.0)
+
+	var director_b: Director = Director.new()
+	director_b.configure(99, [marker_a, marker_b], Vector2(0, 100))
+	director_b._step_phase(1.0)
+	var spawn_b: Dictionary = director_b.select_spawn(0.0)
+
+	_assert(director_a._phase == director_b._phase, "same seed should produce same phase")
+	_assert(spawn_a.enemy_type == spawn_b.enemy_type, "same seed should produce same spawn type")
+	_assert(spawn_a.position == spawn_b.position, "same seed should produce same spawn position")
+
+	marker_a.free()
+	marker_b.free()
+	director_a.free()
+	director_b.free()
 
 
 func _test_mixed_archetypes_retain_navigation_and_attack() -> void:
