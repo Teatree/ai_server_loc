@@ -600,6 +600,14 @@ func _create_test_player() -> CharacterBody2D:
 	health.name = "HealthComponent"
 	health.max_health = 100.0
 	player.add_child(health)
+	var body: StaticBody2D = StaticBody2D.new()
+	body.add_to_group("player")
+	body.collision_layer = 1
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	shape.shape = RectangleShape2D.new()
+	shape.shape.size = Vector2(10, 40)
+	body.add_child(shape)
+	player.add_child(body)
 	var script: GDScript = GDScript.new()
 	script.source_code = "extends CharacterBody2D\n\nfunc take_damage(info: DamageInfo) -> void:\n\tvar h = get_node_or_null(\"HealthComponent\") as HealthComponent\n\tif h:\n\t\th.take_damage(info)\n\nfunc apply_knockback(velocity: Vector2, duration: float) -> void:\n\tpass"
 	script.reload()
