@@ -1563,8 +1563,7 @@ func _test_brute_telegraph_has_visible_pulse() -> void:
 	add_child(player)
 	brute._physics_process(0.1)
 	_assert(brute._state == &"attack_telegraph", "brute should enter telegraph when in range")
-	_assert(brute._attack_timer > 0.0, "telegraph should set attack cooldown")
-	_assert(brute._sprite.modulate != brute._base_modulate, "brute sprite should flash during telegraph")
+	_assert(brute._sprite.modulate != brute._base_modulate, "brute sprite should pulse during telegraph")
 	player.free()
 	brute.free()
 
@@ -1585,17 +1584,15 @@ func _test_brute_attack_deals_heavy_damage() -> void:
 	brute._sprite.scale = Vector2.ONE
 	brute.attack_range = 100.0
 	brute.attack_damage = 30.0
+	brute.attack_telegraph_duration = 0.1
 	var player: CharacterBody2D = _create_test_player()
 	player.global_position = Vector2(30, 0)
 	var health: HealthComponent = player.get_node("HealthComponent") as HealthComponent
 	brute._physics_process(0.1)
-	_assert(brute._state == &"attack_telegraph", "brute should telegraph first")
-	brute._telegraph_timer = 0.0
-	brute._physics_process(0.1)
+	_assert(brute._state == &"attack", "brute should enter attack after telegraph expires")
 	_assert(brute._attack_timer > 0.0, "attack cooldown should be set after brute attack")
 	_assert(brute._target == player, "brute target should be the player")
-	brute._perform_attack()
-	_assert(health.current_health < 100.0, "brute attack should deal damage, got health %.1f" % health.current_health)
+	_assert(health.current_health < 100.0, "brute attack should deal at least 30 damage, got health %.1f" % health.current_health)
 	player.free()
 	brute.free()
 

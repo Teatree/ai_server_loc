@@ -16,7 +16,7 @@ signal attack_telegraph_started()
 @export var stagger_duration: float = 0.2
 @export var knockback_resistance: float = 0.02
 @export var separation_radius: float = 35.0
-@export var separation_force: float = 80.0
+@export var separation_force: float = 60.0
 
 @onready var health_component: HealthComponent = $HealthComponent
 @onready var _raycast: RayCast2D = $RayCast2D
@@ -101,11 +101,12 @@ func _update_perception() -> void:
 			if abs(angle_to_target) < deg_to_rad(fov_degrees * 0.5) and _has_clear_sight(_target.global_position):
 				_last_known_position = _target.global_position
 				_noise_timer = noise_memory_duration
-				if _state != &"attack_telegraph":
-					if dist <= attack_range:
-						_set_state(&"attack")
-					else:
-						_set_state(&"chase")
+			if _state != &"attack_telegraph":
+				if dist <= attack_range:
+					_set_state(&"attack_telegraph")
+					_telegraph_timer = attack_telegraph_duration
+				else:
+					_set_state(&"chase")
 				return
 
 	if _last_known_position != Vector2.ZERO and _noise_timer > 0.0:
@@ -155,9 +156,11 @@ func _run_state(delta: float) -> void:
 			_telegraph_timer -= delta
 			if _telegraph_timer <= 0.0:
 				_perform_attack()
+				_attack_timer = attack_cooldown
 				_set_state(&"attack")
 		&"attack":
 			velocity = Vector2.ZERO
+			_attack_timer -= delta
 			if _target and is_instance_valid(_target):
 				var dist: float = global_position.distance_to(_target.global_position)
 				if dist > attack_range:
