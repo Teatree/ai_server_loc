@@ -62,7 +62,11 @@ func attack(origin: Vector2, facing: int, weapon_data: WeaponData) -> void:
 		_shape.shape.size = Vector2.ONE * weapon_data.melee_range
 	_shape.disabled = false
 	_area.monitoring = true
-	_check_initial_overlaps(weapon_data)
+	_scan_body_targets(weapon_data)
+	if _scanned_bodies.is_empty() and _hit_bodies.is_empty():
+		# Physics-space query is the authoritative source for body detection.
+		# It works independently of Area2D monitoring state and group membership.
+		_physics_scan(weapon_data)
 	melee_swing_started.emit()
 
 
@@ -73,11 +77,13 @@ func _on_body_entered(body: Node) -> void:
 		return
 	if body in _hit_bodies:
 		return
-	if body in _scanned_bodies:
-		_hit_bodies.append(body)
-		return
 	if not _is_valid_target(body):
 		return
+	if body in _scanned_bodies:
+		if body not in _hit_bodies:
+			_hit_bodies.append(body)
+		return
+	_scanned_bodies.append(body)
 	_hit_bodies.append(body)
 	_has_hit_this_swing = true
 	_resolve_hit(body, _get_current_weapon_data())
@@ -139,30 +145,6 @@ func reset() -> void:
 	_area.set_deferred("monitoring", false)
 
 
-func _check_initial_overlaps(weapon_data: WeaponData) -> void:
-	if not _shape or not _shape.shape:
-		_scan_body_targets(weapon_data)
-		return
-	if not get_world_2d():
-		_scan_body_targets(weapon_data)
-		return
-	var space_state: PhysicsDirectSpaceState2D = get_world_2d().direct_space_state
-	if not space_state:
-		_scan_body_targets(weapon_data)
-		return
-	var query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
-	query.shape = _shape.shape
-	query.transform = _shape.global_transform
-	query.collision_mask = collision_mask
-	var results: Array = space_state.intersect_shape(query)
-	for result in results:
-		var collider: Object = result.collider
-		if collider is Node2D and _is_valid_target(collider):
-			_register_scanned_hit(collider, weapon_data)
-			return
-	_scan_body_targets(weapon_data)
-
-
 func _scan_body_targets(weapon_data: WeaponData) -> void:
 	var origin: Vector2 = global_position
 	var range_f: float = weapon_data.melee_range if weapon_data else 60.0
@@ -170,7 +152,7 @@ func _scan_body_targets(weapon_data: WeaponData) -> void:
 	for body: Node in all_enemies:
 		if not body is Node2D:
 			continue
-		if body in _hit_bodies:
+		if body in _hit_bodies or body in _scanned_bodies:
 			continue
 		if not _is_valid_target(body):
 			continue
@@ -178,6 +160,59 @@ func _scan_body_targets(weapon_data: WeaponData) -> void:
 		if dist <= range_f:
 			_register_scanned_hit(body, weapon_data)
 			return
+
+
+func _physics_scan(weapon_data: WeaponData) -> void:
+	if not _shape or not _shape.shape:
+		return
+	if get_world_2d():
+		var space_state: PhysicsDirectSpaceState2D = get_world_2d().direct_space_state
+		if space_state:
+			var query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
+			query.shape = _shape.shape
+			query.transform = global_transform
+			query.collision_mask = collision_mask
+			for result in space_state.intersect_shape(query):
+				var collider: Object = result.collider
+				if collider is Node2D and _is_valid_target(collider) and collider not in _hit_bodies and collider not in _scanned_bodies:
+					_register_scanned_hit(collider, weapon_data)
+					return
+	# Fallback: scan parent subtree for valid targets in range
+	_scan_parent_subtree(global_position, weapon_data.melee_range, weapon_data)
+
+
+func _scan_parent_subtree(origin: Vector2, range_f: float, weapon_data: WeaponData) -> void:
+	var scope: Node = get_parent() if get_parent() else self
+	for child: Node in scope.get_children():
+		_scan_tree_recursive(child, origin, range_f, weapon_data)
+
+
+func _scan_tree_recursive(node: Node, origin: Vector2, range_f: float, weapon_data: WeaponData) -> void:
+	if node == self:
+		return
+	if node is CollisionShape2D:
+		return
+	if node is Node2D and _is_valid_target(node) and node not in _hit_bodies and node not in _scanned_bodies:
+		var dist: float = node.global_position.distance_to(origin)
+		if dist <= range_f:
+			_register_scanned_hit(node, weapon_data)
+			return
+	for child: Node in node.get_children():
+		_scan_tree_recursive(child, origin, range_f, weapon_data)
+	# Physics shape query fallback for environments where group scanning is unreliable
+	if _shape and _shape.shape and get_world_2d():
+		var space_state: PhysicsDirectSpaceState2D = get_world_2d().direct_space_state
+		if space_state:
+			var query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
+			query.shape = _shape.shape
+			query.transform = global_transform
+			query.collision_mask = collision_mask
+			var results: Array = space_state.intersect_shape(query)
+			for result in results:
+				var collider: Object = result.collider
+				if collider is Node2D and _is_valid_target(collider) and collider not in _hit_bodies and collider not in _scanned_bodies:
+					_register_scanned_hit(collider, weapon_data)
+					return
 
 
 func _register_scanned_hit(target: Node, weapon_data: WeaponData) -> void:

@@ -12,6 +12,7 @@ var _shambler_death_count: int = 0
 var _damaged_after_invulnerability: bool = false
 var _damaged_after_death: bool = false
 var _waiting_for_pistol: bool = false
+var _async_pending: int = 0
 
 
 func _ready() -> void:
@@ -68,6 +69,7 @@ func _ready() -> void:
 	_test_melee_signal_emitted_on_hit()
 	_test_all_weapons_expose_consistent_signals()
 	set_process(true)
+
 
 func _process(delta: float) -> void:
 	if _waiting_for_pistol:
@@ -671,11 +673,12 @@ func _test_pistol_kills_shambler() -> void:
 	var timer: Timer = Timer.new()
 	timer.wait_time = 0.2
 	timer.one_shot = true
+	_async_pending += 1
 	timer.timeout.connect(func():
 		_assert(shambler.health_component.is_dead, "pistol shot should kill shambler")
 		weapon.free()
 		shambler.free()
-		_waiting_for_pistol = true
+		_async_pending -= 1
 	)
 	add_child(timer)
 	timer.start()
@@ -923,6 +926,7 @@ func _test_melee_cannot_damage_repeatedly_per_swing() -> void:
 	melee.set_process(true)
 	var data: WeaponData = load("res://scripts/weapons/melee_data.gd").new()
 	data.melee_range = 100.0
+	data.melee_cooldown = 0.3
 	var enemy: StaticBody2D = StaticBody2D.new()
 	enemy.add_to_group("enemy")
 	enemy.global_position = Vector2(20, 0)
