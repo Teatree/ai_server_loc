@@ -99,10 +99,10 @@ func load_from_disk() -> Dictionary:
 
 
 func clear_save() -> void:
-	_pending_load_data.clear()
 	if has_save():
 		var absolute_path: String = ProjectSettings.globalize_path(SAVE_PATH)
 		DirAccess.remove_absolute(absolute_path)
+	_pending_load_data.clear()
 
 
 func has_pending_load() -> bool:
