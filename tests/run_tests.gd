@@ -2516,3 +2516,151 @@ func _test_save_schema_upgrade_entry_requires_valid_identifier() -> void:
 	_assert(upgrades[0][SaveSchema.FIELD_UPGRADE_ID] == &"health_up", "valid entry should be preserved")
 
 
+# --- S11B save round trip tests ---
+
+func _test_save_round_trip_preserves_all_stable_fields() -> void:
+	var manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+	add_child(manager)
+	var speed_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	speed_data.upgrade_id = &"speed_boost"
+	speed_data.max_stacks = 3
+	speed_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	speed_data.modifiers[0].stat = &"speed"
+	speed_data.modifiers[0].value = 15.0
+	manager.call("register_upgrade", speed_data)
+	manager.call("apply_upgrade", &"speed_boost")
+	manager.call("apply_upgrade", &"speed_boost")
+
+	var player: CharacterBody2D = _create_inventory_player([WeaponData.new()])
+	var weapon: WeaponBase = player._weapon_pivot as WeaponBase
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+	weapon.fire(Vector2.ZERO, Vector2.RIGHT)
+	weapon._process(0.02)
+
+	var director: Director = Director.new()
+	director.configure(77, [], Vector2.ZERO)
+	add_child(director)
+
+	var save_manager = preload("res://scripts/save/save_manager.gd").new()
+	add_child(save_manager)
+	save_manager._player = player
+	save_manager._upgrade_manager = manager
+	save_manager._director = director
+
+	var saved: Dictionary = save_manager.save_game()
+	_assert(saved.has(SaveSchema.FIELD_VERSION), "save must include version")
+	_assert(saved[SaveSchema.FIELD_CHECKPOINT] == player._last_checkpoint, "checkpoint must be preserved")
+	_assert(saved[SaveSchema.FIELD_HEALTH_CURRENT] == player.health_component.current_health, "health_current must be preserved")
+	_assert(saved[SaveSchema.FIELD_HEALTH_MAX] == player.health_component.max_health, "health_max must be preserved")
+	_assert(saved[SaveSchema.FIELD_WEAPONS].size() == 1, "weapons array must be preserved")
+	_assert(saved[SaveSchema.FIELD_UPGRADES].size() == 1, "upgrades array must be preserved")
+	_assert(saved[SaveSchema.FIELD_ENCOUNTER_COMPLETED] == false, "encounter_completed must be preserved")
+	_assert(saved[SaveSchema.FIELD_SESSION_SEED] == 77, "session_seed must be preserved")
+
+	var player2: CharacterBody2D = _create_inventory_player([WeaponData.new()])
+	player2._last_checkpoint = Vector2(999, 999)
+	player2.health_component.current_health = 1.0
+	save_manager._player = player2
+	save_manager.load_game(saved)
+	_assert(player2._last_checkpoint == player._last_checkpoint, "loaded checkpoint must match saved")
+	_assert(player2.health_component.current_health == player.health_component.current_health, "loaded health_current must match saved")
+	_assert(player2.health_component.max_health == player.health_component.max_health, "loaded health_max must match saved")
+	_assert(player2._weapon_pivot.get_current_ammo() == weapon.get_current_ammo(), "loaded weapon ammo must match saved")
+	_assert(manager.call("get_stack_count", &"speed_boost") == 2, "loaded upgrade stacks must match saved")
+	_assert(director._seed == 77, "loaded seed must match saved")
+	_assert(director.has_victory() == false, "loaded encounter_completed must match saved")
+
+	player.free()
+	player2.free()
+	director.free()
+	save_manager.free()
+	manager.free()
+
+
+func _test_load_reconstructs_from_sanitized_data() -> void:
+	var player: CharacterBody2D = _create_inventory_player([WeaponData.new()])
+	var weapon: WeaponBase = player._weapon_pivot as WeaponBase
+	weapon._current_ammo = 5
+	weapon._reserve_ammo = 20
+
+	var manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+	add_child(manager)
+	var data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	data.upgrade_id = &"health_up"
+	data.max_stacks = 3
+	data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	data.modifiers[0].stat = &"health_max"
+	data.modifiers[0].value = 25.0
+	manager.call("register_upgrade", data)
+	manager.call("apply_upgrade", &"health_up")
+
+	var raw: Dictionary = SaveSchema.create_empty()
+	raw[SaveSchema.FIELD_VERSION] = 1
+	raw[SaveSchema.FIELD_CHECKPOINT] = Vector2(300, 500)
+	raw[SaveSchema.FIELD_HEALTH_CURRENT] = 75.0
+	raw[SaveSchema.FIELD_HEALTH_MAX] = 125.0
+	raw[SaveSchema.FIELD_WEAPONS] = [SaveSchema.weapon_entry(&"pistol", 3, 15)]
+	raw[SaveSchema.FIELD_UPGRADES] = [SaveSchema.upgrade_entry(&"health_up", 1)]
+	raw[SaveSchema.FIELD_ENCOUNTER_COMPLETED] = true
+	raw[SaveSchema.FIELD_SESSION_SEED] = 99
+	raw["_unknown_field"] = "stripped"
+
+	var save_manager = preload("res://scripts/save/save_manager.gd").new()
+	add_child(save_manager)
+	save_manager._player = player
+	save_manager._upgrade_manager = manager
+	save_manager.load_game(raw)
+	_assert(player._last_checkpoint == Vector2(300, 500), "sanitized checkpoint should be applied")
+	_assert(player.health_component.current_health == 75.0, "sanitized health_current should be applied")
+	_assert(player.health_component.max_health == 125.0, "sanitized health_max should be applied")
+	_assert(weapon.get_current_ammo() == 3, "sanitized weapon ammo should be applied")
+	_assert(weapon.get_reserve_ammo() == 15, "sanitized reserve ammo should be applied")
+	_assert(manager.call("get_stack_count", &"health_up") == 1, "sanitized upgrade stacks should be applied")
+
+	player.free()
+	manager.free()
+	save_manager.free()
+
+
+func _test_load_does_not_duplicate_upgrades_or_ammo() -> void:
+	var manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+	add_child(manager)
+	var speed_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	speed_data.upgrade_id = &"speed_boost"
+	speed_data.max_stacks = 3
+	speed_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	speed_data.modifiers[0].stat = &"speed"
+	speed_data.modifiers[0].value = 15.0
+	manager.call("register_upgrade", speed_data)
+	manager.call("apply_upgrade", &"speed_boost")
+	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "preexisting upgrade should be 1 stack")
+
+	var player: CharacterBody2D = _create_inventory_player([WeaponData.new()])
+	var weapon: WeaponBase = player._weapon_pivot as WeaponBase
+	weapon._current_ammo = 8
+	weapon._reserve_ammo = 30
+
+	var save_data: Dictionary = SaveSchema.create_empty()
+	save_data[SaveSchema.FIELD_WEAPONS] = [SaveSchema.weapon_entry(&"pistol", 4, 12)]
+	save_data[SaveSchema.FIELD_UPGRADES] = [SaveSchema.upgrade_entry(&"speed_boost", 2)]
+
+	var save_manager = preload("res://scripts/save/save_manager.gd").new()
+	add_child(save_manager)
+	save_manager._player = player
+	save_manager._upgrade_manager = manager
+	save_manager.load_game(save_data)
+	_assert(weapon.get_current_ammo() == 4, "load should set ammo, not add to existing")
+	_assert(weapon.get_reserve_ammo() == 12, "load should set reserve, not add to existing")
+	_assert(manager.call("get_stack_count", &"speed_boost") == 2, "load should set upgrade stacks, not duplicate")
+
+	var second_load: Dictionary = SaveSchema.create_empty()
+	second_load[SaveSchema.FIELD_UPGRADES] = [SaveSchema.upgrade_entry(&"speed_boost", 1)]
+	save_manager.load_game(second_load)
+	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "repeated load should not accumulate stacks")
+
+	player.free()
+	manager.free()
+	save_manager.free()
+
+

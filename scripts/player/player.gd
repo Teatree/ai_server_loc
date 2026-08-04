@@ -9,6 +9,8 @@ extends CharacterBody2D
 @onready var _aim: AimController = $AimController
 var upgrade_component: Node = null
 
+const SaveSchema = preload("res://scripts/save/save_schema.gd")
+
 var _last_checkpoint: Vector2 = Vector2(200, 600)
 var _respawn_invulnerability: float = 0.0
 var _facing: int = 1
@@ -162,6 +164,51 @@ func respawn() -> void:
 
 func is_respawn_invulnerable() -> bool:
 	return _respawn_invulnerability > 0.0
+
+
+func serialize_state() -> Dictionary:
+	var state: Dictionary = {}
+	state[SaveSchema.FIELD_CHECKPOINT] = _last_checkpoint
+	if health_component:
+		state[SaveSchema.FIELD_HEALTH_CURRENT] = health_component.current_health
+		state[SaveSchema.FIELD_HEALTH_MAX] = health_component.max_health
+	state[SaveSchema.FIELD_WEAPONS] = []
+	if _weapon_pivot and _weapon_pivot.has_method("serialize_state"):
+		state[SaveSchema.FIELD_WEAPONS].append(_weapon_pivot.serialize_state())
+	return state
+
+
+func apply_state(data: Dictionary) -> void:
+	if data.has(SaveSchema.FIELD_CHECKPOINT):
+		_last_checkpoint = data[SaveSchema.FIELD_CHECKPOINT]
+	if health_component:
+		if data.has(SaveSchema.FIELD_HEALTH_CURRENT):
+			health_component.current_health = data[SaveSchema.FIELD_HEALTH_CURRENT]
+		if data.has(SaveSchema.FIELD_HEALTH_MAX):
+			health_component.max_health = data[SaveSchema.FIELD_HEALTH_MAX]
+			health_component.health_changed.emit(health_component.current_health, health_component.max_health)
+	if data.has(SaveSchema.FIELD_WEAPONS):
+		for entry in data[SaveSchema.FIELD_WEAPONS]:
+			if not entry is Dictionary:
+				continue
+			var weapon_id: StringName = entry.get(SaveSchema.FIELD_WEAPON_ID, &"")
+			var found: bool = false
+			for i in range(_weapon_inventory.size()):
+				if _weapon_inventory[i] and _weapon_inventory[i].weapon_id == weapon_id:
+					_current_weapon_index = i
+					_weapon_pivot.data = _weapon_inventory[i]
+					if _weapon_pivot.has_method("apply_state"):
+						_weapon_pivot.apply_state(entry)
+					if _weapon_pivot.has_signal("equipped"):
+						_weapon_pivot.equipped.emit(_weapon_pivot)
+					found = true
+					break
+			if not found and _weapon_inventory.size() > 0:
+				_current_weapon_index = 0
+				_weapon_pivot.data = _weapon_inventory[0]
+				_weapon_pivot.reset()
+	if upgrade_component and upgrade_component.has_method("on_respawn"):
+		upgrade_component.on_respawn()
 
 
 func _register_available_upgrades() -> void:

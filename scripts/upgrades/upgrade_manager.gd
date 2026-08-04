@@ -5,6 +5,8 @@ signal upgrade_removed(upgrade_id: StringName, stack_count: int)
 signal modifier_changed(modifier: Resource, active: bool)
 signal upgrade_unlocked(upgrade_id: StringName)
 
+const SaveSchema = preload("res://scripts/save/save_schema.gd")
+
 var _registry: Dictionary = {}
 var _active_upgrades: Dictionary = {}
 var _active_modifiers: Array = []
@@ -83,6 +85,30 @@ func on_respawn() -> void:
 	_active_modifiers.clear()
 	for upgrade_id in to_apply:
 		apply_upgrade(upgrade_id)
+
+
+func serialize_state() -> Array:
+	var result: Array = []
+	for upgrade_id in _applied_upgrades:
+		result.append(SaveSchema.upgrade_entry(upgrade_id, _active_upgrades.get(upgrade_id, 0)))
+	return result
+
+
+func apply_state(data: Dictionary) -> void:
+	_applied_upgrades.clear()
+	_active_upgrades.clear()
+	_active_modifiers.clear()
+	var upgrades: Array = data.get(SaveSchema.FIELD_UPGRADES, [])
+	for entry in upgrades:
+		if not entry is Dictionary:
+			continue
+		var upgrade_id: StringName = entry.get(SaveSchema.FIELD_UPGRADE_ID, &"")
+		var stacks: int = entry.get(SaveSchema.FIELD_UPGRADE_STACKS, 0)
+		if upgrade_id == &"" or not _registry.has(upgrade_id):
+			continue
+		for i in range(stacks):
+			apply_upgrade(upgrade_id)
+
 
 func _apply_modifier(modifier: Resource) -> void:
 	modifier_changed.emit(modifier, true)

@@ -9,6 +9,8 @@ signal noise_emitted(position: Vector2, strength: float)
 signal reload_completed()
 signal equipped(weapon: WeaponBase)
 
+const SaveSchema = preload("res://scripts/save/save_schema.gd")
+
 @export var data: WeaponData :
 	set(value):
 		data = value
@@ -145,3 +147,26 @@ func _apply_recoil(direction: Vector2) -> void:
 func _set_state(new_state: StringName) -> void:
 	_state = new_state
 	state_changed.emit(_state)
+
+
+func serialize_state() -> Dictionary:
+	var state: Dictionary = {}
+	state[SaveSchema.FIELD_WEAPON_ID] = data.weapon_id if data else &""
+	state[SaveSchema.FIELD_CURRENT_AMMO] = _current_ammo
+	state[SaveSchema.FIELD_RESERVE_AMMO] = _reserve_ammo
+	return state
+
+
+func apply_state(data: Dictionary) -> void:
+	if not data is Dictionary:
+		return
+	if data.has(SaveSchema.FIELD_CURRENT_AMMO):
+		_current_ammo = max(0, int(data[SaveSchema.FIELD_CURRENT_AMMO]))
+	if data.has(SaveSchema.FIELD_RESERVE_AMMO):
+		_reserve_ammo = max(0, int(data[SaveSchema.FIELD_RESERVE_AMMO]))
+	var max_ammo: int = data.max_ammo if data and data.has("max_ammo") else (data.max_ammo if data else -1)
+	ammo_changed.emit(_current_ammo, max_ammo)
+	_set_state(&"idle")
+	_can_fire = true
+	_cooldown_remaining = 0.0
+	_reloading = false

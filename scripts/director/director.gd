@@ -8,6 +8,8 @@ signal slot_changed(remaining: int)
 enum Phase { RECOVERY, PRESSURE, ESCALATION, PEAK }
 const _PHASE_COUNT: int = 4
 
+const SaveSchema = preload("res://scripts/save/save_schema.gd")
+
 @export var max_threat_budget: float = 100.0
 @export var max_living_enemies: int = 10
 @export var spawn_visibility_range: float = 600.0
@@ -63,6 +65,22 @@ func reset() -> void:
 
 func has_victory() -> bool:
 	return _victory_emitted
+
+
+func serialize_state() -> Dictionary:
+	var state: Dictionary = {}
+	state[SaveSchema.FIELD_SESSION_SEED] = _seed
+	state[SaveSchema.FIELD_ENCOUNTER_COMPLETED] = _victory_emitted
+	return state
+
+
+func apply_state(data: Dictionary) -> void:
+	if data.has(SaveSchema.FIELD_SESSION_SEED):
+		_seed = int(data[SaveSchema.FIELD_SESSION_SEED])
+	reset()
+	if data.has(SaveSchema.FIELD_ENCOUNTER_COMPLETED) and data[SaveSchema.FIELD_ENCOUNTER_COMPLETED]:
+		_victory_emitted = true
+		_max_phase_reached = _PHASE_COUNT - 1
 
 
 func get_remaining_threat() -> float:
