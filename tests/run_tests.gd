@@ -98,6 +98,9 @@ func _ready() -> void:
 	_test_upgrades_apply_and_survive_respawn()
 	_test_upgrade_stack_limit_enforced()
 	_test_upgrade_mutual_exclusion_enforced()
+	_test_chooser_fixed_seed_reproduces_same_three_choices()
+	_test_chooser_excludes_maxed_and_conflicting_upgrades()
+	_test_chooser_descriptions_expose_numerical_effects()
 	set_process(true)
 
 
@@ -2088,5 +2091,129 @@ func _test_upgrade_mutual_exclusion_enforced() -> void:
 	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "speed_boost should remain active")
 	_assert(manager.call("get_stack_count", &"damage_boost") == 0, "damage_boost should not be active")
 	manager.queue_free()
+
+
+# --- S10B upgrade chooser tests ---
+
+func _test_chooser_fixed_seed_reproduces_same_three_choices() -> void:
+	var registry: Dictionary = {}
+	var speed_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	speed_data.upgrade_id = &"speed_boost"
+	speed_data.display_name = "Speed Boost"
+	speed_data.description = "Increases movement speed by 15% per stack."
+	speed_data.max_stacks = 3
+	speed_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	speed_data.modifiers[0].stat = &"speed"
+	speed_data.modifiers[0].value = 15.0
+	speed_data.modifiers[0].operation = 3
+	registry[speed_data.upgrade_id] = speed_data
+
+	var health_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	health_data.upgrade_id = &"health_up"
+	health_data.display_name = "Health Up"
+	health_data.description = "Increases maximum health by 25 points per stack."
+	health_data.max_stacks = 4
+	health_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	health_data.modifiers[0].stat = &"health_max"
+	health_data.modifiers[0].value = 25.0
+	health_data.modifiers[0].operation = 0
+	registry[health_data.upgrade_id] = health_data
+
+	var damage_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	damage_data.upgrade_id = &"damage_boost"
+	damage_data.display_name = "Damage Boost"
+	damage_data.description = "Increases damage dealt by 25% per stack."
+	damage_data.max_stacks = 5
+	damage_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	damage_data.modifiers[0].stat = &"damage_mult"
+	damage_data.modifiers[0].value = 0.25
+	damage_data.modifiers[0].operation = 1
+	registry[damage_data.upgrade_id] = damage_data
+
+	var active: Dictionary = {}
+
+	var chooser_a = preload("res://scripts/upgrades/upgrade_chooser.gd").new()
+	chooser_a.configure(42, registry, active)
+	var choices_a: Array[Dictionary] = chooser_a.generate_choices(3)
+
+	var chooser_b = preload("res://scripts/upgrades/upgrade_chooser.gd").new()
+	chooser_b.configure(42, registry, active)
+	var choices_b: Array[Dictionary] = chooser_b.generate_choices(3)
+
+	_assert(choices_a.size() == 3, "chooser should return three choices, got %d" % choices_a.size())
+	_assert(choices_b.size() == 3, "chooser should return three choices, got %d" % choices_b.size())
+	for i in range(3):
+		_assert(choices_a[i].upgrade_id == choices_b[i].upgrade_id,
+			"same seed should produce same choice %d: %s vs %s" % [i, choices_a[i].upgrade_id, choices_b[i].upgrade_id])
+
+	chooser_a.queue_free()
+	chooser_b.queue_free()
+
+
+func _test_chooser_excludes_maxed_and_conflicting_upgrades() -> void:
+	var registry: Dictionary = {}
+	var speed_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	speed_data.upgrade_id = &"speed_boost"
+	speed_data.display_name = "Speed Boost"
+	speed_data.description = "Increases movement speed."
+	speed_data.max_stacks = 1
+	speed_data.modifiers = []
+	registry[speed_data.upgrade_id] = speed_data
+
+	var damage_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	damage_data.upgrade_id = &"damage_boost"
+	damage_data.display_name = "Damage Boost"
+	damage_data.description = "Increases damage."
+	damage_data.max_stacks = 5
+	damage_data.mutual_exclusions = [StringName("speed_boost")]
+	damage_data.modifiers = []
+	registry[damage_data.upgrade_id] = damage_data
+
+	var health_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	health_data.upgrade_id = &"health_up"
+	health_data.display_name = "Health Up"
+	health_data.description = "Increases health."
+	health_data.max_stacks = 4
+	health_data.modifiers = []
+	registry[health_data.upgrade_id] = health_data
+
+	var active: Dictionary = {}
+	active[&"speed_boost"] = 1
+
+	var chooser = preload("res://scripts/upgrades/upgrade_chooser.gd").new()
+	chooser.configure(7, registry, active)
+	var choices: Array[Dictionary] = chooser.generate_choices(3)
+
+	for choice in choices:
+		_assert(choice.upgrade_id != &"speed_boost", "maxed speed_boost should not appear")
+		_assert(choice.upgrade_id != &"damage_boost", "excluded damage_boost should not appear")
+
+	chooser.queue_free()
+
+
+func _test_chooser_descriptions_expose_numerical_effects() -> void:
+	var registry: Dictionary = {}
+	var data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	data.upgrade_id = &"fire_rate_up"
+	data.display_name = "Fire Rate Up"
+	data.description = "Increases fire rate."
+	data.max_stacks = 3
+	data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	data.modifiers[0].stat = &"fire_rate"
+	data.modifiers[0].value = 0.15
+	data.modifiers[0].operation = 0
+	registry[data.upgrade_id] = data
+
+	var chooser = preload("res://scripts/upgrades/upgrade_chooser.gd").new()
+	chooser.configure(1, registry, {})
+	var choices: Array[Dictionary] = chooser.generate_choices(1)
+
+	_assert(not choices.is_empty(), "should produce at least one choice")
+	var description: String = choices[0].description
+	_assert(description.find("fire_rate") >= 0, "description should expose stat name, got: %s" % description)
+	_assert(description.find("0.15") >= 0 or description.find("15") >= 0,
+		"description should expose modifier value, got: %s" % description)
+
+	chooser.queue_free()
 
 
