@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="UpgradeData" load_steps=2 format=3 uid="uid://upg_speed_01"]
+
+[ext_resource type="Script" path="res://scripts/upgrades/upgrade_data.gd" id="1_ud"]
+[ext_resource type="Script" path="res://scripts/upgrades/modifier_data.gd" id="2_md"]
+
+[resource]
+script = ExtResource("1_ud")
+upgrade_id = &"speed_boost"
+display_name = "Speed Boost"
+description = "Increases movement speed by 15% per stack."
+max_stacks = 3
+applies_once = false
+permanent = false
+mutual_exclusions = Array[StringName]([])
+category = &"movement"
+modifiers = Array[Resource]([ExtResource("2_md")])
+modifiers[0].stat = &"speed"
+modifiers[0].value = 15.0
+modifiers[0].operation = 0
+modifiers[0].target = &"player"

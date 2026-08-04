@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="UpgradeData" load_steps=2 format=3 uid="uid://upg_regen_01"]
+
+[ext_resource type="Script" path="res://scripts/upgrades/upgrade_data.gd" id="1_ud"]
+[ext_resource type="Script" path="res://scripts/upgrades/modifier_data.gd" id="2_md"]
+
+[resource]
+script = ExtResource("1_ud")
+upgrade_id = &"health_regen"
+display_name = "Health Regen"
+description = "Regenerates health over time. Only one can be active."
+max_stacks = 1
+applies_once = true
+permanent = false
+mutual_exclusions = Array[StringName]([])
+category = &"survival"
+modifiers = Array[Resource]([ExtResource("2_md")])
+modifiers[0].stat = &"health_regen"
+modifiers[0].value = 1.0
+modifiers[0].operation = 0
+modifiers[0].target = &"player"

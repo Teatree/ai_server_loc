@@ -7,16 +7,22 @@ extends CharacterBody2D
 @onready var _sprite: Sprite2D = $Sprite2D
 @onready var _collision: CollisionShape2D = $CollisionShape2D
 @onready var _aim: AimController = $AimController
+var upgrade_component: Node = null
 
 var _last_checkpoint: Vector2 = Vector2(200, 600)
 var _respawn_invulnerability: float = 0.0
 var _facing: int = 1
 var _current_weapon_index: int = 0
 var _melee_attack = null
+var _damage_multiplier: float = 1.0
+var _fire_rate_multiplier: float = 1.0
+var _magazine_bonus: int = 0
+var _ammo_conservation: float = 0.0
 
 
 func _ready() -> void:
 	add_to_group("player")
+	upgrade_component = get_node_or_null("UpgradeRuntime")
 	if movement_controller:
 		movement_controller.facing_changed.connect(_on_facing_changed)
 	if health_component:
@@ -32,6 +38,8 @@ func _ready() -> void:
 	_melee_attack = load("res://scripts/weapons/melee_attack.gd").new()
 	_melee_attack.collision_mask = 2
 	add_child(_melee_attack)
+	if upgrade_component:
+		_register_available_upgrades()
 
 
 var _melee_swing_timer: float = 0.0
@@ -145,11 +153,48 @@ func respawn() -> void:
 		_melee_attack.reset()
 	_melee_swing_timer = 0.0
 	_respawn_invulnerability = 1.0
+	if upgrade_component:
+		upgrade_component.call("on_respawn")
 
 
 func is_respawn_invulnerable() -> bool:
 	return _respawn_invulnerability > 0.0
 
+
+func _register_available_upgrades() -> void:
+	var dir: DirAccess = DirAccess.open("res://resources/upgrades")
+	if dir:
+		dir.list_dir_begin()
+		var file: String = dir.get_next()
+		while file != "":
+			if file.ends_with(".tres"):
+				var path: String = "res://resources/upgrades/" + file
+				var data: Resource = load(path)
+				var mgr = get_node_or_null("/root/UpgradeManager")
+				if not mgr:
+					mgr = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+					get_tree().root.add_child(mgr)
+				if data:
+					mgr.call("register_upgrade", data)
+			file = dir.get_next()
+
+func set_damage_multiplier(value: float) -> void:
+	_damage_multiplier = value
+
+func set_fire_rate_multiplier(value: float) -> void:
+	_fire_rate_multiplier = value
+
+func set_magazine_bonus(value: float) -> void:
+	_magazine_bonus = int(value)
+
+func set_ammo_conservation(value: float) -> void:
+	_ammo_conservation = value
+
+func get_damage_multiplier() -> float:
+	return _damage_multiplier
+
+func get_fire_rate_multiplier() -> float:
+	return _fire_rate_multiplier
 
 func _on_facing_changed(new_facing: int) -> void:
 	_sprite.scale.x = new_facing

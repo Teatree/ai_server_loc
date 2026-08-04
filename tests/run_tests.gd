@@ -95,6 +95,9 @@ func _ready() -> void:
 	_test_director_victory_emitted_once()
 	_test_director_reset_clears_victory_state()
 	_test_level_restart_clears_enemies_and_director()
+	_test_upgrades_apply_and_survive_respawn()
+	_test_upgrade_stack_limit_enforced()
+	_test_upgrade_mutual_exclusion_enforced()
 	set_process(true)
 
 
@@ -2003,5 +2006,87 @@ func _test_level_restart_clears_enemies_and_director() -> void:
 
 	level.queue_free()
 	director = null
+
+
+# --- S10A upgrade tests ---
+
+func _test_upgrades_apply_and_survive_respawn() -> void:
+	var manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+	add_child(manager)
+	var speed_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	speed_data.upgrade_id = &"speed_boost"
+	speed_data.max_stacks = 3
+	speed_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	speed_data.modifiers[0].stat = &"speed"
+	speed_data.modifiers[0].value = 15.0
+	var health_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	health_data.upgrade_id = &"health_up"
+	health_data.max_stacks = 4
+	health_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	health_data.modifiers[0].stat = &"health_max"
+	health_data.modifiers[0].value = 25.0
+	var regen_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	regen_data.upgrade_id = &"health_regen"
+	regen_data.max_stacks = 1
+	regen_data.applies_once = true
+	regen_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	regen_data.modifiers[0].stat = &"health_regen"
+	regen_data.modifiers[0].value = 1.0
+	manager.call("register_upgrade", speed_data)
+	manager.call("register_upgrade", health_data)
+	manager.call("register_upgrade", regen_data)
+	_assert(manager.call("apply_upgrade", &"speed_boost"), "speed_boost should apply")
+	_assert(manager.call("apply_upgrade", &"health_up"), "health_up should apply")
+	_assert(manager.call("apply_upgrade", &"health_regen"), "health_regen should apply once")
+	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "speed_boost should have 1 stack")
+	_assert(manager.call("get_stack_count", &"health_up") == 1, "health_up should have 1 stack")
+	_assert(manager.call("get_stack_count", &"health_regen") == 1, "health_regen should have 1 stack")
+	manager.call("on_respawn")
+	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "speed_boost should survive respawn")
+	_assert(manager.call("get_stack_count", &"health_up") == 1, "health_up should survive respawn")
+	_assert(manager.call("get_stack_count", &"health_regen") == 1, "health_regen should survive respawn")
+	manager.queue_free()
+
+
+func _test_upgrade_stack_limit_enforced() -> void:
+	var manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+	add_child(manager)
+	var data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	data.upgrade_id = &"damage_boost"
+	data.max_stacks = 5
+	data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	data.modifiers[0].stat = &"damage_mult"
+	data.modifiers[0].value = 0.25
+	manager.call("register_upgrade", data)
+	for i in range(data.max_stacks):
+		_assert(manager.call("apply_upgrade", &"damage_boost"), "damage_boost stack %d should apply" % (i + 1))
+	_assert(not manager.call("apply_upgrade", &"damage_boost"), "damage_boost beyond max_stacks should be rejected")
+	_assert(manager.call("get_stack_count", &"damage_boost") == data.max_stacks, "stack count should equal max_stacks")
+	manager.queue_free()
+
+
+func _test_upgrade_mutual_exclusion_enforced() -> void:
+	var manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+	add_child(manager)
+	var data_a = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	data_a.upgrade_id = &"speed_boost"
+	data_a.max_stacks = 3
+	data_a.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	data_a.modifiers[0].stat = &"speed"
+	data_a.modifiers[0].value = 15.0
+	var data_b = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	data_b.upgrade_id = &"damage_boost"
+	data_b.max_stacks = 5
+	data_b.mutual_exclusions = [StringName("speed_boost")]
+	data_b.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	data_b.modifiers[0].stat = &"damage_mult"
+	data_b.modifiers[0].value = 0.25
+	manager.call("register_upgrade", data_a)
+	manager.call("register_upgrade", data_b)
+	_assert(manager.call("apply_upgrade", &"speed_boost"), "speed_boost should apply")
+	_assert(not manager.call("apply_upgrade", &"damage_boost"), "damage_boost should be excluded by speed_boost")
+	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "speed_boost should remain active")
+	_assert(manager.call("get_stack_count", &"damage_boost") == 0, "damage_boost should not be active")
+	manager.queue_free()
 
 
