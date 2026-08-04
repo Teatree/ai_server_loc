@@ -1,5 +1,6 @@
 extends Node
 
+const SaveSchema = preload("res://scripts/save/save_schema.gd")
 const RIFLE_DATA_SCRIPT = preload("res://scripts/weapons/rifle_data.gd")
 const AUTOMATIC_RIFLE_SCRIPT = preload("res://scripts/weapons/automatic_rifle.gd")
 const MELEE_ATTACK_SCRIPT = preload("res://scripts/weapons/melee_attack.gd")
@@ -105,6 +106,16 @@ func _ready() -> void:
 	_test_upgrade_selection_applies_once_and_closes()
 	_test_checkpoint_respawn_does_not_double_apply()
 	_test_scene_reload_does_not_double_apply()
+	_test_save_schema_has_explicit_version_and_stable_identifiers()
+	_test_save_schema_missing_fields_fall_back_to_defaults()
+	_test_save_schema_corrupt_health_is_repaired()
+	_test_save_schema_unknown_fields_are_stripped()
+	_test_save_schema_invalid_version_returns_empty_defaults()
+	_test_save_schema_old_version_migrates_deterministically()
+	_test_save_sanitizer_repairs_negative_ammo()
+	_test_save_sanitizer_skips_unknown_version_fields()
+	_test_save_schema_weapon_entry_requires_valid_identifier()
+	_test_save_schema_upgrade_entry_requires_valid_identifier()
 	set_process(true)
 
 
@@ -174,6 +185,11 @@ func _assert(condition: bool, message: String) -> void:
 	else:
 		_failed += 1
 		print("FAIL: ", message)
+
+
+func _sanitize(raw: Dictionary) -> Dictionary:
+	var sanitizer = preload("res://scripts/save/save_sanitizer.gd").new()
+	return sanitizer.sanitize(raw)
 
 
 func _print_summary() -> void:
@@ -2364,5 +2380,139 @@ func _test_scene_reload_does_not_double_apply() -> void:
 
 	runtime.queue_free()
 	manager.queue_free()
+
+
+# --- S11A save schema and sanitization tests ---
+
+func _test_save_schema_has_explicit_version_and_stable_identifiers() -> void:
+	var data: Dictionary = SaveSchema.create_empty()
+	_assert(data.has(SaveSchema.FIELD_VERSION), "save data must contain version field")
+	_assert(data[SaveSchema.FIELD_VERSION] == SaveSchema.CURRENT_VERSION, "version must be current")
+	var weapon: Dictionary = SaveSchema.weapon_entry(&"pistol", 10, 20)
+	_assert(weapon[SaveSchema.FIELD_WEAPON_ID] is StringName, "weapon_id must be a stable StringName")
+	var upgrade: Dictionary = SaveSchema.upgrade_entry(&"speed_boost", 2)
+	_assert(upgrade[SaveSchema.FIELD_UPGRADE_ID] is StringName, "upgrade_id must be a stable StringName")
+
+
+func _test_save_schema_missing_fields_fall_back_to_defaults() -> void:
+	var partial: Dictionary = {}
+	partial[SaveSchema.FIELD_VERSION] = 1
+	var sanitized: Dictionary = _sanitize(partial)
+	_assert(sanitized.has(SaveSchema.FIELD_CHECKPOINT), "missing checkpoint should be filled")
+	_assert(sanitized.has(SaveSchema.FIELD_HEALTH_CURRENT), "missing health_current should be filled")
+	_assert(sanitized.has(SaveSchema.FIELD_HEALTH_MAX), "missing health_max should be filled")
+	_assert(sanitized.has(SaveSchema.FIELD_WEAPONS), "missing weapons should be filled")
+	_assert(sanitized.has(SaveSchema.FIELD_UPGRADES), "missing upgrades should be filled")
+	_assert(sanitized.has(SaveSchema.FIELD_ENCOUNTER_COMPLETED), "missing encounter_completed should be filled")
+	_assert(sanitized.has(SaveSchema.FIELD_SESSION_SEED), "missing session_seed should be filled")
+	_assert(sanitized[SaveSchema.FIELD_CHECKPOINT] == SaveSchema.DEFAULT_CHECKPOINT, "default checkpoint should be applied")
+
+
+func _test_save_schema_corrupt_health_is_repaired() -> void:
+	var data: Dictionary = SaveSchema.create_empty()
+	data[SaveSchema.FIELD_HEALTH_CURRENT] = 200.0
+	data[SaveSchema.FIELD_HEALTH_MAX] = 100.0
+	var sanitized: Dictionary = _sanitize(data)
+	_assert(sanitized[SaveSchema.FIELD_HEALTH_CURRENT] == sanitized[SaveSchema.FIELD_HEALTH_MAX],
+		"health_current exceeding max should be clamped to max")
+	data[SaveSchema.FIELD_HEALTH_CURRENT] = -10.0
+	sanitized = _sanitize(data)
+	_assert(sanitized[SaveSchema.FIELD_HEALTH_CURRENT] == 0.0,
+		"negative health_current should be clamped to zero")
+	data[SaveSchema.FIELD_HEALTH_MAX] = 0.0
+	sanitized = _sanitize(data)
+	_assert(sanitized[SaveSchema.FIELD_HEALTH_MAX] == SaveSchema.DEFAULT_HEALTH_MAX,
+		"zero health_max should be repaired to default")
+
+
+func _test_save_schema_unknown_fields_are_stripped() -> void:
+	var data: Dictionary = SaveSchema.create_empty()
+	data["_unknown_field"] = "should disappear"
+	data["another_unknown"] = 42
+	var sanitized: Dictionary = _sanitize(data)
+	_assert(not sanitized.has("_unknown_field"), "unknown fields should be stripped")
+	_assert(not sanitized.has("another_unknown"), "unknown fields should be stripped")
+	_assert(sanitized[SaveSchema.FIELD_VERSION] == SaveSchema.CURRENT_VERSION, "known fields should remain")
+
+
+func _test_save_schema_invalid_version_returns_empty_defaults() -> void:
+	var no_version: Dictionary = {}
+	no_version[SaveSchema.FIELD_CHECKPOINT] = Vector2(500, 500)
+	var sanitized: Dictionary = _sanitize(no_version)
+	_assert(sanitized[SaveSchema.FIELD_CHECKPOINT] == SaveSchema.DEFAULT_CHECKPOINT,
+		"missing version should reset to defaults, ignoring other fields")
+	var bad_version: Dictionary = {}
+	bad_version[SaveSchema.FIELD_VERSION] = "not_a_number"
+	sanitized = _sanitize(bad_version)
+	_assert(sanitized[SaveSchema.FIELD_VERSION] == SaveSchema.CURRENT_VERSION,
+		"invalid version type should reset to defaults")
+	var future_version: Dictionary = {}
+	future_version[SaveSchema.FIELD_VERSION] = 99
+	sanitized = _sanitize(future_version)
+	_assert(sanitized == SaveSchema.create_empty(),
+		"future version beyond current should reset to empty defaults")
+
+
+func _test_save_schema_old_version_migrates_deterministically() -> void:
+	var old_data: Dictionary = {}
+	old_data[SaveSchema.FIELD_VERSION] = 0
+	old_data["legacy_field"] = "removed"
+	old_data[SaveSchema.FIELD_HEALTH_CURRENT] = 50.0
+	var sanitized_a: Dictionary = _sanitize(old_data)
+	var old_data_b: Dictionary = {}
+	old_data_b[SaveSchema.FIELD_VERSION] = 0
+	old_data_b["legacy_field"] = "removed"
+	old_data_b[SaveSchema.FIELD_HEALTH_CURRENT] = 50.0
+	var sanitized_b: Dictionary = _sanitize(old_data_b)
+	_assert(sanitized_a == sanitized_b, "migration must be deterministic across repeated calls")
+	_assert(sanitized_a[SaveSchema.FIELD_VERSION] == SaveSchema.CURRENT_VERSION, "migrated version must be current")
+	_assert(not sanitized_a.has("legacy_field"), "migration must strip legacy unknown fields")
+	_assert(sanitized_a[SaveSchema.FIELD_CHECKPOINT] == SaveSchema.DEFAULT_CHECKPOINT,
+		"migration from version 0 must fill checkpoint default")
+	_assert(sanitized_a[SaveSchema.FIELD_HEALTH_CURRENT] == SaveSchema.DEFAULT_HEALTH_CURRENT,
+		"migration from version 0 must reset health to safe default (ancient format)")
+
+
+func _test_save_sanitizer_repairs_negative_ammo() -> void:
+	var data: Dictionary = SaveSchema.create_empty()
+	data[SaveSchema.FIELD_WEAPONS] = [
+		SaveSchema.weapon_entry(&"pistol", -5, -3),
+	]
+	var sanitized: Dictionary = _sanitize(data)
+	var weapons: Array = sanitized[SaveSchema.FIELD_WEAPONS]
+	_assert(weapons.size() == 1, "valid weapon entry should be kept")
+	_assert(weapons[0][SaveSchema.FIELD_CURRENT_AMMO] == 0, "negative ammo should be clamped to zero")
+	_assert(weapons[0][SaveSchema.FIELD_RESERVE_AMMO] == 0, "negative reserve ammo should be clamped to zero")
+
+
+func _test_save_sanitizer_skips_unknown_version_fields() -> void:
+	var data: Dictionary = SaveSchema.create_empty()
+	data["extra_key"] = "value"
+	var sanitized: Dictionary = _sanitize(data)
+	_assert(not sanitized.has("extra_key"), "unknown top-level field must be stripped")
+
+
+func _test_save_schema_weapon_entry_requires_valid_identifier() -> void:
+	var data: Dictionary = SaveSchema.create_empty()
+	data[SaveSchema.FIELD_WEAPONS] = [
+		{"wrong_key": "pistol", SaveSchema.FIELD_CURRENT_AMMO: 5},
+		SaveSchema.weapon_entry(&"pistol", 5, 10),
+	]
+	var sanitized: Dictionary = _sanitize(data)
+	var weapons: Array = sanitized[SaveSchema.FIELD_WEAPONS]
+	_assert(weapons.size() == 1, "entries without valid weapon_id should be dropped")
+	_assert(weapons[0][SaveSchema.FIELD_WEAPON_ID] == &"pistol", "valid entry should be preserved")
+
+
+func _test_save_schema_upgrade_entry_requires_valid_identifier() -> void:
+	var data: Dictionary = SaveSchema.create_empty()
+	data[SaveSchema.FIELD_UPGRADES] = [
+		{"upgrade_id": 123, SaveSchema.FIELD_UPGRADE_STACKS: 2},
+		SaveSchema.upgrade_entry(&"health_up", 1),
+	]
+	var sanitized: Dictionary = _sanitize(data)
+	var upgrades: Array = sanitized[SaveSchema.FIELD_UPGRADES]
+	_assert(upgrades.size() == 1, "entries without valid upgrade_id should be dropped")
+	_assert(upgrades[0][SaveSchema.FIELD_UPGRADE_ID] == &"health_up", "valid entry should be preserved")
 
 

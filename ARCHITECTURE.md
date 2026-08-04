@@ -14,12 +14,13 @@ scenes/
   weapons/
   ui/
 scripts/
-  components/
-  game/
-  player/
-  enemies/
-  weapons/
-  ui/
+  components
+  game
+  player
+  enemies
+  weapons
+  ui
+  save
 resources/
   movement/
   weapons/
@@ -88,7 +89,7 @@ Upgrade definitions are data. A runtime modifier service applies validated stack
 
 ### Save System
 
-Save data is versioned and validated at the boundary. Loading must tolerate missing, corrupt, old, unknown, and invalid data. Scene nodes reconstruct runtime state from sanitized data.
+Save data is versioned and validated at the boundary. `scripts/save/save_schema.gd` declares the canonical field set and current version. `scripts/save/save_sanitizer.gd` enforces type constraints, strips unknown fields, fills defaults for missing data, repairs corrupt values, and applies deterministic migrations from older schema versions. Scene nodes reconstruct runtime state from sanitized data using stable StringName identifiers; no serialized runtime objects are persisted.
 
 ### UI and Feedback
 
