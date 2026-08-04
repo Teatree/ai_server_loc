@@ -27,6 +27,8 @@ var _input_locked: bool = false
 
 
 func _physics_process(delta: float) -> void:
+	if not body:
+		return
 	_update_dodge(delta)
 	_update_knockback(delta)
 	_handle_jump_input()

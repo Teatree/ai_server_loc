@@ -91,6 +91,10 @@ func _ready() -> void:
 	_test_director_rejects_too_close_spawn_to_recent()
 	_test_director_pressure_escalates_through_phases()
 	_test_director_phase_and_spawn_reproduce_from_seed()
+	_test_director_victory_emitted_after_all_phases()
+	_test_director_victory_emitted_once()
+	_test_director_reset_clears_victory_state()
+	_test_level_restart_clears_enemies_and_director()
 	set_process(true)
 
 
@@ -1898,5 +1902,106 @@ func _test_mixed_archetypes_retain_navigation_and_attack() -> void:
 	brute.free()
 	runner.free()
 	spitter.free()
+
+
+# --- S09C holdout and victory tests ---
+
+func _test_director_victory_emitted_after_all_phases() -> void:
+	var marker: SpawnMarker = SpawnMarker.new()
+	marker.global_position = Vector2(100, 0)
+	marker.enemy_type = &"shambler"
+	marker.active = true
+	add_child(marker)
+
+	var director: Director = Director.new()
+	director.recovery_duration = 1.0
+	director.pressure_duration = 1.0
+	director.escalation_duration = 1.0
+	director.peak_duration = 1.0
+	director.configure(1, [marker], Vector2(0, 100))
+
+	director.register_spawn(10.0)
+	director._step_phase(1.1)
+	director._step_phase(1.1)
+	director._step_phase(1.1)
+	director._step_phase(1.1)
+	director.register_death(10.0)
+	director._step_phase(0.1)
+	_assert(director.has_victory(), "victory should be true after all phases visited")
+
+	marker.free()
+	director.free()
+
+
+func _test_director_victory_emitted_once() -> void:
+	var marker: SpawnMarker = SpawnMarker.new()
+	marker.global_position = Vector2(100, 0)
+	marker.enemy_type = &"shambler"
+	marker.active = true
+	add_child(marker)
+
+	var director: Director = Director.new()
+	director.recovery_duration = 1.0
+	director.pressure_duration = 1.0
+	director.escalation_duration = 1.0
+	director.peak_duration = 1.0
+	director.configure(1, [marker], Vector2(0, 100))
+
+	director.register_spawn(10.0)
+	director._step_phase(1.1)
+	director._step_phase(1.1)
+	director._step_phase(1.1)
+	director._step_phase(1.1)
+	director.register_death(10.0)
+	director._step_phase(0.1)
+
+	var blocked: Dictionary = director.select_spawn(0.0)
+	_assert(blocked.is_empty(), "spawn should be blocked after victory")
+
+	marker.free()
+	director.free()
+
+
+func _test_director_reset_clears_victory_state() -> void:
+	var marker: SpawnMarker = SpawnMarker.new()
+	marker.global_position = Vector2(100, 0)
+	marker.enemy_type = &"shambler"
+	marker.active = true
+	add_child(marker)
+
+	var director: Director = Director.new()
+	director.recovery_duration = 1.0
+	director.pressure_duration = 1.0
+	director.escalation_duration = 1.0
+	director.peak_duration = 1.0
+	director.configure(1, [marker], Vector2(0, 100))
+
+	director.register_spawn(10.0)
+	director._step_phase(1.1)
+	director._step_phase(1.1)
+	director._step_phase(1.1)
+	director._step_phase(1.1)
+	director.register_death(10.0)
+	director._step_phase(0.1)
+	_assert(director.has_victory(), "victory should be set after holdout")
+
+	director.reset()
+	_assert(not director.has_victory(), "victory should be cleared after reset")
+
+	marker.free()
+	director.free()
+
+
+func _test_level_restart_clears_enemies_and_director() -> void:
+	var level: Node2D = _load_level_scene()
+	var director: Director = level.get_node_or_null("Director") as Director
+	_assert(director != null, "level should contain a Director node")
+
+	var victory_label: Label = level.get_node_or_null("VictoryLabel") as Label
+	_assert(victory_label != null, "level should contain a VictoryLabel")
+	_assert(not victory_label.visible, "VictoryLabel should start hidden")
+
+	level.queue_free()
+	director = null
 
 

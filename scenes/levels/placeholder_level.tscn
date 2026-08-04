@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://scripts/components/pickup.gd" id="6_p"]
 [ext_resource type="Script" path="res://scripts/enemies/spawn_marker.gd" id="7_s"]
 [ext_resource type="Script" path="res://scripts/navigation/platform_graph.gd" id="8_nav"]
+[ext_resource type="Script" path="res://scripts/director/director.gd" id="9_dir"]
 
 [sub_resource type="RectangleShape2D" id="Rect2D_ground1"]
 size = Vector2(500, 40)
@@ -330,6 +331,26 @@ enemy_type = "ranged"
 [node name="EnemySpawnShambler_C" type="Marker2D" parent="."]
 position = Vector2(1100, 260)
 script = ExtResource("7_s")
+
+[node name="Director" type="Node" parent="."]
+script = ExtResource("9_dir")
+
+[node name="RestartEncounter" type="Button" parent="."]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 180.0
+offset_bottom = 60.0
+text = "Restart Encounter"
+
+[node name="VictoryLabel" type="Label" parent="."]
+offset_left = 460.0
+offset_top = 300.0
+offset_right = 780.0
+offset_bottom = 380.0
+text = "HOLDOUT COMPLETE"
+horizontal_alignment = 1
+vertical_alignment = 1
+visible = false
 
 [node name="PlatformGraph" type="Node2D" parent="."]
 script = ExtResource("8_nav")

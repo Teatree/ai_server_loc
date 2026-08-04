@@ -6,6 +6,7 @@ signal budget_changed(remaining: float)
 signal slot_changed(remaining: int)
 
 enum Phase { RECOVERY, PRESSURE, ESCALATION, PEAK }
+const _PHASE_COUNT: int = 4
 
 @export var max_threat_budget: float = 100.0
 @export var max_living_enemies: int = 10
@@ -14,8 +15,9 @@ enum Phase { RECOVERY, PRESSURE, ESCALATION, PEAK }
 @export var recovery_duration: float = 8.0
 @export var pressure_duration: float = 12.0
 @export var escalation_duration: float = 8.0
-
+@export var peak_duration: float = 8.0
 signal phase_changed(phase: Director.Phase)
+signal victory
 
 var _seed: int = 0
 var _rng: RandomNumberGenerator
@@ -26,6 +28,9 @@ var _spawn_markers: Array = []
 var _phase: Phase = Phase.RECOVERY
 var _phase_elapsed: float = 0.0
 var _recent_spawn_positions: Array[Vector2] = []
+var _max_phase_reached: int = 0
+var _victory_emitted: bool = false
+
 
 func _init() -> void:
 	_rng = RandomNumberGenerator.new()
@@ -41,6 +46,23 @@ func configure(seed: int, spawn_markers: Array, player_position: Vector2) -> voi
 	_phase = Phase.RECOVERY
 	_phase_elapsed = 0.0
 	_recent_spawn_positions.clear()
+	_max_phase_reached = 0
+	_victory_emitted = false
+
+
+func reset() -> void:
+	_current_threat = 0.0
+	_living_enemies = 0
+	_rng.seed = _seed
+	_phase = Phase.RECOVERY
+	_phase_elapsed = 0.0
+	_recent_spawn_positions.clear()
+	_max_phase_reached = 0
+	_victory_emitted = false
+
+
+func has_victory() -> bool:
+	return _victory_emitted
 
 
 func get_remaining_threat() -> float:
@@ -73,6 +95,8 @@ func register_death(threat_cost: float) -> void:
 
 
 func select_spawn(delta: float = 0.0) -> Dictionary:
+	if _victory_emitted:
+		return {}
 	_step_phase(delta)
 	var available: Array[Dictionary] = []
 	for marker in _spawn_markers:
@@ -145,36 +169,41 @@ func _step_phase(delta: float) -> void:
 			if _phase_elapsed >= recovery_duration:
 				_phase = Phase.PRESSURE
 				_phase_elapsed = 0.0
+				_max_phase_reached = max(_max_phase_reached, 1)
 				phase_changed.emit(_phase)
 		Phase.PRESSURE:
 			if get_remaining_threat() <= 0.0:
 				_phase = Phase.RECOVERY
 				_phase_elapsed = 0.0
 				phase_changed.emit(_phase)
+				_check_victory()
 			elif _phase_elapsed >= pressure_duration:
 				_phase = Phase.ESCALATION
 				_phase_elapsed = 0.0
+				_max_phase_reached = max(_max_phase_reached, 2)
 				phase_changed.emit(_phase)
 		Phase.ESCALATION:
 			if get_remaining_threat() <= 0.0:
 				_phase = Phase.RECOVERY
 				_phase_elapsed = 0.0
 				phase_changed.emit(_phase)
+				_check_victory()
 			elif _phase_elapsed >= escalation_duration:
 				_phase = Phase.PEAK
 				_phase_elapsed = 0.0
+				_max_phase_reached = max(_max_phase_reached, 3)
 				phase_changed.emit(_phase)
 		Phase.PEAK:
-			if get_remaining_threat() <= 0.0:
+			if get_remaining_threat() <= 0.0 or _phase_elapsed >= peak_duration:
 				_phase = Phase.RECOVERY
 				_phase_elapsed = 0.0
 				phase_changed.emit(_phase)
+				_check_victory()
 
 
-func reset() -> void:
-	_current_threat = 0.0
-	_living_enemies = 0
-	_rng.seed = _seed
-	_phase = Phase.RECOVERY
-	_phase_elapsed = 0.0
-	_recent_spawn_positions.clear()
+func _check_victory() -> void:
+	if _victory_emitted:
+		return
+	if _max_phase_reached >= _PHASE_COUNT - 1:
+		_victory_emitted = true
+		victory.emit()
