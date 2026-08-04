@@ -12,6 +12,7 @@ const FIELD_SESSION_SEED: StringName = &"session_seed"
 const FIELD_WEAPON_ID: StringName = &"weapon_id"
 const FIELD_CURRENT_AMMO: StringName = &"current_ammo"
 const FIELD_RESERVE_AMMO: StringName = &"reserve_ammo"
+const FIELD_WEAPON_MAX_AMMO: StringName = &"max_ammo"
 const FIELD_UPGRADE_ID: StringName = &"upgrade_id"
 const FIELD_UPGRADE_STACKS: StringName = &"upgrade_stacks"
 
@@ -44,9 +45,10 @@ static func sanitize(raw: Dictionary) -> Dictionary:
 
 
 static func _is_valid_version(value) -> bool:
-	if typeof(value) != TYPE_INT:
+	if not _is_numeric(value):
 		return false
-	return int(value) >= MIN_SUPPORTED_VERSION and int(value) <= CURRENT_VERSION
+	var v: int = int(value)
+	return v >= MIN_SUPPORTED_VERSION and v <= CURRENT_VERSION
 
 
 static func _migrate(data: Dictionary, from_version: int) -> Dictionary:
@@ -73,7 +75,7 @@ static func _apply_migration(data: Dictionary, from_version: int) -> Dictionary:
 
 
 static func _strip_unknown_fields(data: Dictionary) -> void:
-	var known: Array[StringName] = [
+	var known: Array = [
 		FIELD_VERSION,
 		FIELD_CHECKPOINT,
 		FIELD_HEALTH_CURRENT,
@@ -85,6 +87,8 @@ static func _strip_unknown_fields(data: Dictionary) -> void:
 		FIELD_WEAPON_ID,
 		FIELD_CURRENT_AMMO,
 		FIELD_RESERVE_AMMO,
+		FIELD_WEAPON_MAX_AMMO,
+		"max_ammo",
 		FIELD_UPGRADE_ID,
 		FIELD_UPGRADE_STACKS,
 	]
@@ -198,8 +202,17 @@ static func _is_float(value) -> bool:
 
 
 static func _is_int(value) -> bool:
-	return typeof(value) == TYPE_INT
+	if typeof(value) == TYPE_INT:
+		return true
+	if typeof(value) == TYPE_FLOAT and value == float(int(value)):
+		return true
+	return false
 
 
 static func _is_bool(value) -> bool:
 	return typeof(value) == TYPE_BOOL
+
+
+static func _is_numeric(value) -> bool:
+	var t = typeof(value)
+	return t == TYPE_INT or t == TYPE_FLOAT

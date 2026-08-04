@@ -4,10 +4,17 @@ signal game_started
 signal game_ended
 
 var _pending_transition: Callable = _nop
+var _save_manager: SaveManager = null
 
 
 func _nop() -> void:
 	pass
+
+
+func _ready() -> void:
+	_save_manager = SaveManager.new()
+	_save_manager.name = "SaveManager"
+	add_child(_save_manager)
 
 
 func _notification(what: int) -> void:
@@ -47,6 +54,31 @@ func request_return_to_title() -> void:
 	resume()
 	game_ended.emit()
 	go_to_title()
+
+
+func has_save() -> bool:
+	if not _save_manager:
+		return false
+	return _save_manager.has_save()
+
+
+func new_game() -> void:
+	if _save_manager:
+		_save_manager.clear_save()
+	go_to_level()
+
+
+func continue_game() -> void:
+	if not _save_manager:
+		go_to_level()
+		return
+	_save_manager.load_from_disk()
+	go_to_level()
+
+
+func clear_save() -> void:
+	if _save_manager:
+		_save_manager.clear_save()
 
 
 func _make_or_get_pause_menu() -> Control:

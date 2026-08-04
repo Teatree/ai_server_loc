@@ -164,7 +164,7 @@ func apply_state(data: Dictionary) -> void:
 		_current_ammo = max(0, int(data[SaveSchema.FIELD_CURRENT_AMMO]))
 	if data.has(SaveSchema.FIELD_RESERVE_AMMO):
 		_reserve_ammo = max(0, int(data[SaveSchema.FIELD_RESERVE_AMMO]))
-	var max_ammo: int = data.max_ammo if data and data.has("max_ammo") else (data.max_ammo if data else -1)
+	var max_ammo: int = data.get("max_ammo", -1) if data is Dictionary else -1
 	ammo_changed.emit(_current_ammo, max_ammo)
 	_set_state(&"idle")
 	_can_fire = true

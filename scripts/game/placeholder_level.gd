@@ -26,6 +26,11 @@ func _ready() -> void:
 		_exit_zone.body_entered.connect(_on_exit_entered)
 	_configure_director()
 	_build_navigation_graph()
+	var save_manager := get_node_or_null("/root/GameFlow/SaveManager") as SaveManager
+	if save_manager and save_manager.has_pending_load():
+		save_manager.apply_pending_load()
+		if _director and _player:
+			_director.set_player_position(_player.global_position)
 
 
 func _build_navigation_graph() -> void:
@@ -53,12 +58,22 @@ func _on_return() -> void:
 
 
 func _on_restart() -> void:
+	var save_manager := get_node_or_null("/root/GameFlow/SaveManager") as SaveManager
+	if save_manager and save_manager.has_save():
+		save_manager.load_from_disk()
+		if save_manager.has_pending_load():
+			save_manager.apply_pending_load()
+			if _director and _player:
+				_director.set_player_position(_player.global_position)
 	_restart_encounter()
 
 
 func _on_checkpoint_activated(position: Vector2) -> void:
 	if _player and _player.has_method("set_checkpoint"):
 		_player.set_checkpoint(position)
+	var save_manager := get_node_or_null("/root/GameFlow/SaveManager") as SaveManager
+	if save_manager:
+		save_manager.save_to_disk()
 
 
 func _on_exit_entered(body: Node2D) -> void:

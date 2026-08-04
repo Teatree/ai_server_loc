@@ -1,6 +1,7 @@
 extends Node
 
 const SaveSchema = preload("res://scripts/save/save_schema.gd")
+const SaveSanitizer = preload("res://scripts/save/save_sanitizer.gd")
 const RIFLE_DATA_SCRIPT = preload("res://scripts/weapons/rifle_data.gd")
 const AUTOMATIC_RIFLE_SCRIPT = preload("res://scripts/weapons/automatic_rifle.gd")
 const MELEE_ATTACK_SCRIPT = preload("res://scripts/weapons/melee_attack.gd")
@@ -116,6 +117,11 @@ func _ready() -> void:
 	_test_save_sanitizer_skips_unknown_version_fields()
 	_test_save_schema_weapon_entry_requires_valid_identifier()
 	_test_save_schema_upgrade_entry_requires_valid_identifier()
+	_test_save_manager_has_save_detects_file()
+	_test_save_manager_file_round_trip_preserves_fields()
+	_test_save_manager_clear_save_removes_availability()
+	_test_repeated_lifecycle_cycles_remain_clean()
+	_test_checkpoint_save_and_restart_reconstructs_state()
 	set_process(true)
 
 
@@ -2514,6 +2520,100 @@ func _test_save_schema_upgrade_entry_requires_valid_identifier() -> void:
 	var upgrades: Array = sanitized[SaveSchema.FIELD_UPGRADES]
 	_assert(upgrades.size() == 1, "entries without valid upgrade_id should be dropped")
 	_assert(upgrades[0][SaveSchema.FIELD_UPGRADE_ID] == &"health_up", "valid entry should be preserved")
+
+
+# --- S11C save lifecycle tests ---
+
+func _test_save_manager_has_save_detects_file() -> void:
+	var manager = preload("res://scripts/save/save_manager.gd").new()
+	add_child(manager)
+	manager.clear_save()
+	_assert(not manager.has_save(), "has_save should be false when no file exists")
+	manager.save_to_disk()
+	_assert(manager.has_save(), "has_save should be true after saving")
+	manager.clear_save()
+	_assert(not manager.has_save(), "has_save should be false after clearing")
+	manager.free()
+
+
+func _test_save_manager_file_round_trip_preserves_fields() -> void:
+	var manager = preload("res://scripts/save/save_manager.gd").new()
+	add_child(manager)
+	var player = _create_inventory_player([WeaponData.new()])
+	var weapon = player._weapon_pivot as WeaponBase
+	weapon._current_ammo = 4
+	weapon._reserve_ammo = 12
+	manager._player = player
+	manager.save_to_disk()
+	var loaded = manager.load_from_disk()
+	_assert(loaded.has(SaveSchema.FIELD_VERSION), "loaded data should have version")
+	_assert(loaded[SaveSchema.FIELD_VERSION] == SaveSchema.CURRENT_VERSION, "version should match")
+	_assert(loaded.has(SaveSchema.FIELD_CHECKPOINT), "loaded data should have checkpoint")
+	_assert(loaded.has(SaveSchema.FIELD_HEALTH_CURRENT), "loaded data should have health_current")
+	_assert(loaded.has(SaveSchema.FIELD_HEALTH_MAX), "loaded data should have health_max")
+	_assert(loaded.has(SaveSchema.FIELD_WEAPONS), "loaded data should have weapons")
+	_assert(loaded[SaveSchema.FIELD_WEAPONS].size() == 1, "loaded data should have one weapon")
+	_assert(loaded[SaveSchema.FIELD_WEAPONS][0][SaveSchema.FIELD_CURRENT_AMMO] == 4, "weapon ammo should round trip")
+	_assert(loaded[SaveSchema.FIELD_WEAPONS][0][SaveSchema.FIELD_RESERVE_AMMO] == 12, "weapon reserve should round trip")
+	manager.clear_save()
+	player.free()
+	manager.free()
+
+
+func _test_save_manager_clear_save_removes_availability() -> void:
+	var manager = preload("res://scripts/save/save_manager.gd").new()
+	add_child(manager)
+	manager.save_to_disk()
+	_assert(manager.has_save(), "save should exist after writing")
+	manager.clear_save()
+	_assert(not manager.has_save(), "save should not exist after clearing")
+	var loaded = manager.load_from_disk()
+	_assert(loaded == SaveSchema.create_empty(), "loading after clear should return empty defaults")
+	manager.free()
+
+
+func _test_repeated_lifecycle_cycles_remain_clean() -> void:
+	var manager = preload("res://scripts/save/save_manager.gd").new()
+	add_child(manager)
+	var player = _create_inventory_player([WeaponData.new()])
+	var weapon = player._weapon_pivot as WeaponBase
+	weapon._current_ammo = 5
+	manager._player = player
+	for i in range(3):
+		manager.save_to_disk()
+		var loaded = manager.load_from_disk()
+		_assert(loaded[SaveSchema.FIELD_WEAPONS].size() == 1, "cycle %d should preserve weapon count" % i)
+		_assert(loaded[SaveSchema.FIELD_WEAPONS][0][SaveSchema.FIELD_CURRENT_AMMO] == 5, "cycle %d should not duplicate ammo" % i)
+	manager.clear_save()
+	player.free()
+	manager.free()
+
+
+func _test_checkpoint_save_and_restart_reconstructs_state() -> void:
+	var manager = preload("res://scripts/save/save_manager.gd").new()
+	add_child(manager)
+	var player = _create_inventory_player([WeaponData.new()])
+	var weapon = player._weapon_pivot as WeaponBase
+	weapon._current_ammo = 3
+	manager._player = player
+	player._last_checkpoint = Vector2(500, 300)
+	var health = player.get_node_or_null("HealthComponent") as HealthComponent
+	if health:
+		health.current_health = 50.0
+		player.health_component = health
+	manager.save_to_disk()
+	player._last_checkpoint = Vector2(100, 100)
+	if health:
+		health.current_health = 100.0
+	var loaded_data = manager.load_from_disk()
+	manager.apply_pending_load()
+	_assert(player._last_checkpoint == Vector2(500, 300), "checkpoint should be restored")
+	if health:
+		_assert(health.current_health == 50.0, "health should be restored, got %s" % health.current_health)
+	_assert(weapon.get_current_ammo() == 3, "ammo should be restored")
+	manager.clear_save()
+	player.free()
+	manager.free()
 
 
 # --- S11B save round trip tests ---
