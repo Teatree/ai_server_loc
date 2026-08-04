@@ -67,6 +67,10 @@ func has_victory() -> bool:
 	return _victory_emitted
 
 
+func get_seed() -> int:
+	return _seed
+
+
 func serialize_state() -> Dictionary:
 	var state: Dictionary = {}
 	state[SaveSchema.FIELD_SESSION_SEED] = _seed
@@ -81,6 +85,10 @@ func apply_state(data: Dictionary) -> void:
 	if data.has(SaveSchema.FIELD_ENCOUNTER_COMPLETED) and data[SaveSchema.FIELD_ENCOUNTER_COMPLETED]:
 		_victory_emitted = true
 		_max_phase_reached = _PHASE_COUNT - 1
+
+
+func set_player_position(position: Vector2) -> void:
+	_player_position = position
 
 
 func get_remaining_threat() -> float:
