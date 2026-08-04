@@ -2,7 +2,7 @@ extends Node
 
 signal modifiers_changed
 
-@onready var player: Node2D = get_parent()
+@onready var player: Node = get_parent()
 @onready var health_component: HealthComponent = player.get_node_or_null("HealthComponent")
 @onready var movement_controller: MovementController = player.get_node_or_null("MovementController")
 
@@ -15,7 +15,9 @@ var _upgrade_manager = null
 
 func _get_manager():
 	if not _upgrade_manager:
-		_upgrade_manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+		_upgrade_manager = get_node_or_null("/root/UpgradeManager")
+		if not _upgrade_manager:
+			_upgrade_manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
 	return _upgrade_manager
 
 func _ready() -> void:
@@ -48,9 +50,22 @@ func on_respawn() -> void:
 	_regen_timer = 0.0
 	var mgr = _get_manager()
 	if mgr:
-		for upgrade_id in _active_upgrades:
-			mgr.apply_upgrade(upgrade_id)
+		mgr.on_respawn()
 	modifiers_changed.emit()
+
+func offer_choices(seed: int) -> void:
+	var mgr = _get_manager()
+	if not mgr:
+		return
+	var chooser = preload("res://scripts/upgrades/upgrade_chooser.gd").new()
+	chooser.configure(seed, mgr.get_registry(), mgr.get_active_upgrades())
+	var choices: Array[Dictionary] = chooser.generate_choices(3)
+	chooser.queue_free()
+	if choices.is_empty():
+		return
+	var ui = preload("res://scenes/ui/upgrade_selection.tscn").instantiate()
+	ui.setup(choices, self)
+	get_tree().root.add_child(ui)
 
 func _on_modifier_changed(modifier: Resource, active: bool) -> void:
 	var stat: StringName = modifier.stat

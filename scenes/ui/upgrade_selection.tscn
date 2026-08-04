@@ -1,0 +1,35 @@
+[gd_scene load_steps=3 format=3 uid="uid://b_upgrade_selection"]
+
+[ext_resource type="Script" path="res://scripts/ui/upgrade_selection.gd" id="1_s"]
+
+[sub_resource type="Theme" id="Theme_1"]
+
+[node name="UpgradeSelection" type="PanelContainer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("Theme_1")
+script = ExtResource("1_s")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="Title" type="Label" parent="VBox"]
+layout_mode = 2
+text = "Choose an Upgrade"
+horizontal_alignment = 1
+
+[node name="Choice1" type="Button" parent="VBox"]
+layout_mode = 2
+text = "Choice 1"
+
+[node name="Choice2" type="Button" parent="VBox"]
+layout_mode = 2
+text = "Choice 2"
+
+[node name="Choice3" type="Button" parent="VBox"]
+layout_mode = 2
+text = "Choice 3"

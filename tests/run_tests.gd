@@ -101,6 +101,10 @@ func _ready() -> void:
 	_test_chooser_fixed_seed_reproduces_same_three_choices()
 	_test_chooser_excludes_maxed_and_conflicting_upgrades()
 	_test_chooser_descriptions_expose_numerical_effects()
+	_test_upgrade_ui_displays_three_choices()
+	_test_upgrade_selection_applies_once_and_closes()
+	_test_checkpoint_respawn_does_not_double_apply()
+	_test_scene_reload_does_not_double_apply()
 	set_process(true)
 
 
@@ -2215,5 +2219,150 @@ func _test_chooser_descriptions_expose_numerical_effects() -> void:
 		"description should expose modifier value, got: %s" % description)
 
 	chooser.queue_free()
+
+
+# --- S10C upgrade UI tests ---
+
+func _test_upgrade_ui_displays_three_choices() -> void:
+	var runtime = preload("res://scripts/upgrades/upgrade_runtime.gd").new()
+	add_child(runtime)
+	var manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+	add_child(manager)
+	var speed_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	speed_data.upgrade_id = &"speed_boost"
+	speed_data.display_name = "Speed Boost"
+	speed_data.description = "Increases speed."
+	speed_data.max_stacks = 3
+	speed_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	speed_data.modifiers[0].stat = &"speed"
+	speed_data.modifiers[0].value = 15.0
+	speed_data.modifiers[0].operation = 3
+	var health_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	health_data.upgrade_id = &"health_up"
+	health_data.display_name = "Health Up"
+	health_data.description = "Increases health."
+	health_data.max_stacks = 4
+	health_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	health_data.modifiers[0].stat = &"health_max"
+	health_data.modifiers[0].value = 25.0
+	health_data.modifiers[0].operation = 0
+	var damage_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	damage_data.upgrade_id = &"damage_boost"
+	damage_data.display_name = "Damage Boost"
+	damage_data.description = "Increases damage."
+	damage_data.max_stacks = 5
+	damage_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	damage_data.modifiers[0].stat = &"damage_mult"
+	damage_data.modifiers[0].value = 0.25
+	damage_data.modifiers[0].operation = 1
+	manager.call("register_upgrade", speed_data)
+	manager.call("register_upgrade", health_data)
+	manager.call("register_upgrade", damage_data)
+	manager.call("unlock_upgrade", &"speed_boost")
+	manager.call("unlock_upgrade", &"health_up")
+	manager.call("unlock_upgrade", &"damage_boost")
+	runtime._upgrade_manager = manager
+
+	var ui = preload("res://scenes/ui/upgrade_selection.tscn").instantiate()
+	var choices: Array[Dictionary] = [
+		{"upgrade_id": &"speed_boost", "display_name": "Speed Boost", "description": "speed +15.00"},
+		{"upgrade_id": &"health_up", "display_name": "Health Up", "description": "health_max +25.00"},
+		{"upgrade_id": &"damage_boost", "display_name": "Damage Boost", "description": "damage_mult x0.25"}
+	]
+	add_child(ui)
+	ui.setup(choices, runtime)
+
+	_assert(ui.get_node("VBox/Choice1").text.find("Speed Boost") >= 0, "choice 1 should show upgrade name")
+	_assert(ui.get_node("VBox/Choice1").text.find("15.00") >= 0, "choice 1 should show numerical effect")
+	_assert(ui.get_node("VBox/Choice2").text.find("Health Up") >= 0, "choice 2 should show upgrade name")
+	_assert(ui.get_node("VBox/Choice2").text.find("25.00") >= 0, "choice 2 should show numerical effect")
+	_assert(ui.get_node("VBox/Choice3").text.find("Damage Boost") >= 0, "choice 3 should show upgrade name")
+	_assert(ui.get_node("VBox/Choice3").text.find("0.25") >= 0, "choice 3 should show numerical effect")
+
+	ui.queue_free()
+	runtime.queue_free()
+	manager.queue_free()
+
+
+func _test_upgrade_selection_applies_once_and_closes() -> void:
+	var runtime = preload("res://scripts/upgrades/upgrade_runtime.gd").new()
+	add_child(runtime)
+	var manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+	add_child(manager)
+	var speed_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	speed_data.upgrade_id = &"speed_boost"
+	speed_data.display_name = "Speed Boost"
+	speed_data.description = "Increases speed."
+	speed_data.max_stacks = 3
+	speed_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	speed_data.modifiers[0].stat = &"speed"
+	speed_data.modifiers[0].value = 15.0
+	speed_data.modifiers[0].operation = 3
+	manager.call("register_upgrade", speed_data)
+	manager.call("unlock_upgrade", &"speed_boost")
+	runtime._upgrade_manager = manager
+
+	var ui = preload("res://scenes/ui/upgrade_selection.tscn").instantiate()
+	var choices: Array[Dictionary] = [
+		{"upgrade_id": &"speed_boost", "display_name": "Speed Boost", "description": "speed +15.00"}
+	]
+	add_child(ui)
+	ui.setup(choices, runtime)
+
+	_assert(is_instance_valid(ui), "UI should exist before selection")
+	ui._select_choice(0)
+	await get_tree().process_frame
+	_assert(not is_instance_valid(ui), "UI should be freed after selection")
+	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "upgrade should apply once")
+
+	runtime.queue_free()
+	manager.queue_free()
+
+
+func _test_checkpoint_respawn_does_not_double_apply() -> void:
+	var manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+	add_child(manager)
+	var speed_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	speed_data.upgrade_id = &"speed_boost"
+	speed_data.max_stacks = 3
+	speed_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	speed_data.modifiers[0].stat = &"speed"
+	speed_data.modifiers[0].value = 15.0
+	manager.call("register_upgrade", speed_data)
+	manager.call("unlock_upgrade", &"speed_boost")
+	manager.call("apply_upgrade", &"speed_boost")
+	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "should start with 1 stack")
+
+	var runtime = preload("res://scripts/upgrades/upgrade_runtime.gd").new()
+	runtime._upgrade_manager = manager
+	add_child(runtime)
+	runtime.on_respawn()
+	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "respawn should not double apply")
+
+	runtime.queue_free()
+	manager.queue_free()
+
+
+func _test_scene_reload_does_not_double_apply() -> void:
+	var manager = preload("res://scripts/upgrades/upgrade_manager.gd").new()
+	var speed_data = preload("res://scripts/upgrades/upgrade_data.gd").new()
+	speed_data.upgrade_id = &"speed_boost"
+	speed_data.max_stacks = 3
+	speed_data.modifiers = [preload("res://scripts/upgrades/modifier_data.gd").new()]
+	speed_data.modifiers[0].stat = &"speed"
+	speed_data.modifiers[0].value = 15.0
+	manager.call("register_upgrade", speed_data)
+	manager.call("unlock_upgrade", &"speed_boost")
+	manager.call("apply_upgrade", &"speed_boost")
+	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "should start with 1 stack")
+
+	var runtime = preload("res://scripts/upgrades/upgrade_runtime.gd").new()
+	runtime._upgrade_manager = manager
+	add_child(runtime)
+	runtime.on_respawn()
+	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "scene reload should not double apply")
+
+	runtime.queue_free()
+	manager.queue_free()
 
 

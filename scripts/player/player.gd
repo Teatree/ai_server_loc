@@ -68,6 +68,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_melee()
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		GameFlow.request_pause()
+	if event is InputEventKey and event.pressed and event.keycode == KEY_U:
+		if upgrade_component and upgrade_component.has_method("offer_choices"):
+			upgrade_component.offer_choices(42)
 
 
 func _try_fire() -> void:
@@ -173,8 +176,8 @@ func _register_available_upgrades() -> void:
 				var mgr = get_node_or_null("/root/UpgradeManager")
 				if not mgr:
 					mgr = preload("res://scripts/upgrades/upgrade_manager.gd").new()
-					get_tree().root.add_child(mgr)
-				if data:
+					get_tree().root.call_deferred("add_child", mgr)
+				if data and mgr:
 					mgr.call("register_upgrade", data)
 			file = dir.get_next()
 

@@ -70,9 +70,18 @@ func unlock_upgrade(upgrade_id: StringName) -> void:
 func is_unlocked(upgrade_id: StringName) -> bool:
 	return upgrade_id in _unlocked_upgrades
 
+func get_registry() -> Dictionary:
+	return _registry.duplicate()
+
+func get_active_upgrades() -> Dictionary:
+	return _active_upgrades.duplicate()
+
 func on_respawn() -> void:
+	var to_apply: Array[StringName] = _applied_upgrades.duplicate()
 	_applied_upgrades.clear()
-	for upgrade_id in _unlocked_upgrades:
+	_active_upgrades.clear()
+	_active_modifiers.clear()
+	for upgrade_id in to_apply:
 		apply_upgrade(upgrade_id)
 
 func _apply_modifier(modifier: Resource) -> void:

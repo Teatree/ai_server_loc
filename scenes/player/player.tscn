@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/weapons/aim_controller.gd" id="4_a"]
 [ext_resource type="Resource" path="res://resources/movement/movement_config.tres" id="5_c"]
 [ext_resource type="Script" path="res://scripts/core/health_component.gd" id="6_h"]
+[ext_resource type="Script" path="res://scripts/upgrades/upgrade_runtime.gd" id="7_u"]
 
 [sub_resource type="RectangleShape2D" id="Rect2D_1"]
 size = Vector2(32, 48)
@@ -44,3 +45,6 @@ position = Vector2(20, 0)
 enabled = true
 target_position = Vector2(50, 0)
 collision_mask = 1
+
+[node name="UpgradeRuntime" type="Node" parent="."]
+script = ExtResource("7_u")
