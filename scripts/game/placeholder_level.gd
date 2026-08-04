@@ -15,6 +15,9 @@ const _PLATFORM_NODE_SCRIPT = preload("res://scripts/navigation/platform_node.gd
 const _PLATFORM_LINK_SCRIPT = preload("res://scripts/navigation/platform_link.gd")
 
 var _spawned_enemies: Array[Node] = []
+var _hud: CanvasLayer = null
+var _death_screen = null
+var _victory_screen = null
 
 
 func _ready() -> void:
@@ -25,12 +28,73 @@ func _ready() -> void:
 	if _exit_zone:
 		_exit_zone.body_entered.connect(_on_exit_entered)
 	_configure_director()
+	if _director and not _director.spawned.is_connected(Callable(self, "_on_spawn")):
+		_director.spawned.connect(_on_spawn)
 	_build_navigation_graph()
+	_setup_hud()
+	_setup_death_screen()
+	_setup_victory_screen()
 	var save_manager := get_node_or_null("/root/GameFlow/SaveManager") as SaveManager
 	if save_manager and save_manager.has_pending_load():
 		save_manager.apply_pending_load()
 		if _director and _player:
 			_director.set_player_position(_player.global_position)
+	if _player and _player.health_component:
+		_player.health_component.died.disconnect(Callable(_player, "_on_died"))
+		_player.health_component.died.connect(_on_player_died)
+
+
+func _setup_hud() -> void:
+	var hud_scene = preload("res://scenes/ui/hud.tscn")
+	_hud = hud_scene.instantiate()
+	_hud.name = "HUD"
+	add_child(_hud)
+
+
+func _setup_death_screen() -> void:
+	var death_scene = preload("res://scenes/ui/death_screen.tscn")
+	_death_screen = death_scene.instantiate()
+	_death_screen.name = "DeathScreen"
+	_death_screen.visible = false
+	_death_screen.process_mode = Control.PROCESS_MODE_ALWAYS
+	_death_screen.connect("respawn_requested", _on_respawn_requested)
+	_death_screen.connect("return_to_title_requested", _on_return_to_title)
+	add_child(_death_screen)
+
+
+func _setup_victory_screen() -> void:
+	var victory_scene = preload("res://scenes/ui/victory_screen.tscn")
+	_victory_screen = victory_scene.instantiate()
+	_victory_screen.name = "VictoryScreen"
+	_victory_screen.visible = false
+	_victory_screen.process_mode = Control.PROCESS_MODE_ALWAYS
+	_victory_screen.connect("return_to_title_requested", _on_return_to_title)
+	add_child(_victory_screen)
+	if _director:
+		_director.victory.connect(_on_victory_screen)
+
+
+func _on_player_died(damage_info: DamageInfo) -> void:
+	if _death_screen:
+		_death_screen.visible = true
+
+
+func _on_respawn_requested() -> void:
+	if _death_screen:
+		_death_screen.visible = false
+	if _player:
+		_player.respawn()
+
+
+func _on_victory_screen() -> void:
+	if _victory_label:
+		_victory_label.visible = false
+	if _victory_screen:
+		_victory_screen.visible = true
+
+
+func _on_return_to_title() -> void:
+	GameFlow.request_return_to_title()
 
 
 func _build_navigation_graph() -> void:
@@ -90,8 +154,6 @@ func _configure_director() -> void:
 		return
 	var markers: Array = _collect_spawn_markers()
 	_director.configure(0, markers, _player.global_position if _player else Vector2.ZERO)
-	_director.spawned.connect(_on_spawn)
-	_director.victory.connect(_on_victory)
 
 
 func _collect_spawn_markers() -> Array:

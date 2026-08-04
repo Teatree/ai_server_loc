@@ -5,6 +5,7 @@ signal game_ended
 
 var _pending_transition: Callable = _nop
 var _save_manager: SaveManager = null
+var _options_menu: Control = null
 
 
 func _nop() -> void:
@@ -39,6 +40,22 @@ func request_pause() -> void:
 	get_tree().paused = true
 	var pause_menu := _make_or_get_pause_menu()
 	get_tree().root.add_child(pause_menu)
+	if pause_menu.has_signal("options_requested"):
+		pause_menu.connect("options_requested", _on_options_requested)
+
+
+func _on_options_requested() -> void:
+	if not _options_menu:
+		_options_menu = preload("res://scenes/ui/options_menu.tscn").instantiate()
+		_options_menu.name = "OptionsMenu"
+		_options_menu.connect("back_requested", _on_options_back)
+		get_tree().root.add_child(_options_menu)
+
+
+func _on_options_back() -> void:
+	if _options_menu:
+		_options_menu.queue_free()
+		_options_menu = null
 
 
 func resume() -> void:
@@ -47,6 +64,9 @@ func resume() -> void:
 	var pause_menu := get_tree().root.get_node_or_null("PauseMenu")
 	if pause_menu:
 		pause_menu.queue_free()
+	if _options_menu:
+		_options_menu.queue_free()
+		_options_menu = null
 	get_tree().paused = false
 
 
@@ -85,9 +105,6 @@ func _make_or_get_pause_menu() -> Control:
 	var existing := get_tree().root.get_node_or_null("PauseMenu")
 	if existing:
 		return existing
-	var menu := Control.new()
+	var menu := preload("res://scenes/ui/pause_menu.tscn").instantiate()
 	menu.name = "PauseMenu"
-	menu.anchors_preset = Control.PRESET_FULL_RECT
-	menu.mouse_filter = Control.MOUSE_FILTER_STOP
-	menu.set_script(preload("res://scripts/ui/pause_menu.gd"))
 	return menu
