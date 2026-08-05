@@ -6,6 +6,8 @@ const RIFLE_DATA_SCRIPT = preload("res://scripts/weapons/rifle_data.gd")
 const AUTOMATIC_RIFLE_SCRIPT = preload("res://scripts/weapons/automatic_rifle.gd")
 const MELEE_ATTACK_SCRIPT = preload("res://scripts/weapons/melee_attack.gd")
 const MELEE_DATA_SCRIPT = preload("res://scripts/weapons/melee_data.gd")
+const CAMERA_SHAKE_SCRIPT = preload("res://scripts/feedback/camera_shake.gd")
+const HIT_STOP_SCRIPT = preload("res://scripts/feedback/hit_stop.gd")
 
 var _passed: int = 0
 var _failed: int = 0
@@ -122,6 +124,9 @@ func _ready() -> void:
 	_test_save_manager_clear_save_removes_availability()
 	_test_repeated_lifecycle_cycles_remain_clean()
 	_test_checkpoint_save_and_restart_reconstructs_state()
+	_test_shake_requests_combine_within_limits()
+	_test_hit_stop_restores_time_scale_exactly_once()
+	_test_transient_effects_release_nodes_and_signals()
 	set_process(true)
 
 
@@ -2758,9 +2763,72 @@ func _test_load_does_not_duplicate_upgrades_or_ammo() -> void:
 	second_load[SaveSchema.FIELD_UPGRADES] = [SaveSchema.upgrade_entry(&"speed_boost", 1)]
 	save_manager.load_game(second_load)
 	_assert(manager.call("get_stack_count", &"speed_boost") == 1, "repeated load should not accumulate stacks")
-
+ 
 	player.free()
 	manager.free()
 	save_manager.free()
+
+# --- S12B camera and combat feedback tests ---
+
+func _test_shake_requests_combine_within_limits() -> void:
+	var shake: Node = CAMERA_SHAKE_SCRIPT.new()
+	shake.max_intensity = 20.0
+	shake.max_duration = 0.5
+	add_child(shake)
+	var camera: Camera2D = Camera2D.new()
+	shake.camera = camera
+	shake.add_shake(5.0, 0.2)
+	shake.add_shake(8.0, 0.3)
+	shake._process(0.1)
+	_assert(shake._requests.size() == 2, "two concurrent requests should both be pending")
+	var offset: Vector2 = camera.offset
+	_assert(offset.length() > 0.0, "camera should have non-zero offset from shake")
+	shake._process(0.3)
+	_assert(shake._requests.is_empty(), "requests should clear after duration expires")
+	_assert(camera.offset == Vector2.ZERO, "camera offset should reset when no requests")
+	shake.add_shake(25.0, 0.2)
+	shake._process(0.1)
+	_assert(camera.offset.length() <= shake.max_intensity * shake.max_duration + 0.1,
+		"shake should be capped by configured max intensity")
+	shake.free()
+	camera.free()
+
+
+func _test_hit_stop_restores_time_scale_exactly_once() -> void:
+	var hit_stop: Node = HIT_STOP_SCRIPT.new()
+	add_child(hit_stop)
+	_assert(not hit_stop.is_active(), "hit stop should start inactive")
+	_assert(Engine.time_scale == 1.0, "time scale should start at 1.0")
+	hit_stop.request_stop(0.2)
+	_assert(hit_stop.is_active(), "hit stop should be active after request")
+	_assert(Engine.time_scale == 0.01, "time scale should be frozen")
+	hit_stop.request_stop(0.3)
+	_assert(hit_stop.is_active(), "concurrent request should extend stop")
+	_assert(Engine.time_scale == 0.01, "time scale should remain frozen")
+	hit_stop._process(0.15)
+	_assert(hit_stop.is_active(), "hit stop should still be active after first tick")
+	_assert(Engine.time_scale == 0.01, "time scale should still be frozen")
+	hit_stop._process(0.2)
+	_assert(not hit_stop.is_active(), "hit stop should restore after all requests expire")
+	_assert(Engine.time_scale == 1.0, "time scale should restore to 1.0 exactly")
+	hit_stop.request_stop(0.1)
+	hit_stop._process(0.05)
+	_assert(hit_stop.is_active(), "second stop cycle should work")
+	hit_stop._process(0.1)
+	_assert(not hit_stop.is_active(), "second stop should restore")
+	_assert(Engine.time_scale == 1.0, "time scale should restore again")
+	hit_stop.free()
+
+
+func _test_transient_effects_release_nodes_and_signals() -> void:
+	var effect: Control = preload("res://scenes/effects/hit_flash.tscn").instantiate()
+	add_child(effect)
+	_assert(is_instance_valid(effect), "effect should be valid after spawn")
+	effect.queue_free()
+	_assert(is_instance_valid(effect), "queued effect remains valid until frame end")
+	var damage_number: Control = preload("res://scenes/effects/damage_number.tscn").instantiate()
+	add_child(damage_number)
+	damage_number.queue_free()
+	_assert(is_instance_valid(damage_number), "multiple queued effects should coexist")
 
 

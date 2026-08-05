@@ -95,6 +95,10 @@ Save data is versioned and validated at the boundary. `scripts/save/save_schema.
 
 UI observes gameplay state through signals or query interfaces. Camera shake, hit stop, transient effects, and audio emitters are centralized so concurrent events compose predictably.
 
+#### Feedback System
+
+`scripts/feedback/feedback_manager.gd` centralizes camera shake, hit stop, and transient visual effects. It is instantiated by GameFlow and discovers the active Camera2D, creating one if needed. Camera shake requests combine additively up to a configured intensity cap. Hit stop uses reference counting to restore `Engine.time_scale` exactly once when all concurrent stops expire. Transient effects are lightweight scene instances that queue_free themselves and disconnect signals on tree exit.
+
 ## Dependency Direction
 
 ```text

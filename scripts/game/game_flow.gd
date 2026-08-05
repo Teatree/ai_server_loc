@@ -6,6 +6,8 @@ signal game_ended
 var _pending_transition: Callable = _nop
 var _save_manager: SaveManager = null
 var _options_menu: Control = null
+var _feedback_manager: Node = null
+const FeedbackManagerScript = preload("res://scripts/feedback/feedback_manager.gd")
 
 
 func _nop() -> void:
@@ -16,6 +18,9 @@ func _ready() -> void:
 	_save_manager = SaveManager.new()
 	_save_manager.name = "SaveManager"
 	add_child(_save_manager)
+	_feedback_manager = FeedbackManagerScript.new()
+	_feedback_manager.name = "FeedbackManager"
+	add_child(_feedback_manager)
 
 
 func _notification(what: int) -> void:
