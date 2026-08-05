@@ -19,6 +19,7 @@ window/stretch/mode="canvas_items"
 [autoload]
 
 GameFlow="*res://scripts/game/game_flow.gd"
+AudioManager="*res://scripts/audio/audio_manager.gd"
 
 [input]
 

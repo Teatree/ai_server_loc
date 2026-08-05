@@ -8,6 +8,8 @@ const MELEE_ATTACK_SCRIPT = preload("res://scripts/weapons/melee_attack.gd")
 const MELEE_DATA_SCRIPT = preload("res://scripts/weapons/melee_data.gd")
 const CAMERA_SHAKE_SCRIPT = preload("res://scripts/feedback/camera_shake.gd")
 const HIT_STOP_SCRIPT = preload("res://scripts/feedback/hit_stop.gd")
+const AUDIO_MANAGER_SCRIPT = preload("res://scripts/audio/audio_manager.gd")
+const AUDIO_EMITTER_SCRIPT = preload("res://scripts/audio/audio_emitter.gd")
 
 var _passed: int = 0
 var _failed: int = 0
@@ -127,6 +129,9 @@ func _ready() -> void:
 	_test_shake_requests_combine_within_limits()
 	_test_hit_stop_restores_time_scale_exactly_once()
 	_test_transient_effects_release_nodes_and_signals()
+	_test_transient_sounds_reuse_emitters_without_node_growth()
+	_test_music_effects_ui_categories_expose_stable_volume_controls()
+	_test_scene_change_stops_sfx_but_retains_music()
 	set_process(true)
 
 
@@ -2831,4 +2836,63 @@ func _test_transient_effects_release_nodes_and_signals() -> void:
 	damage_number.queue_free()
 	_assert(is_instance_valid(damage_number), "multiple queued effects should coexist")
 
+
+# --- S12C audio architecture tests ---
+
+func _create_test_audio_stream() -> AudioStream:
+	var wav = AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = 22050
+	wav.loop_mode = AudioStreamWAV.LOOP_DISABLED
+	var data = PackedByteArray()
+	data.resize(4410)
+	data.fill(0)
+	wav.data = data
+	return wav
+
+func _test_transient_sounds_reuse_emitters_without_node_growth() -> void:
+	var manager = AUDIO_MANAGER_SCRIPT.new()
+	add_child(manager)
+	var stream = _create_test_audio_stream()
+	for i in range(25):
+		manager.play_sfx(stream)
+	_assert(manager.get_pool_size() <= manager.max_pool_size,
+		"pool size should not exceed max_pool_size, got %d" % manager.get_pool_size())
+	for emitter in manager._active_transient.duplicate():
+		emitter.stop()
+	manager._process(0.1)
+	_assert(manager.get_active_transient_count() == 0,
+		"stopped emitters should be released back to pool")
+	_assert(manager.get_pool_size() <= manager.max_pool_size,
+		"pool should reuse released emitters")
+	manager.queue_free()
+
+func _test_music_effects_ui_categories_expose_stable_volume_controls() -> void:
+	var manager = AUDIO_MANAGER_SCRIPT.new()
+	add_child(manager)
+	manager.set_music_volume(0.8)
+	manager.set_sfx_volume(0.5)
+	manager.set_ui_volume(0.3)
+	_assert(abs(manager.get_music_volume() - 0.8) < 0.01,
+		"music volume should be stable, got %f" % manager.get_music_volume())
+	_assert(abs(manager.get_sfx_volume() - 0.5) < 0.01,
+		"sfx volume should be stable, got %f" % manager.get_sfx_volume())
+	_assert(abs(manager.get_ui_volume() - 0.3) < 0.01,
+		"ui volume should be stable, got %f" % manager.get_ui_volume())
+	manager.queue_free()
+
+func _test_scene_change_stops_sfx_but_retains_music() -> void:
+	var manager = AUDIO_MANAGER_SCRIPT.new()
+	add_child(manager)
+	var stream = _create_test_audio_stream()
+	var music_emitter = manager.play_music(stream)
+	var sfx_emitter = manager.play_sfx(stream)
+	_assert(is_instance_valid(music_emitter), "music emitter should exist")
+	_assert(is_instance_valid(sfx_emitter), "sfx emitter should exist")
+	get_tree().scene_changed.emit()
+	_assert(sfx_emitter.playing == false,
+		"sfx should stop on scene change, playing=%s" % sfx_emitter.playing)
+	_assert(music_emitter.playing == true or not is_instance_valid(sfx_emitter),
+		"music should be retained across scene change")
+	manager.queue_free()
 

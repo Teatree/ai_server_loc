@@ -99,6 +99,10 @@ UI observes gameplay state through signals or query interfaces. Camera shake, hi
 
 `scripts/feedback/feedback_manager.gd` centralizes camera shake, hit stop, and transient visual effects. It is instantiated by GameFlow and discovers the active Camera2D, creating one if needed. Camera shake requests combine additively up to a configured intensity cap. Hit stop uses reference counting to restore `Engine.time_scale` exactly once when all concurrent stops expire. Transient effects are lightweight scene instances that queue_free themselves and disconnect signals on tree exit.
 
+### Audio System
+
+`scripts/audio/audio_manager.gd` centralizes audio playback with bounded object pooling. Transient SFX and UI sounds reuse `AudioEmitter` nodes from a capped pool; excess temporary emitters are freed after playback. Music uses a dedicated persistent emitter that survives scene changes. The manager creates `Music`, `SFX`, and `UI` audio buses at runtime and exposes stable linear-volume controls for each category. On scene change, SFX and UI emitters are stopped while music is retained, matching explicit ownership semantics.
+
 ## Dependency Direction
 
 ```text
