@@ -69,6 +69,13 @@ Each enemy uses an explicit state machine. Shared capabilities should be compone
 - Attack execution
 - Stagger handling
 
+Implemented archetypes:
+
+- **Shambler** (`scripts/enemies/shambler.gd`) — balanced melee chaser with sight/noise perception, investigate/chase/attack_telegraph/dead states.
+- **Runner** (`scripts/enemies/runner.gd`) — fast lunge attacker with visible telegraph flash.
+- **Spitter** (`scripts/enemies/spitter.gd`) — ranged projectile attacker with cooldown-based behavior.
+- **Brute** (`scripts/enemies/brute.gd`) — heavy tank with stagger resistance, heavy damage, and crowd separation.
+
 Enemy archetypes configure and compose these capabilities rather than duplicating a giant base script.
 
 ### Perception and Noise
@@ -77,7 +84,7 @@ A scoped noise-event service publishes short-lived events. Receivers unsubscribe
 
 ### Platform Navigation
 
-Use a pragmatic authored graph or hybrid system with platform nodes, jump/drop links, reachability classification, and stuck recovery. Do not attempt a general-purpose platformer pathfinder before a smaller authored approach is validated.
+`scripts/navigation/platform_graph.gd` defines an authored graph of platform nodes and jump/drop links. `scripts/navigation/enemy_navigator.gd` consumes the graph to classify reachability (jump, drop, blocked, unreachable) and executes traversal with bounded stuck recovery. Use this pragmatic authored approach; do not attempt a general-purpose platformer pathfinder before this hybrid system is validated across all enemy archetypes.
 
 ### Encounter Director
 
@@ -85,11 +92,11 @@ The director owns threat budget and spawn selection, not individual enemy behavi
 
 ### Upgrades
 
-Upgrade definitions are data. A runtime modifier service applies validated stacks and exclusions exactly once. Save data stores upgrade identifiers and stack counts, not serialized runtime objects.
+Upgrade definitions are data (`resources/upgrades/*.tres`). `scripts/upgrades/upgrade_manager.gd` owns the active upgrade graph, stack limits, and mutual exclusion rules. `scripts/upgrades/upgrade_runtime.gd` is attached to the player and exposes `apply_upgrade()` for pickup/level events. `scripts/upgrades/upgrade_chooser.gd` presents a fixed-seed random selection of three valid choices when an upgrade is earned. Save data stores upgrade identifiers and stack counts, not serialized runtime objects.
 
 ### Save System
 
-Save data is versioned and validated at the boundary. `scripts/save/save_schema.gd` declares the canonical field set and current version. `scripts/save/save_sanitizer.gd` enforces type constraints, strips unknown fields, fills defaults for missing data, repairs corrupt values, and applies deterministic migrations from older schema versions. Scene nodes reconstruct runtime state from sanitized data using stable StringName identifiers; no serialized runtime objects are persisted.
+Save data is versioned and validated at the boundary. `scripts/save/save_schema.gd` declares the canonical field set and current version. `scripts/save/save_sanitizer.gd` enforces type constraints, strips unknown fields, fills defaults for missing data, repairs corrupt values, and applies deterministic migrations from older schema versions. `scripts/save/save_manager.gd` owns file I/O, coordinates with `GameFlow` for lifecycle events (load on continue, save on exit), and injects sanitized data into runtime services. Scene nodes reconstruct runtime state from sanitized data using stable StringName identifiers; no serialized runtime objects are persisted.
 
 ### UI and Feedback
 
