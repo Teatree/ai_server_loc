@@ -86,6 +86,11 @@ switch_weapon={
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":81,"unicode":113,"location":0,"echo":false,"script":null)
 ]
 }
+toggle_debug={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":114,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
 
 [layer_names]
 
@@ -96,3 +101,6 @@ switch_weapon={
 2d_physics/layer_5="Hazards"
 2d_physics/layer_6="Pickups"
 2d_physics/layer_7="Platforms"
+
+[debug]
+overlay/enabled=false

@@ -2896,3 +2896,73 @@ func _test_scene_change_stops_sfx_but_retains_music() -> void:
 		"music should be retained across scene change")
 	manager.queue_free()
 
+# --- S12D debug overlay tests ---
+
+func _test_debug_overlay_can_be_instantiated() -> void:
+	var overlay = preload("res://scenes/ui/debug_overlay.tscn").instantiate()
+	add_child(overlay)
+	_assert(is_instance_valid(overlay), "debug overlay should instantiate")
+	overlay.queue_free()
+
+
+func _test_debug_overlay_starts_hidden() -> void:
+	var overlay = preload("res://scenes/ui/debug_overlay.tscn").instantiate()
+	add_child(overlay)
+	_assert(overlay.visible == false, "debug overlay should start hidden")
+	overlay.queue_free()
+
+
+func _test_debug_overlay_toggles_visibility() -> void:
+	var overlay = preload("res://scenes/ui/debug_overlay.tscn").instantiate()
+	add_child(overlay)
+	_assert(overlay.visible == false, "debug overlay should start hidden")
+	var toggle_event = InputEventKey.new()
+	toggle_event.keycode = KEY_F3
+	toggle_event.pressed = true
+	overlay._input(toggle_event)
+	_assert(overlay.visible == true, "debug overlay should be visible after toggle")
+	toggle_event.pressed = false
+	overlay._input(toggle_event)
+	var toggle_event2 = InputEventKey.new()
+	toggle_event2.keycode = KEY_F3
+	toggle_event2.pressed = true
+	overlay._input(toggle_event2)
+	_assert(overlay.visible == false, "debug overlay should be hidden after second toggle")
+	overlay.queue_free()
+
+
+func _test_debug_overlay_has_required_labels() -> void:
+	var overlay = preload("res://scenes/ui/debug_overlay.tscn").instantiate()
+	add_child(overlay)
+	_assert(overlay.get_node_or_null("FPSLabel") != null, "debug overlay should have FPSLabel")
+	_assert(overlay.get_node_or_null("EnemiesLabel") != null, "debug overlay should have EnemiesLabel")
+	_assert(overlay.get_node_or_null("ProjectilesLabel") != null, "debug overlay should have ProjectilesLabel")
+	_assert(overlay.get_node_or_null("DirectorLabel") != null, "debug overlay should have DirectorLabel")
+	_assert(overlay.get_node_or_null("PlayerLabel") != null, "debug overlay should have PlayerLabel")
+	_assert(overlay.get_node_or_null("WeaponLabel") != null, "debug overlay should have WeaponLabel")
+	_assert(overlay.get_node_or_null("CheckpointLabel") != null, "debug overlay should have CheckpointLabel")
+	_assert(overlay.get_node_or_null("SeedLabel") != null, "debug overlay should have SeedLabel")
+	overlay.queue_free()
+
+
+func _test_debug_overlay_uses_timer_not_process() -> void:
+	var overlay = preload("res://scenes/ui/debug_overlay.tscn").instantiate()
+	add_child(overlay)
+	var timer = overlay.get_node_or_null("UpdateTimer") as Timer
+	_assert(timer != null, "debug overlay should have UpdateTimer")
+	_assert(timer.autostart == true, "UpdateTimer should autostart")
+	_assert(timer.wait_time > 0.0, "UpdateTimer should have positive wait_time")
+	overlay.queue_free()
+
+
+func _test_debug_overlay_updates_via_signals() -> void:
+	var overlay = preload("res://scenes/ui/debug_overlay.tscn").instantiate()
+	add_child(overlay)
+	var player = _create_test_player()
+	player.global_position = Vector2(100, 200)
+	overlay._find_player()
+	overlay._update_player_label()
+	_assert(overlay._player_label.text.contains("100"), "player label should update position")
+	player.free()
+	overlay.queue_free()
+

@@ -17,6 +17,7 @@ func _ready() -> void:
     _find_director()
     _connect_signals()
     _update_all_labels()
+    _setup_debug_overlay()
 
 
 func _find_player() -> void:
@@ -79,6 +80,15 @@ func _on_phase_changed(phase: int) -> void:
             2: phase_name = "Escalation"
             3: phase_name = "Peak"
         _phase_label.text = "Phase: %s" % phase_name
+
+
+func _setup_debug_overlay() -> void:
+    if not ProjectSettings.get_setting("debug/overlay/enabled", false):
+        return
+    var debug_scene = preload("res://scenes/ui/debug_overlay.tscn")
+    var overlay = debug_scene.instantiate()
+    overlay.name = "DebugOverlay"
+    get_parent().add_child(overlay)
 
 
 func _update_all_labels() -> void:
