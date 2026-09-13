@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Agent Match-3 Setup Guide</title>
+  <style>
+    :root {
+      --bg: #0f1220;
+      --panel: #171b2f;
+      --panel-2: #202743;
+      --text: #eef2ff;
+      --muted: #b5bfdc;
+      --accent: #7c9cff;
+      --accent-2: #55e6c1;
+      --accent-3: #ffcf5a;
+      --danger: #ff7c7c;
+      --ok: #82f2a4;
+      --border: rgba(255,255,255,0.12);
+      --shadow: 0 14px 40px rgba(0,0,0,0.35);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at top right, rgba(124,156,255,0.18), transparent 30%),
+        radial-gradient(circle at top left, rgba(85,230,193,0.12), transparent 30%),
+        linear-gradient(180deg, #0d1120 0%, #101528 100%);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    a { color: #9dc0ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .wrap {
+      width: min(1220px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 64px;
+    }
+
+    header.hero {
+      background: linear-gradient(135deg, rgba(124,156,255,0.14), rgba(85,230,193,0.10));
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1.05;
+    }
+
+    .hero p.lead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 900px;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .badge {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.92rem;
+    }
+
+    nav.toc {
+      margin: 22px 0 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    nav.toc a {
+      display: inline-block;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+    }
+
+    section.card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 26px;
+      margin-top: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    section.card h2 {
+      margin-top: 0;
+      font-size: 1.7rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 18px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    .mini-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+    }
+
+    .mini-card h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 16px;
+      padding: 16px 0;
+      border-top: 1px dashed rgba(255,255,255,0.12);
+    }
+
+    .step:first-of-type { border-top: none; padding-top: 0; }
+
+    .step-num {
+      width: 56px;
+      height: 56px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #0a0d18;
+      font-weight: 800;
+      font-size: 1.25rem;
+      box-shadow: 0 8px 20px rgba(124,156,255,0.35);
+    }
+
+    .robot-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 18px;
+      margin-top: 12px;
+    }
+
+    @media (max-width: 1100px) {
+      .robot-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+
+    @media (max-width: 700px) {
+      .robot-grid { grid-template-columns: 1fr; }
+    }
+
+    .robot-card {
+      position: relative;
+      background: linear-gradient(180deg, var(--panel), #13182a);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 18px;
+      min-height: 280px;
+      overflow: hidden;
+    }
+
+    .robot {
+      width: 110px;
+      margin: 0 auto 14px;
+      position: relative;
+    }
+
+    .robot-head {
+      width: 110px;
+      height: 90px;
+      background: linear-gradient(180deg, #d8e2ff, #a4baff);
+      border-radius: 22px;
+      position: relative;
+      border: 4px solid #0e1430;
+      box-shadow: inset 0 -8px 0 rgba(0,0,0,0.12);
+    }
+
+    .robot-head::before {
+      content: "";
+      position: absolute;
+      width: 12px;
+      height: 18px;
+      background: #d8e2ff;
+      border: 4px solid #0e1430;
+      border-bottom: none;
+      border-radius: 10px 10px 0 0;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .eye {
+      position: absolute;
+      top: 26px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #22f0c0;
+      border: 3px solid #0e1430;
+      box-shadow: 0 0 12px rgba(34,240,192,0.8);
+    }
+
+    .eye.left { left: 24px; }
+    .eye.right { right: 24px; }
+
+    .mouth {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      width: 36px;
+      height: 10px;
+      border-radius: 10px;
+      background: #0e1430;
+    }
+
+    .robot-body {
+      width: 84px;
+      height: 58px;
+      background: linear-gradient(180deg, #b9ccff, #8aa5f5);
+      border: 4px solid #0e1430;
+      border-radius: 18px;
+      margin: 8px auto 0;
+      position: relative;
+    }
+
+    .robot-body::before,
+    .robot-body::after {
+      content: "";
+      position: absolute;
+      top: 18px;
+      width: 16px;
+      height: 4px;
+      background: #0e1430;
+    }
+
+    .robot-body::before { left: -16px; }
+    .robot-body::after { right: -16px; }
+
+    .bubble {
+      position: relative;
+      margin-top: 14px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: 14px;
+      color: var(--text);
+      min-height: 100px;
+    }
+
+    .bubble::before {
+      content: "";
+      position: absolute;
+      top: -12px;
+      left: 26px;
+      border: 12px solid transparent;
+      border-bottom-color: rgba(255,255,255,0.10);
+    }
+
+    .robot-name {
+      margin: 4px 0 8px;
+      text-align: center;
+      font-weight: 800;
+      font-size: 1.05rem;
+    }
+
+    .robot-role {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.93rem;
+      margin-bottom: 12px;
+    }
+
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .flow-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 18px;
+      min-width: 180px;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .arrow {
+      font-size: 1.8rem;
+      color: var(--accent-2);
+      font-weight: 800;
+    }
+
+    code, pre {
+      font-family: var(--mono);
+    }
+
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      background: #0b1020;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 16px;
+      color: #dce7ff;
+      overflow-x: auto;
+    }
+
+    .cmd {
+      background: #0b1020;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin: 10px 0 0;
+      font-family: var(--mono);
+      color: #dce7ff;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      overflow: hidden;
+      border-radius: 14px;
+      background: #10162a;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      vertical-align: top;
+    }
+
+    th {
+      background: rgba(255,255,255,0.06);
+    }
+
+    .note, .warn, .success {
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-top: 14px;
+      border: 1px solid var(--border);
+    }
+
+    .note { background: rgba(124,156,255,0.12); }
+    .warn { background: rgba(255,124,124,0.10); }
+    .success { background: rgba(130,242,164,0.10); }
+
+    details {
+      margin-top: 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .footer {
+      margin-top: 28px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.95rem;
+    }
+
+    .tiny {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .pill.ok { background: rgba(130,242,164,0.16); color: #baffcd; }
+    .pill.info { background: rgba(124,156,255,0.16); color: #cfe0ff; }
+    .pill.warn { background: rgba(255,207,90,0.16); color: #ffe7a7; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero" id="top">
+      <h1>🤖 Multi-Agent Match-3 Setup Guide</h1>
+      <p class="lead">
+        A simple, subscription-first setup for building a small HTML Match-3 game with
+        <strong>Agent Orchestrator (AO)</strong>, <strong>Claude Code</strong>, and <strong>Codex CLI</strong>.
+        In this first test, Claude leads the studio and owns the base mechanics, while Codex builds
+        levels, UX, progression, and player-facing features on top.
+      </p>
+
+      <div class="badges">
+        <span class="badge">AO = Orchestrator</span>
+        <span class="badge">Claude = Technical Director</span>
+        <span class="badge">Codex = Level & UX Builder</span>
+        <span class="badge">HTML/CSS/JS only</span>
+        <span class="badge">No backend required</span>
+        <span class="badge">Subscription-first</span>
+      </div>
+
+      <nav class="toc">
+        <a href="#overview">Overview</a>
+        <a href="#links">Important Links</a>
+        <a href="#agents">Subagents</a>
+        <a href="#steps">Setup Steps</a>
+        <a href="#structure">Project Structure</a>
+        <a href="#files">Copy-Paste Files</a>
+        <a href="#kickoff">Kickoff Prompt</a>
+      </nav>
+    </header>
+
+    <section class="card" id="overview">
+      <h2>1) What You’re Building</h2>
+      <div class="grid-2">
+        <div class="mini-card">
+          <h3>🎯 Goal</h3>
+          <p>
+            Build a small browser Match-3 game while testing a genuine multi-agent workflow.
+            The project is intentionally simple so you can validate the workflow before doing
+            something heavier like Godot.
+          </p>
+        </div>
+        <div class="mini-card">
+          <h3>🧠 Agent Hierarchy</h3>
+          <p>
+            <strong>Claude</strong> is the boss and technical director.<br />
+            <strong>Codex</strong> is the specialist builder for levels, UX, and player-facing features.<br />
+            <strong>AO</strong> manages the workers, branches, worktrees, tasks, and browser testing.
+          </p>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-box">You</div>
+        <div class="arrow">→</div>
+        <div class="flow-box">AO Orchestrator</div>
+        <div class="arrow">→</div>
+        <div class="flow-box">Claude Code<br/>Technical Director</div>
+        <div class="arrow">→</div>
+        <div class="flow-box">Codex CLI<br/>Level + UX Worker</div>
+        <div class="arrow">→</div>
+        <div class="flow-box">HTML Match-3 Game</div>
+      </div>
+
+      <div class="success">
+        <strong>Why HTML first?</strong><br />
+        AO can already work very well with HTML apps through browser preview, console inspection,
+        clicks, interaction testing, and screenshots. So this is a very good first proving ground.
+      </div>
+    </section>
+
+    <section class="card" id="links">
+      <h2>2) Important Links</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Tool</th>
+            <th>Use</th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Agent Orchestrator (AO)</td>
+            <td>Main multi-agent workspace and orchestrator</td>
+            <td><a href="https://aoagents.dev/docs" target="_blank" rel="noopener noreferrer">https://aoagents.dev/docs</a></td>
+          </tr>
+          <tr>
+            <td>Claude Code</td>
+            <td>Claude CLI used as Technical Director</td>
+            <td><a href="https://docs.anthropic.com/en/docs/claude-code/quickstart" target="_blank" rel="noopener noreferrer">https://docs.anthropic.com/en/docs/claude-code/quickstart</a></td>
+          </tr>
+          <tr>
+            <td>Codex CLI</td>
+            <td>OpenAI coding CLI used as Level/UX worker</td>
+            <td><a href="https://developers.openai.com/codex/cli" target="_blank" rel="noopener noreferrer">https://developers.openai.com/codex/cli</a></td>
+          </tr>
+          <tr>
+            <td>Codex Auth</td>
+            <td>Make sure ChatGPT subscription is used</td>
+            <td><a href="https://developers.openai.com/codex/auth" target="_blank" rel="noopener noreferrer">https://developers.openai.com/codex/auth</a></td>
+          </tr>
+          <tr>
+            <td>Claude Code IAM / Auth</td>
+            <td>Use Claude.ai subscription auth, not API billing</td>
+            <td><a href="https://docs.anthropic.com/en/docs/claude-code/iam" target="_blank" rel="noopener noreferrer">https://docs.anthropic.com/en/docs/claude-code/iam</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" id="agents">
+      <h2>3) Meet the Subagents</h2>
+      <div class="robot-grid">
+        <div class="robot-card">
+          <div class="robot">
+            <div class="robot-head">
+              <div class="eye left"></div>
+              <div class="eye right"></div>
+              <div class="mouth"></div>
+            </div>
+            <div class="robot-body"></div>
+          </div>
+          <div class="robot-name">🎩 Claude Boss-Bot</div>
+          <div class="robot-role">Technical Director / Core Mechanics Owner</div>
+          <div class="bubble">
+            “I own the foundation. I decide how the Match-3 rules work, what the architecture
+            should be, and I make sure everybody else is building on something clean instead
+            of spaghetti.”
+          </div>
+        </div>
+
+        <div class="robot-card">
+          <div class="robot">
+            <div class="robot-head">
+              <div class="eye left" style="background:#ffd966; box-shadow:0 0 12px rgba(255,217,102,0.8);"></div>
+              <div class="eye right" style="background:#ffd966; box-shadow:0 0 12px rgba(255,217,102,0.8);"></div>
+              <div class="mouth"></div>
+            </div>
+            <div class="robot-body"></div>
+          </div>
+          <div class="robot-name">🧩 Codex Fun-Bot</div>
+          <div class="robot-role">Level / UX / Features Worker</div>
+          <div class="bubble">
+            “I take Claude’s mechanics and make them feel like a real game. I build levels,
+            objectives, onboarding, hints, progression, polish, and I ask whether the player
+            experience is actually fun.”
+          </div>
+        </div>
+
+        <div class="robot-card">
+          <div class="robot">
+            <div class="robot-head">
+              <div class="eye left" style="background:#82f2a4; box-shadow:0 0 12px rgba(130,242,164,0.8);"></div>
+              <div class="eye right" style="background:#82f2a4; box-shadow:0 0 12px rgba(130,242,164,0.8);"></div>
+              <div class="mouth"></div>
+            </div>
+            <div class="robot-body"></div>
+          </div>
+          <div class="robot-name">🗂️ AO Manager-Bot</div>
+          <div class="robot-role">Orchestrator / Worktree Manager</div>
+          <div class="bubble">
+            “I coordinate the workers, isolate them in clean workspaces, keep track of tasks,
+            and make sure the little studio doesn’t devolve into branch-collision madness.”
+          </div>
+        </div>
+
+        <div class="robot-card">
+          <div class="robot">
+            <div class="robot-head">
+              <div class="eye left" style="background:#ff9ed7; box-shadow:0 0 12px rgba(255,158,215,0.8);"></div>
+              <div class="eye right" style="background:#ff9ed7; box-shadow:0 0 12px rgba(255,158,215,0.8);"></div>
+              <div class="mouth"></div>
+            </div>
+            <div class="robot-body"></div>
+          </div>
+          <div class="robot-name">🌐 Browser Scout-Bot</div>
+          <div class="robot-role">Preview / Interaction / Screenshot Evidence</div>
+          <div class="bubble">
+            “I open the HTML game, click things, inspect console errors, and help the team
+            prove that the game works visually rather than merely looking correct in code.”
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="steps">
+      <h2>4) Step-by-Step Setup</h2>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <h3>Install Node.js</h3>
+          <p>
+            You need Node installed first, especially on Windows, because the easiest Codex CLI
+            installation path uses npm.
+          </p>
+          <div class="cmd">node --version</div>
+          <div class="cmd">npm --version</div>
+          <div class="note">
+            If these fail, install Node.js from the official site before continuing:
+            <a href="https://nodejs.org/" target="_blank" rel="noopener noreferrer">https://nodejs.org/</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <h3>Install Codex CLI</h3>
+          <p>On Windows PowerShell:</p>
+          <div class="cmd">npm install -g @openai/codex</div>
+          <p>Then launch it:</p>
+          <div class="cmd">codex</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <h3>Authenticate Codex with ChatGPT Subscription</h3>
+          <p>
+            When Codex prompts you to authenticate, choose <strong>Sign in with ChatGPT</strong>,
+            not API key authentication.
+          </p>
+          <div class="cmd">codex login status</div>
+          <p>Optional extra safety:</p>
+          <div class="cmd">notepad $HOME\.codex\config.toml</div>
+          <p>Put this inside the file:</p>
+          <pre>forced_login_method = "chatgpt"</pre>
+
+          <div class="warn">
+            <strong>Important:</strong> do not set <code>OPENAI_API_KEY</code> on this machine if
+            you want to avoid accidental usage-based billing.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div>
+          <h3>Install Claude Code</h3>
+          <p>
+            Follow the official Claude Code install docs for your platform:
+          </p>
+          <p>
+            <a href="https://docs.anthropic.com/en/docs/claude-code/quickstart" target="_blank" rel="noopener noreferrer">
+              Claude Code Quickstart
+            </a>
+          </p>
+          <p>
+            On Windows, follow the current official Windows-supported Claude Code path from the docs.
+          </p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div>
+          <h3>Authenticate Claude Code with Your Claude Subscription</h3>
+          <p>
+            Launch Claude Code and sign in using your <strong>Claude.ai</strong> account.
+          </p>
+          <div class="cmd">claude</div>
+          <p>
+            Inside Claude Code, verify you are authenticated using your normal Claude subscription path.
+          </p>
+
+          <div class="warn">
+            <strong>Important:</strong> remove or avoid setting <code>ANTHROPIC_API_KEY</code> if
+            you want to ensure subscription-only behavior.
+          </div>
+
+          <div class="note">
+            Also make sure any optional “usage credits” / API-style overage behavior is disabled on the
+            Claude side if you want the tool to simply stop once the included subscription quota is exhausted.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">6</div>
+        <div>
+          <h3>Install Agent Orchestrator (AO)</h3>
+          <p>
+            Install the current AO desktop app and open it:
+          </p>
+          <p>
+            <a href="https://aoagents.dev/docs/installation" target="_blank" rel="noopener noreferrer">
+              AO Installation Docs
+            </a>
+          </p>
+          <p>
+            AO should detect your locally installed agent binaries and let you wire them into the project.
+          </p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">7</div>
+        <div>
+          <h3>Create the Project Folder</h3>
+          <p>Create a repo folder called <code>match3-ao-test</code> and use the structure shown below.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">8</div>
+        <div>
+          <h3>Add the Copy-Paste Files</h3>
+          <p>
+            Add the three main instructions files:
+          </p>
+          <ul>
+            <li><code>docs/GAME_SPEC.md</code></li>
+            <li><code>CLAUDE.md</code></li>
+            <li><code>AGENTS.md</code></li>
+          </ul>
+          <p>Use the exact contents in the sections below.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">9</div>
+        <div>
+          <h3>Initialize Git</h3>
+          <div class="cmd">git init</div>
+          <div class="cmd">git branch -M main</div>
+          <div class="cmd">git add .</div>
+          <div class="cmd">git commit -m "Bootstrap Match-3 agent experiment"</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">10</div>
+        <div>
+          <h3>Add the Project to AO</h3>
+          <p>Inside AO:</p>
+          <ul>
+            <li>Add project: <code>match3-ao-test</code></li>
+            <li>Set <strong>Claude Code</strong> as orchestrator</li>
+            <li>Set <strong>Codex</strong> as worker</li>
+            <li>Point worker guidance to <code>AGENTS.md</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">11</div>
+        <div>
+          <h3>Kick Off the Build</h3>
+          <p>
+            Paste the kickoff prompt from the last section into Claude/AO and let it start by creating the
+            foundation first, then the content / UX layer second.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="structure">
+      <h2>5) Project Structure</h2>
+      <pre>match3-ao-test/
+├── index.html
+├── styles.css
+├── src/
+│   ├── game.js
+│   ├── board.js
+│   ├── renderer.js
+│   └── levels.js
+├── docs/
+│   └── GAME_SPEC.md
+├── evidence/
+│   └── screenshots/
+├── CLAUDE.md
+├── AGENTS.md
+└── README.md</pre>
+
+      <div class="note">
+        <strong>Minimalism is a feature here.</strong> Keep it plain HTML/CSS/JS.
+        No React. No build system. No backend. No unnecessary complexity.
+      </div>
+    </section>
+
+    <section class="card" id="files">
+      <h2>6) Copy-Paste Files</h2>
+
+      <details open>
+        <summary><code>docs/GAME_SPEC.md</code></summary>
+        <pre># Match-3 Experiment — Game Specification
+
+## Goal
+
+Build a polished browser-based Match-3 puzzle game using plain HTML, CSS and JavaScript.
+
+The purpose of this project is also to test autonomous multi-agent game development.
+
+## Core Gameplay
+
+The game uses an 8x8 board.
+
+There are 6 visually distinct piece types.
+
+The player swaps two orthogonally adjacent pieces.
+
+A swap is legal only if it creates a match.
+
+An invalid swap must animate back to its original state.
+
+Matches consist of 3 or more identical pieces horizontally or vertically.
+
+After a match:
+
+1. matched pieces disappear;
+2. pieces above fall down;
+3. empty spaces are refilled;
+4. new automatic matches cascade;
+5. the board stabilizes before the player can act again.
+
+The board must never begin in a state containing an automatic match.
+
+The game must detect when no legal moves remain and reshuffle the board.
+
+## Scoring
+
+3-piece match = base score.
+
+4 and 5-piece matches should award progressively more points.
+
+Cascades increase a combo multiplier.
+
+The implementation should expose game events so level objectives and future features can respond without rewriting the core matching engine.
+
+## Level System
+
+Levels are data-driven.
+
+A level definition may specify:
+
+- move limit;
+- target score;
+- board configuration;
+- available piece types;
+- one or more objectives;
+- optional rule modifiers.
+
+The core engine must not hardcode individual levels.
+
+## Initial Content Target
+
+Create 10 levels.
+
+Level 1 should teach basic matching.
+
+Levels 2–3 introduce increasingly constrained move counts.
+
+Levels 4–6 require more deliberate planning.
+
+Levels 7–10 should feel substantially harder but remain fair.
+
+## UX Requirements
+
+The player must always understand:
+
+- what the current objective is;
+- how many moves remain;
+- why a swap failed;
+- what matched;
+- whether a cascade occurred;
+- whether the level was won or lost.
+
+Interactions should feel responsive and satisfying.
+
+Use animation and feedback rather than relying only on text.
+
+## Required Player Features
+
+- level progression;
+- restart level;
+- level complete screen;
+- level failed screen;
+- score display;
+- moves remaining;
+- objective display;
+- hint system after inactivity;
+- automatic reshuffle when no move exists;
+- simple level select;
+- localStorage progress saving.
+
+## Technical Constraints
+
+Use only HTML, CSS and JavaScript.
+
+Do not use a game engine.
+
+Do not require a server.
+
+Do not introduce a framework unless the Technical Director explicitly approves it.
+
+Keep game rules separate from presentation.
+
+Keep level data separate from the matching engine.
+
+## Definition of Done
+
+A feature is not complete merely because code exists.
+
+It must:
+
+1. load without console errors;
+2. work in the AO browser preview;
+3. be manually interacted with;
+4. produce the expected visible result;
+5. not break existing mechanics.
+
+For major milestones, save a screenshot under:
+
+evidence/screenshots/</pre>
+      </details>
+
+      <details>
+        <summary><code>CLAUDE.md</code></summary>
+        <pre># Claude — Technical Director
+
+## Who I Am
+
+I am the Technical Director of this game.
+
+I own the game's architecture, core mechanics and overall technical direction.
+
+I think about the whole product rather than individual tickets.
+
+My job is to make sure all later work is being built on a clean, extensible foundation.
+
+## My Voice
+
+"I own the rules of the game and the technical foundation underneath them. I make the architectural calls, build or delegate the difficult foundational systems, and make sure everyone else can add features without turning the project into spaghetti."
+
+## Responsibilities
+
+I own:
+
+- architecture;
+- board representation;
+- swap rules;
+- match detection;
+- cascades;
+- refill logic;
+- scoring events;
+- deterministic game-state rules;
+- extension points for level rules;
+- technical standards;
+- task decomposition;
+- worker coordination;
+- integration decisions.
+
+## Multi-Agent Workflow
+
+I am the project's AO orchestrator.
+
+I should normally coordinate rather than make large implementation changes directly in the orchestrator workspace.
+
+When implementation is required:
+
+1. define the architectural requirement;
+2. spawn an appropriate worker;
+3. give that worker explicit acceptance criteria;
+4. inspect the resulting implementation;
+5. verify it in the browser;
+6. only then allow it to become part of the foundation.
+
+For the initial core mechanics, use a Claude Code worker because core mechanics are under my ownership.
+
+After the core foundation is stable and merged, delegate level design, progression, player-facing features and UX work to Codex workers.
+
+## Ownership Boundary
+
+Claude owns the core game engine.
+
+Codex should be able to build levels and player-facing systems through stable interfaces.
+
+If Codex discovers that the core engine lacks an important capability, it should report the requirement rather than casually rewriting the core.
+
+## Architecture Principle
+
+Prefer:
+
+core engine → events/interfaces → features/content
+
+Never:
+
+feature-specific hacks → directly embedded in match logic
+
+## Verification
+
+Do not accept "implemented" as proof.
+
+Use the AO browser to:
+
+- launch the game;
+- interact with it;
+- inspect console errors;
+- verify visible behavior;
+- take milestone screenshots.
+
+## Initial Milestone
+
+The first milestone is a stable Match-3 foundation containing:
+
+- 8x8 board;
+- six piece types;
+- adjacent swapping;
+- invalid swap rejection;
+- match detection;
+- cascades;
+- gravity/refill;
+- scoring;
+- legal-move detection;
+- reshuffling;
+- an event/interface layer for level rules;
+- one basic playable demonstration level.
+
+Do not start the Codex content phase until this foundation is stable.</pre>
+      </details>
+
+      <details>
+        <summary><code>AGENTS.md</code></summary>
+        <pre># Codex — Level & Player Experience Designer-Programmer
+
+## Who I Am
+
+I am responsible for turning the Technical Director's Match-3 engine into an actual game people would want to play.
+
+## My Voice
+
+"I take the mechanics Claude gives me and ask whether they're actually fun. I build levels, progression, objectives, feedback and player-facing features, then I play what I made instead of assuming the code feels good."
+
+## My Responsibilities
+
+I own:
+
+- level design;
+- difficulty progression;
+- level data;
+- move limits;
+- objectives;
+- scoring targets;
+- onboarding;
+- player feedback;
+- UX improvements;
+- animations;
+- hints;
+- win/lose flow;
+- level selection;
+- progression;
+- persistence;
+- general game feel.
+
+## Core Ownership Boundary
+
+The underlying Match-3 engine is owned by Claude.
+
+Do not substantially rewrite:
+
+- board representation;
+- swap resolution;
+- match detection;
+- cascade resolution;
+- refill logic;
+
+unless explicitly authorized by the Technical Director.
+
+If the foundation is missing something required for good game design:
+
+1. document the requirement;
+2. explain the player-experience reason;
+3. report it to the Technical Director;
+4. wait for the architectural decision.
+
+## Player Experience Standard
+
+Do not optimize for "technically functional."
+
+Ask:
+
+- Is the objective obvious?
+- Does the player understand why something happened?
+- Is the first level immediately understandable?
+- Does each subsequent level teach or test something?
+- Is failure perceived as fair?
+- Is feedback satisfying?
+- Is difficulty increasing deliberately rather than randomly?
+- Is there an obvious next action after winning or losing?
+
+## Initial Content Assignment
+
+Using the completed core engine:
+
+1. polish Level 1 as onboarding;
+2. create Levels 2–10;
+3. produce a deliberate difficulty curve;
+4. implement player-facing level objectives;
+5. add move limits;
+6. add progression;
+7. add restart;
+8. add win/lose screens;
+9. add hint behavior;
+10. add localStorage progression;
+11. improve visual and interaction feedback.
+
+## Verification
+
+For every substantial feature:
+
+1. run the game;
+2. play the affected level;
+3. inspect browser console errors;
+4. verify the feature visually;
+5. test at least one failure case;
+6. save screenshots for meaningful visual milestones.
+
+A feature is not finished merely because its source code looks correct.</pre>
+      </details>
+
+      <details>
+        <summary><code>README.md</code> (optional but recommended)</summary>
+        <pre># Match-3 AO Test
+
+This project is a small browser-based Match-3 puzzle game used to test a multi-agent development workflow.
+
+## Studio Roles
+
+- Claude Code acts as Technical Director and owns the base mechanics and architecture.
+- Codex acts as the Level / UX / Features worker and builds on the core engine.
+- Agent Orchestrator coordinates the workers and project state.
+
+## Tech Stack
+
+- HTML
+- CSS
+- JavaScript
+- Git
+- Agent Orchestrator
+- Claude Code
+- Codex CLI
+
+## Core Principle
+
+Do not mark work complete merely because code exists.
+
+Everything should be run, checked in the browser, and visually verified.
+
+## Initial Goal
+
+Produce a polished 10-level Match-3 browser game with:
+
+- swap validation;
+- match detection;
+- cascades;
+- level goals;
+- move limits;
+- restart;
+- win/lose screens;
+- progression;
+- hint system;
+- localStorage saving.</pre>
+      </details>
+    </section>
+
+    <section class="card" id="kickoff">
+      <h2>7) Kickoff Prompt for Claude in AO</h2>
+      <p>
+        Paste this into the Claude orchestrator when the project is loaded into AO:
+      </p>
+
+      <pre>Read CLAUDE.md, AGENTS.md and docs/GAME_SPEC.md.
+
+You are the Technical Director for this experiment.
+
+Build the project in two phases.
+
+PHASE 1 — FOUNDATION
+
+Design the architecture and then create a Claude Code worker responsible for implementing the core Match-3 mechanics described in GAME_SPEC.md.
+
+You own this foundation.
+
+The worker must build and visually verify the game using AO's browser before the foundation is considered complete.
+
+Review its work critically.
+
+Do not begin the content phase until the foundation is stable and integrated into the project's base branch.
+
+PHASE 2 — GAME DESIGN AND PLAYER EXPERIENCE
+
+Once the foundation is available, create a Codex worker.
+
+Codex owns levels, objectives, progression, player feedback, game feel and the other player-facing features described in AGENTS.md and GAME_SPEC.md.
+
+Do not ask Codex to rewrite the fundamental Match-3 engine unless a genuine architectural blocker is discovered.
+
+When Codex reports a missing core capability, evaluate the requirement yourself and arrange the appropriate foundational change.
+
+Continue supervising both architecture and quality.
+
+For every major milestone, require actual browser testing rather than accepting code inspection as proof.
+
+The final target is a polished 10-level browser Match-3 game.
+
+Keep me informed through AO of:
+- current milestone;
+- active worker;
+- what has been completed;
+- blockers;
+- what is being tested next.</pre>
+
+      <div class="success">
+        <strong>Expected sequence:</strong><br />
+        Claude creates the foundation first → foundation is checked in browser →
+        only then Codex gets to build levels, progression, UX, polish, and player-facing features.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>8) Recommended AO Configuration</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Setting</th>
+            <th>Recommended Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Project Type</td>
+            <td>Local Git repo</td>
+          </tr>
+          <tr>
+            <td>Default branch</td>
+            <td><code>main</code></td>
+          </tr>
+          <tr>
+            <td>Orchestrator</td>
+            <td>Claude Code</td>
+          </tr>
+          <tr>
+            <td>Orchestrator Role</td>
+            <td>Technical Director</td>
+          </tr>
+          <tr>
+            <td>Worker</td>
+            <td>Codex CLI</td>
+          </tr>
+          <tr>
+            <td>Worker Role</td>
+            <td>Level / UX / Features</td>
+          </tr>
+          <tr>
+            <td>Worker guidance file</td>
+            <td><code>AGENTS.md</code></td>
+          </tr>
+          <tr>
+            <td>Core spec file</td>
+            <td><code>docs/GAME_SPEC.md</code></td>
+          </tr>
+          <tr>
+            <td>Testing surface</td>
+            <td>AO browser preview</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>9) Subscription Safety Checklist</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Tool</th>
+            <th>What You Want</th>
+            <th>What To Avoid</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Codex</td>
+            <td>Logged in with ChatGPT subscription</td>
+            <td>API key auth</td>
+          </tr>
+          <tr>
+            <td>Codex config</td>
+            <td><code>forced_login_method = "chatgpt"</code></td>
+            <td>Loose auth config</td>
+          </tr>
+          <tr>
+            <td>OpenAI env vars</td>
+            <td>No <code>OPENAI_API_KEY</code> set</td>
+            <td>Key lingering in shell/profile</td>
+          </tr>
+          <tr>
+            <td>Claude Code</td>
+            <td>Logged in with Claude.ai account</td>
+            <td>Anthropic API credentials</td>
+          </tr>
+          <tr>
+            <td>Anthropic env vars</td>
+            <td>No <code>ANTHROPIC_API_KEY</code> set</td>
+            <td>Key lingering in shell/profile</td>
+          </tr>
+          <tr>
+            <td>Claude overage behavior</td>
+            <td>Stop on limit / no paid overage</td>
+            <td>Silent usage-credit billing</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="warn">
+        <strong>Golden rule:</strong> if you care about avoiding token billing, treat API keys as radioactive.
+        The cleanest approach is simply not to have them configured on the machine you use for this setup.
+      </div>
+    </section>
+
+    <div class="footer">
+      Built for a simple two-agent HTML Match-3 experiment:
+      <strong>Claude leads</strong>, <strong>Codex builds fun on top</strong>, and <strong>AO keeps the tiny robot studio organized</strong>.
+      <br /><br />
+      <a href="#top">Back to top ↑</a>
+    </div>
+  </div>
+</body>
+</html>

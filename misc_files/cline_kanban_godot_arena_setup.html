@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pulse Arena — Cline + Kanban + Godot Multi-Agent Setup</title>
+<style>
+:root{--bg:#0b0e15;--panel:#121824;--panel2:#182132;--ink:#edf3ff;--muted:#9daac2;--line:#27334a;--blue:#69a8ff;--cyan:#4de0d0;--amber:#ffc865;--pink:#ff88ba;--green:#6ce6a6;--red:#ff7d7d;--shadow:0 18px 55px #0008;--mono:ui-monospace,SFMono-Regular,Consolas,monospace;--sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 80% 0,#18345a55,transparent 32%),radial-gradient(circle at 10% 18%,#17453d44,transparent 28%),var(--bg);color:var(--ink);font:16px/1.55 var(--sans)}
+a{color:#9ec7ff;text-decoration:none}a:hover{text-decoration:underline}code,pre{font-family:var(--mono)}
+.shell{width:min(1380px,calc(100% - 28px));margin:auto;padding:20px 0 70px}
+.hero{position:relative;overflow:hidden;padding:34px;border:1px solid var(--line);border-radius:26px;background:linear-gradient(135deg,#161f31dd,#10242bdd);box-shadow:var(--shadow)}
+.hero:after{content:"";position:absolute;width:310px;height:310px;border-radius:50%;right:-100px;top:-120px;background:radial-gradient(circle,#69a8ff44,transparent 65%)}
+h1{font-size:clamp(2rem,5vw,4rem);line-height:1.02;margin:0 0 14px;max-width:950px}.lead{color:#bac7dc;font-size:1.08rem;max-width:980px;margin:0}
+.badges{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}.badge{border:1px solid var(--line);background:#ffffff09;border-radius:999px;padding:7px 11px;font-size:.88rem}
+.notice{margin-top:20px;border-left:4px solid var(--amber);padding:14px 16px;background:#ffc86510;border-radius:12px;color:#f5deb0}
+.layout{display:grid;grid-template-columns:270px minmax(0,1fr);gap:22px;margin-top:22px}@media(max-width:980px){.layout{grid-template-columns:1fr}.side{position:static!important}}
+.side{position:sticky;top:16px;align-self:start;background:#111725ee;border:1px solid var(--line);border-radius:19px;padding:15px;max-height:calc(100vh - 32px);overflow:auto}
+.side strong{display:block;margin:4px 6px 10px}.side a{display:block;padding:8px 9px;border-radius:9px;color:#bdc9dc;font-size:.92rem}.side a:hover{background:#ffffff09;text-decoration:none;color:white}
+main{min-width:0}section{background:#111725d9;border:1px solid var(--line);border-radius:21px;padding:25px;margin-bottom:20px;box-shadow:0 8px 30px #0003}h2{font-size:1.65rem;margin:0 0 13px}h3{margin:22px 0 8px}p{margin:8px 0 14px;color:#c5d0e2}.muted{color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}@media(max-width:840px){.grid2,.grid3{grid-template-columns:1fr}}
+.card{background:linear-gradient(180deg,#182132,#111927);border:1px solid #2b3952;border-radius:17px;padding:17px}.card h3{margin-top:0}
+.robot-card{background:linear-gradient(180deg,#182132,#101722);border:1px solid #30405b;border-radius:20px;padding:17px;position:relative}.robot{width:105px;margin:0 auto 12px;position:relative}.antenna{width:4px;height:16px;background:#91a5c4;margin:auto;border-radius:4px;position:relative}.antenna:before{content:"";position:absolute;width:12px;height:12px;background:var(--robot);border:3px solid #0b1020;border-radius:50%;left:-4px;top:-7px}.head{height:77px;border:4px solid #0a1020;background:linear-gradient(#cdd9f2,#8ea7d3);border-radius:23px;position:relative;box-shadow:inset 0 -9px #0002}.eye{position:absolute;top:25px;width:17px;height:17px;border:3px solid #0a1020;background:var(--robot);border-radius:50%;box-shadow:0 0 12px var(--robot)}.eye.a{left:23px}.eye.b{right:23px}.mouth{position:absolute;width:37px;height:8px;background:#0a1020;border-radius:10px;left:50%;bottom:14px;transform:translateX(-50%)}.body{height:53px;width:79px;margin:6px auto 0;border:4px solid #0a1020;background:#90a9d8;border-radius:15px}.bubble{position:relative;background:#ffffff09;border:1px solid #ffffff12;border-radius:15px;padding:13px;margin-top:14px;color:#dae5f6;font-size:.93rem}.bubble:before{content:"";position:absolute;top:-10px;left:28px;border:10px solid transparent;border-bottom-color:#ffffff12;border-top:0}
+.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:16px 0}.node{background:#172033;border:1px solid #33435f;border-radius:13px;padding:10px 13px;font-weight:700;text-align:center}.arrow{font-size:1.4rem;color:var(--cyan)}
+.step{display:grid;grid-template-columns:48px minmax(0,1fr);gap:15px;border-top:1px dashed #2b3850;padding:18px 0}.step:first-of-type{border-top:0}.n{width:45px;height:45px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--blue),var(--cyan));color:#07101c;font-weight:900}
+.cmd,pre{background:#090d15;border:1px solid #26334b;border-radius:13px;padding:14px;color:#dce8ff;overflow:auto}.cmd{font-family:var(--mono);white-space:pre-wrap;margin:9px 0}pre{max-height:560px;white-space:pre;line-height:1.45}
+.good,.warn,.info{border-radius:13px;padding:13px 15px;margin:14px 0;border:1px solid #ffffff12}.good{background:#6ce6a612;border-left:4px solid var(--green)}.warn{background:#ff7d7d10;border-left:4px solid var(--red)}.info{background:#69a8ff10;border-left:4px solid var(--blue)}
+table{width:100%;border-collapse:collapse;background:#0d1320;border-radius:12px;overflow:hidden}th,td{padding:11px 12px;border-bottom:1px solid #253149;text-align:left;vertical-align:top}th{background:#182235;color:#eef5ff}td{color:#c5d1e3}
+.checklist label{display:flex;gap:10px;align-items:flex-start;padding:8px 4px;border-bottom:1px solid #ffffff08}.checklist input{margin-top:5px;accent-color:#69a8ff}
+.file-card{margin:16px 0;background:#0d1320;border:1px solid #293650;border-radius:15px;overflow:hidden}.file-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:11px 13px;background:#182235;border-bottom:1px solid #293650}.file-head pre{margin:0}.file-card pre{border:0;border-radius:0;margin:0;max-height:520px}.file-actions{display:flex;gap:7px}button{cursor:pointer;background:#24334d;color:#ecf4ff;border:1px solid #3a4f70;border-radius:9px;padding:7px 10px}button:hover{background:#304465}.file-icon{margin-right:8px}
+.kcard{border:1px solid #344762;background:#151e2d;border-radius:14px;padding:14px}.kcard .tag{display:inline-block;font-size:.78rem;padding:3px 7px;border-radius:999px;background:#ffffff0b;border:1px solid #ffffff12;margin-bottom:8px}.kcard h4{margin:2px 0 7px;font-size:1rem}.kcard p{font-size:.91rem;margin:0;color:#b9c6da}
+.small{font-size:.9rem}.sources li{margin:7px 0;color:#b9c6da}
+footer{text-align:center;color:#8492aa;padding:25px 0}
+</style>
+</head>
+<body><div class="shell">
+<header class="hero">
+  <h1>🤖 Pulse Arena<br>Cline + Kanban + Godot Multi-Agent Setup</h1>
+  <p class="lead">A Windows-first, subscription-first setup for a three-agent Godot arena-FPS project. You keep the repository open in VS Code with Cline, while Cline Kanban launches three isolated workers in parallel: Claude for core gameplay/bot AI, Codex for arena/UX/playtesting, and Claude for 3D art/polish.</p>
+  <div class="badges"><span class="badge">VS Code + Cline</span><span class="badge">Cline Kanban</span><span class="badge">Claude subscription</span><span class="badge">ChatGPT/Codex subscription</span><span class="badge">Godot 4.x</span><span class="badge">Godot MCP Runtime</span><span class="badge">Blender MCP</span></div>
+  <div class="notice"><b>One important limitation:</b> Cline’s persistent Agent Teams feature currently runs in Cline CLI/SDK/Kanban, not directly inside the VS Code extension. So VS Code is your main editor/control desk, while <code>npx kanban</code> opens the parallel-agent board locally in your browser. This guide deliberately uses that split.</div>
+</header>
+<div class="layout">
+<nav class="side"><strong>Guide</strong>
+<a href="#architecture">1. Architecture</a><a href="#agents">2. The 3 agents</a><a href="#prereqs">3. Install prerequisites</a><a href="#subscriptions">4. Subscription-only auth</a><a href="#project">5. Create Godot project</a><a href="#mcp">6. Add MCP tools</a><a href="#skills">7. Rules & skills</a><a href="#kanban">8. Configure Kanban</a><a href="#first-run">9. First 3-agent run</a><a href="#loop">10. Development loop</a><a href="#files">11. Copy-paste files</a><a href="#troubleshoot">12. Troubleshooting</a><a href="#sources">Sources</a></nav>
+<main>
+<section id="architecture"><h2>1. The architecture you are actually testing</h2>
+<p>This avoids the failure mode you saw with AO: no prompt is trusted to “maybe spawn” another agent. You explicitly create three Kanban cards and start all three. Kanban creates a separate Git worktree and terminal for each card, so the workers are genuinely separate processes and contexts.</p>
+<div class="flow"><div class="node">VS Code<br><span class="muted">repo + Cline extension</span></div><span class="arrow">→</span><div class="node">Cline Kanban<br><span class="muted">local browser board</span></div><span class="arrow">→</span><div class="node">3 worktrees<br><span class="muted">3 CLI workers</span></div><span class="arrow">→</span><div class="node">Godot MCP<br><span class="muted">run / see / test</span></div></div>
+<div class="grid3"><div class="card"><h3>Parallel work</h3><p>Each worker owns different directories. They can run simultaneously without editing the same files.</p></div><div class="card"><h3>Real verification</h3><p>Godot MCP Runtime can launch the game, simulate input, inspect the live scene tree, read debug output, and capture screenshots.</p></div><div class="card"><h3>Milestone integration</h3><p>After the three cards finish, review/commit them to the base branch and run one integration card. Failures become the next round of role-specific cards.</p></div></div>
+</section>
+
+<section id="agents"><h2>2. Your three workers</h2>
+<div class="grid3">
+<div class="robot-card" style="--robot:#69a8ff"><div class="robot"><div class="antenna"></div><div class="head"><span class="eye a"></span><span class="eye b"></span><span class="mouth"></span></div><div class="body"></div></div><h3>Agent 1 — Core Gameplay & Bot AI Lead</h3><p class="muted">Claude Code · Claude subscription</p><div class="bubble">“I own the part that must feel right. I build the player, weapons, damage model and bot brain, keep the architecture clean, and I am the person who says whether the merged game is technically healthy.”</div></div>
+<div class="robot-card" style="--robot:#ffc865"><div class="robot"><div class="antenna"></div><div class="head"><span class="eye a"></span><span class="eye b"></span><span class="mouth"></span></div><div class="body"></div></div><h3>Agent 2 — Arena Systems, UX & Playtest</h3><p class="muted">Codex CLI · ChatGPT subscription</p><div class="bubble">“I make the combat loop into a game. I build arena flow, pickups, scoring, HUD and test scenarios, then I actually run matches and hunt for boring spaces, bad spawns and confusing feedback.”</div></div>
+<div class="robot-card" style="--robot:#ff88ba"><div class="robot"><div class="antenna"></div><div class="head"><span class="eye a"></span><span class="eye b"></span><span class="mouth"></span></div><div class="body"></div></div><h3>Agent 3 — 3D Art & Polish</h3><p class="muted">Claude Code by default · same Claude subscription</p><div class="bubble">“I make the prototype stop looking like programmer art. I build an original modular kit in Blender, establish materials and lighting, export clean assets, and polish the scene without hiding gameplay problems behind effects.”</div></div>
+</div>
+<div class="info"><b>Quota balancing:</b> Agent 3 is provider-agnostic. If two concurrent Claude workers burn your Claude allowance too quickly, switch the art card to Codex. The role file and MCP workflow remain the same.</div>
+</section>
+
+<section id="prereqs"><h2>3. Install prerequisites — Windows / PowerShell</h2>
+<div class="step"><div class="n">1</div><div><h3>Git + VS Code</h3><p>Install Git and VS Code, then verify:</p><div class="cmd">git --version
+code --version</div></div></div>
+<div class="step"><div class="n">2</div><div><h3>Node.js 20+</h3><p>Cline Kanban and Godot MCP Runtime both use Node tooling. Install current Node LTS, reopen PowerShell, then:</p><div class="cmd">node --version
+npm --version</div></div></div>
+<div class="step"><div class="n">3</div><div><h3>Cline in VS Code + Cline CLI</h3><p>In VS Code press <code>Ctrl+Shift+X</code>, search <b>Cline</b>, and install the official extension. Also install the CLI because Kanban/CLI features live outside the extension:</p><div class="cmd">npm install -g cline
+cline --version</div><p>Later, run the board from the VS Code integrated terminal with <code>npx kanban</code>.</p></div></div>
+<div class="step"><div class="n">4</div><div><h3>Claude Code</h3><p>Install Claude Code using Anthropic's current Windows instructions, then verify:</p><div class="cmd">claude --version</div><p><a href="https://docs.anthropic.com/en/docs/claude-code/quickstart" target="_blank">Official Claude Code quickstart ↗</a></p></div></div>
+<div class="step"><div class="n">5</div><div><h3>Codex CLI</h3><div class="cmd">npm install -g @openai/codex
+codex --version</div><p><a href="https://developers.openai.com/codex/cli" target="_blank">Official Codex CLI docs ↗</a></p></div></div>
+<div class="step"><div class="n">6</div><div><h3>Godot 4.x</h3><p>Install the current stable Godot 4.x editor. Put the executable somewhere stable such as <code>D:/Tools/Godot/</code>. The MCP can use the exact executable path, so Godot does not have to be globally installed.</p><p><a href="https://godotengine.org/download/windows/" target="_blank">Godot Windows download ↗</a></p></div></div>
+<div class="step"><div class="n">7</div><div><h3>Blender</h3><p>Install Blender for Agent 3. The game can be built without Blender, but the dedicated art worker needs it for reusable meshes, materials, and GLB export.</p><p><a href="https://www.blender.org/download/" target="_blank">Blender download ↗</a></p></div></div>
+</section>
+
+<section id="subscriptions"><h2>4. Force subscription-only model access</h2>
+<h3>Codex → ChatGPT subscription</h3><div class="cmd">codex logout
+codex login</div><p>Choose <b>Sign in with ChatGPT</b>. Then check status:</p><div class="cmd">codex login status</div><p>For a hard guard, edit <code>%USERPROFILE%\.codex\config.toml</code> and add:</p><div class="cmd">forced_login_method = "chatgpt"</div><p>OpenAI documents <code>forced_login_method = "chatgpt"</code> as the setting that restricts Codex to ChatGPT authentication.</p>
+<h3>Claude Code → Claude subscription</h3><div class="cmd">claude logout
+claude</div><p>Sign in with your Claude.ai Pro/Max account. Do not configure an Anthropic API key for this experiment. If your plan exposes optional paid usage credits/overages, disable them if you want the worker to stop when quota is exhausted.</p>
+<div class="warn"><b>Safety check:</b> in PowerShell, inspect whether API keys are set before the first run:<div class="cmd">Get-ChildItem Env:OPENAI_API_KEY
+Get-ChildItem Env:ANTHROPIC_API_KEY</div>If they are intentionally absent, PowerShell should report that no such environment variable exists. Kanban will then rely on the authenticated CLI harnesses rather than a hidden pay-as-you-go key.</div>
+</section>
+
+<section id="project"><h2>5. Create the Godot project and repository</h2>
+<p>Create a new Godot project called <b>Pulse Arena</b>. Use the normal 3D renderer appropriate for your machine; do not start by importing plugins or large asset packs.</p>
+<h3>Recommended repository tree</h3><pre><code>pulse-arena/
+├── project.godot
+├── README.md
+├── AGENTS.md
+├── CLAUDE.md
+├── .clinerules/
+│   ├── 00-project.md
+│   └── 10-godot-verification.md
+├── .cline/
+│   └── skills/
+│       ├── godot-runtime-verification/SKILL.md
+│       ├── arena-playtest/SKILL.md
+│       └── blender-to-godot/SKILL.md
+├── .mcp.json                         # Claude Code project MCP
+├── .codex/
+│   └── config.toml                   # Codex project MCP
+├── docs/
+│   ├── GAME_SPEC.md
+│   ├── ARCHITECTURE.md
+│   ├── OWNERSHIP.md
+│   ├── MILESTONES.md
+│   ├── PROGRESS_PROTOCOL.md
+│   └── roles/
+│       ├── 01-core-gameplay-ai.md
+│       ├── 02-arena-ux-playtest.md
+│       └── 03-art-polish.md
+├── game/
+│   ├── core/
+│   ├── player/
+│   ├── combat/
+│   ├── weapons/
+│   ├── ai/
+│   ├── arena/
+│   ├── match/
+│   ├── pickups/
+│   ├── ui/
+│   ├── art/
+│   ├── vfx/
+│   └── testing/
+├── assets/
+│   ├── source/blender/
+│   ├── exported/
+│   ├── materials/
+│   ├── textures/
+│   └── audio/
+├── data/
+│   ├── arena/
+│   ├── match/
+│   └── bots/
+├── evidence/
+└── handoffs/</code></pre>
+<h3>Initialize Git before Kanban</h3><div class="cmd">cd D:\_projects\pulse-arena
+git init
+git branch -M main
+git add .
+git commit -m "Bootstrap Pulse Arena agent project"</div>
+<div class="good"><b>Why commit first?</b> Kanban creates ephemeral Git worktrees for each task. A clean base commit gives all three workers the same known starting point.</div>
+<h3>Input actions to create during bootstrap</h3><table><tr><th>Action</th><th>Purpose</th></tr><tr><td><code>move_forward/back/left/right</code></td><td>Player movement</td></tr><tr><td><code>jump</code></td><td>Jump</td></tr><tr><td><code>fire</code></td><td>Primary fire</td></tr><tr><td><code>weapon_1..4</code></td><td>Weapon selection</td></tr><tr><td><code>pause</code></td><td>Pause/settings</td></tr></table>
+<p>Let Agent 1 create or finalize these during M0 because <code>project.godot</code> is an ownership-sensitive file.</p>
+</section>
+
+<section id="mcp"><h2>6. Give the agents eyes and hands: MCP setup</h2>
+<h3>A. Godot MCP Runtime — required</h3><p>This is the most important tool in the stack. It is a zero-footprint local MCP server: it can launch a stock Godot 4.x project, capture gameplay screenshots, simulate input, inspect visible UI/live scene state, run controlled GDScript against the running scene, and read debug output.</p>
+<p><a href="https://github.com/Erodenn/godot-mcp-runtime" target="_blank">Godot MCP Runtime repository ↗</a></p>
+<h4>Claude Code project config: <code>.mcp.json</code></h4><div class="cmd">{
+  "mcpServers": {
+    "godot": {
+      "command": "npx",
+      "args": ["-y", "godot-mcp-runtime"],
+      "env": {
+        "GODOT_PATH": "D:/Tools/Godot/Godot.exe"
+      }
+    }
+  }
+}</div><p>Replace the path with your actual Godot executable. Then launch Claude once in the repo and approve the project MCP server. Verify with <code>claude mcp list</code>.</p>
+<h4>Codex project config: <code>.codex/config.toml</code></h4><div class="cmd">[mcp_servers.godot]
+command = "npx"
+args = ["-y", "godot-mcp-runtime"]
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+
+[mcp_servers.godot.env]
+GODOT_PATH = "D:/Tools/Godot/Godot.exe"</div><p>Then run <code>codex mcp list</code>. Codex supports project-scoped MCP config in trusted repositories.</p>
+<h4>Cline VS Code config — optional but useful</h4><p>In the Cline panel click <b>MCP Servers → Configure → Configure MCP Servers</b> and add the same <code>mcpServers</code> JSON block. This lets your manual Cline session in VS Code inspect the game too. The direct Claude/Codex Kanban workers still need their own harness configs above.</p>
+<div class="info"><b>Verification test:</b> ask each harness to call the MCP tool that returns Godot project info. Then ask it to launch the project and capture a screenshot. Do this before trusting the three-agent run.</div>
+<h3>B. Blender MCP — Agent 3 only</h3><p>Use the established open-source Blender MCP bridge from ahujasid for direct object/material control and Blender Python execution. Agent 3 uses it to build modular assets, then exports GLB into the repository.</p><p><a href="https://github.com/ahujasid/blender-mcp" target="_blank">Blender MCP repository ↗</a></p>
+<ol><li>Install the Blender MCP addon in Blender according to the repo instructions.</li><li>Start/connect the addon inside Blender.</li><li>Add its stdio MCP server to Claude Code using the repository's current command/config.</li><li>Verify the agent can inspect the Blender scene and obtain a viewport screenshot before starting art production.</li></ol>
+<div class="warn"><b>Do not enable external paid 3D-generation APIs by default.</b> Blender MCP can call optional services in some configurations. For this experiment, keep Agent 3 on procedural/manual Blender operations so your only model spend remains inside your subscriptions.</div>
+<h3>C. Optional later: Context7</h3><p>If Godot/Cline APIs change quickly, Context7 can supply fresh library docs through MCP, but it is not required for the first build. Do not add tools merely because they exist.</p>
+</section>
+
+<section id="skills"><h2>7. Rules, skills, and why both exist</h2>
+<div class="grid2"><div class="card"><h3>Rules = always-on guardrails</h3><p>Cline workspace rules live under <code>.clinerules/</code>. They are ideal for ownership, architecture constraints, and “run the game before claiming done.”</p></div><div class="card"><h3>Skills = load only when relevant</h3><p>Cline skills live under <code>.cline/skills/&lt;name&gt;/SKILL.md</code>. They are better for detailed workflows like runtime verification, arena playtesting, and Blender → Godot export because they do not need to consume every task's context.</p></div></div>
+<p>The critical behavior is also repeated in <code>AGENTS.md</code> and <code>CLAUDE.md</code>, because Kanban may launch Codex/Claude directly rather than through the Cline VS Code extension.</p>
+</section>
+
+<section id="kanban"><h2>8. Start Cline Kanban from VS Code</h2>
+<p>Open the <b>Pulse Arena</b> folder in VS Code. Use Cline normally in the sidebar for ad-hoc questions and MCP checks. For parallel workers, open VS Code's integrated terminal:</p><div class="cmd">cd D:\_projects\pulse-arena
+npx kanban</div><p>Kanban starts a local server and opens the board in your browser. It is currently a research preview, so expect UI/config details to change over time.</p>
+<h3>Configure worker runtimes</h3><p>In Kanban settings, confirm it detects <b>Claude Code</b> and <b>Codex</b> as available CLI agents. We are intentionally using the provider CLIs directly so their existing subscription logins remain the source of model access.</p>
+<h3>Create these three cards after M0 bootstrap</h3><div class="grid3">
+<div class="kcard"><span class="tag">Claude Code</span><h4>M1-A · Core Combat + First Bot</h4><p>Prompt: “Read AGENTS.md and docs/roles/01-core-gameplay-ai.md. Implement your M1 responsibilities only. Use Godot MCP Runtime to verify the result. Do not edit Agent 2/3 owned paths.”</p></div>
+<div class="kcard"><span class="tag">Codex</span><h4>M1-B · Arena + HUD + Match Loop</h4><p>Prompt: “Read AGENTS.md and docs/roles/02-arena-ux-playtest.md. Build the original graybox arena, pickups, HUD, FFA scoring and test scenarios using the published contracts. Verify in the running game.”</p></div>
+<div class="kcard"><span class="tag">Claude Code</span><h4>M1-C · Modular Art Kit + First Polish</h4><p>Prompt: “Read AGENTS.md and docs/roles/03-art-polish.md. Create the first original modular arena kit in Blender, export GLB, integrate only through owned art paths, and verify scale/readability in Godot.”</p></div>
+</div>
+<h3>Then press Play on all three</h3><p>Kanban creates an isolated worktree and terminal per card. You should be able to watch three distinct agent TUIs/tasks instead of one model pretending to be a team.</p>
+<div class="warn"><b>Do not turn on broad YOLO/auto-approve immediately.</b> Cline warns that YOLO mode approves file writes, shell commands, browser actions, and MCP tools without checks. First prove that each role respects its directory boundaries and that the MCP setup launches the correct worktree.</div>
+</section>
+
+<section id="first-run"><h2>9. First-run sequence from zero to three agents</h2>
+<div class="checklist" id="checklist">
+<label><input type="checkbox" data-k="c1"> Install Git, Node, VS Code, Cline extension/CLI, Claude Code, Codex, Godot, Blender.</label>
+<label><input type="checkbox" data-k="c2"> Authenticate Claude Code with Claude subscription and Codex with ChatGPT subscription.</label>
+<label><input type="checkbox" data-k="c3"> Create Godot project and copy the project documentation/rules from this guide.</label>
+<label><input type="checkbox" data-k="c4"> Make the initial Git commit on <code>main</code>.</label>
+<label><input type="checkbox" data-k="c5"> Configure Godot MCP Runtime for Claude Code, Codex, and optionally Cline VS Code.</label>
+<label><input type="checkbox" data-k="c6"> Verify both Claude and Codex can get project info, launch Godot, and capture a screenshot.</label>
+<label><input type="checkbox" data-k="c7"> Install/connect Blender MCP and verify Agent 3 can inspect Blender.</label>
+<label><input type="checkbox" data-k="c8"> Run a short M0 card with Agent 1 to create the base Godot scene/contracts/input actions.</label>
+<label><input type="checkbox" data-k="c9"> Merge M0 to <code>main</code> and make sure the project launches.</label>
+<label><input type="checkbox" data-k="c10"> Create M1-A, M1-B, M1-C cards and start all three simultaneously.</label>
+<label><input type="checkbox" data-k="c11"> Review diffs/evidence from each card before committing them to the base branch.</label>
+<label><input type="checkbox" data-k="c12"> Run an Agent-1 integration card after all three M1 branches are merged.</label>
+</div>
+</section>
+
+<section id="loop"><h2>10. The actual multi-agent game-development loop</h2>
+<div class="flow"><div class="node">3 parallel role cards</div><span class="arrow">→</span><div class="node">runtime evidence</div><span class="arrow">→</span><div class="node">review + merge</div><span class="arrow">→</span><div class="node">Agent 1 integration run</div><span class="arrow">→</span><div class="node">bug / next milestone cards</div><span class="arrow">↺</span></div>
+<h3>Recommended merge discipline</h3><ol><li>Finish and review each role card.</li><li>Commit/merge one branch at a time through Kanban so conflicts are explicit.</li><li>After all three are on <code>main</code>, start an <b>Integration + Regression</b> card using Agent 1.</li><li>That card must run the combined game via Godot MCP, fight at least one bot, inspect errors, and capture a screenshot.</li><li>Every failure becomes a new bounded card assigned to the owning role.</li><li>Start the next milestone only after integration is playable.</li></ol>
+<h3>What the integration card should say</h3><div class="cmd">Read AGENTS.md, docs/GAME_SPEC.md, docs/ARCHITECTURE.md and docs/OWNERSHIP.md.
+
+Act as integration owner. Do not add unrelated features. Run the merged game through Godot MCP Runtime and verify the current milestone end-to-end: spawn, move, acquire weapon, fight a bot, receive/deal damage, die/respawn, score a frag, inspect HUD, and inspect the current art pass. Capture evidence. Fix only integration/core issues inside Agent 1 ownership. For failures owned by Agent 2 or Agent 3, write precise follow-up card descriptions instead of absorbing their work.</div>
+<h3>How to get the screenshot-heavy progress report later</h3><p>Require every card to follow <code>docs/PROGRESS_PROTOCOL.md</code>. Once the evidence directory has several milestones, a tiny local script can build the visual HTML dashboard you originally wanted from Git history + screenshots + test summaries. This is deliberately separate from Kanban: Kanban tracks worker state; the project dashboard tracks the <i>game itself</i>.</p>
+</section>
+
+<section id="files"><h2>11. Copy-paste project files</h2><p>These are the files I would put into the repository before the first serious Kanban run. Use the buttons to copy or download each file. Create parent directories exactly as shown.</p><article class="file-card" id="f_README_md" data-filename="README.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>README.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Pulse Arena — Agentic Godot Experiment
+
+A small original arena-FPS inspired by classic late-1990s arena shooters. It uses original names, maps, meshes, materials, sounds, and UI; do not copy Quake III assets, maps, logos, audio, or branding.
+
+## Goal
+Build a fast single-player arena shooter in Godot 4.x with bot enemies, responsive movement, several weapons, pickups, one polished arena, a score/match loop, and a repeatable agent-driven visual verification process.
+
+## Team
+- Agent 1 — Core Gameplay &amp; Bot AI Lead (Claude Code)
+- Agent 2 — Arena Systems, UX &amp; Playtest Engineer (Codex CLI)
+- Agent 3 — 3D Art &amp; Polish Artist-Engineer (Claude Code by default)
+
+## Working model
+Each Kanban task runs in an isolated Git worktree. Agents only edit their owned paths unless an integration task explicitly grants broader access. Major work must be run in Godot and visually verified before it is considered done.
+
+See `docs/GAME_SPEC.md`, `docs/ARCHITECTURE.md`, `docs/OWNERSHIP.md`, and the role files in `docs/roles/` before editing.</code></pre>
+    </article>
+<article class="file-card" id="f_AGENTS_md" data-filename="AGENTS.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>AGENTS.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Repository Instructions for Agents
+
+## Project
+This repository contains Pulse Arena, an original Godot 4.x arena-FPS experiment with bot enemies.
+
+## Non-negotiable rules
+1. Read `docs/GAME_SPEC.md`, `docs/ARCHITECTURE.md`, and `docs/OWNERSHIP.md` before editing.
+2. Respect path ownership. Do not edit another agent&#x27;s owned paths unless the task explicitly authorizes it.
+3. Do not copy copyrighted Quake III assets, map geometry, names, logos, sounds, textures, or UI. Reproduce only broad arena-shooter mechanics using original content.
+4. Prefer GDScript and stock Godot 4.x features. Add third-party dependencies only when explicitly approved.
+5. Do not make gameplay logic depend on final art assets. Use stable data/resources and clear interfaces.
+6. A feature is not done because it compiles. Run it, inspect runtime output, and capture evidence for meaningful milestones.
+7. Keep `project.godot`, autoloads, input-map changes, and global architecture under Agent 1 ownership unless an integration task says otherwise.
+8. Do not silently rewrite shared interfaces. If an interface must change, document the reason in the task output and update `docs/ARCHITECTURE.md`.
+
+## Verification
+For gameplay-facing work:
+- Run the project through Godot MCP Runtime when available.
+- Check debug output.
+- Exercise the feature with simulated input where feasible.
+- Capture at least one screenshot for major visual milestones.
+- Test a failure/edge case, not only the happy path.
+
+## Git / Kanban
+- One Kanban card = one bounded deliverable.
+- Each card should stay inside its worktree.
+- Commit only after verification.
+- Integration happens after parallel tasks are reviewed and merged to the base branch.
+</code></pre>
+    </article>
+<article class="file-card" id="f_CLAUDE_md" data-filename="CLAUDE.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>CLAUDE.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Claude Code Project Instructions
+
+Read `AGENTS.md` first; it contains the shared repository rules.
+
+When launched as a Kanban worker, read the role file named in your card prompt and obey its ownership boundaries.
+
+## Claude-specific working style
+- For architectural or gameplay work, plan briefly before editing.
+- Keep changes testable in small increments.
+- Use Godot MCP Runtime to launch, inspect, screenshot, and validate the running game whenever the task changes player-visible behavior.
+- When acting as Agent 3, use Blender MCP for asset creation and export, then verify imported results in Godot.
+- Do not expand task scope merely because another subsystem looks unfinished. Report cross-team needs explicitly.
+</code></pre>
+    </article>
+<article class="file-card" id="f_docs_GAME_SPEC_md" data-filename="docs/GAME_SPEC.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>docs/GAME_SPEC.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Pulse Arena — Game Specification
+
+## Product target
+Create a believable, original arena-FPS prototype inspired by the responsiveness and readability of classic arena shooters. The first release is single-player against bots, not online multiplayer.
+
+## Core player experience
+The game should feel immediate, fast, readable, and skill-driven.
+
+### Movement
+- First-person mouse look.
+- Responsive ground acceleration and friction.
+- Air control sufficient to reward movement skill without requiring exact Quake physics emulation.
+- Jumping and momentum preservation.
+- Reliable stairs/slopes/collision behavior.
+- Configurable FOV and mouse sensitivity.
+- No camera bob that interferes with aiming.
+
+### Combat
+Initial weapon set:
+1. Machine gun — reliable hitscan starter.
+2. Shotgun — close-range burst with pellet spread.
+3. Rocket launcher — projectile, splash damage, self-damage, knockback.
+4. Rail-style precision weapon — high-damage hitscan with long recovery.
+
+Weapon rules:
+- Clear damage feedback.
+- Distinct cadence, range, and tactical role.
+- Predictable ammo use.
+- Weapon switching must feel immediate.
+- Pickups respawn on timers.
+
+### Player state
+- Health.
+- Armor that absorbs a defined fraction of incoming damage.
+- Ammo per weapon.
+- Death → short delay → respawn at valid spawn point.
+
+## Bots
+Target 3–5 active bots in the first polished arena.
+
+Bots require:
+- Navigation through the arena.
+- Enemy acquisition and line-of-sight checks.
+- Basic aim error based on difficulty.
+- Weapon choice based on range/ammo.
+- Item-seeking behavior when health/ammo is low.
+- Combat strafing and repositioning.
+- Recovery when stuck.
+- Three difficulty presets driven by data rather than separate AI code.
+
+Bots need not perfectly reproduce Quake III bot behavior. They must create believable pressure and movement around the arena.
+
+## Match loop
+First mode: Free-for-All against bots.
+- 10 frag target by default.
+- Scoreboard.
+- Match timer optional for first milestone.
+- Player and bots score frags.
+- Match-end panel with restart.
+
+## Arena
+One polished original arena is the first content target.
+
+Design requirements:
+- Compact enough to encounter enemies frequently.
+- At least two height layers.
+- Multiple loops rather than one corridor chain.
+- At least one risky high-value pickup location.
+- Vertical sightline opportunities.
+- Rocket-friendly spaces and tighter shotgun spaces.
+- No copied Quake map layout.
+
+## Pickups
+- Health small / large.
+- Armor.
+- Ammo.
+- Weapons.
+- Optional temporary powerup only after core loop is stable.
+
+## UI
+- Crosshair.
+- Health and armor.
+- Ammo and current weapon.
+- Frag score / leader information.
+- Death/respawn feedback.
+- Pause/settings screen.
+- Match-end panel.
+
+## Art direction
+Original industrial sci-fi arena aesthetic:
+- large readable shapes;
+- modular metal/concrete kit;
+- warm hazard lights contrasted with cool ambient lighting;
+- restrained emissive accents;
+- strong pickup silhouettes;
+- clear navigation landmarks;
+- performance-friendly geometry.
+
+Do not reproduce Quake III logos, iconography, map themes, textures, models, or weapon silhouettes exactly.
+
+## Performance target
+For the prototype, prioritize stable gameplay and low input latency over expensive rendering. Avoid unnecessary high-poly assets, excessive transparency, and gratuitous dynamic lights.
+
+## Milestone definition of done
+A milestone is complete only when:
+1. the project launches without fatal errors;
+2. the changed feature is exercised in the running game;
+3. relevant debug output is checked;
+4. major visual work has screenshot evidence;
+5. obvious regressions are addressed;
+6. the work is committed from its Kanban worktree.
+</code></pre>
+    </article>
+<article class="file-card" id="f_docs_ARCHITECTURE_md" data-filename="docs/ARCHITECTURE.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>docs/ARCHITECTURE.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Pulse Arena — Architecture Contract
+
+## Engine
+- Godot 4.x, standard build.
+- GDScript unless a task explicitly justifies another language.
+- Favor small scenes/resources and composition over deep inheritance.
+
+## Top-level scene shape
+Suggested target structure:
+
+`Main`
+- `MatchController`
+- `ArenaRoot`
+- `Actors`
+  - `Player`
+  - `Bots`
+- `Projectiles`
+- `Pickups`
+- `UI`
+
+The exact tree may evolve, but responsibilities should remain separated.
+
+## Shared contracts
+
+### Damage
+All damageable actors should expose a consistent damage entry point such as:
+`apply_damage(amount, source, hit_position, impulse, damage_type)`
+
+Do not make weapons know player/bot implementation details.
+
+### Actor query
+Player and bots should expose common information needed by weapons and match logic:
+- alive/dead state;
+- team/id if future modes need it;
+- position/aim origin;
+- health/armor;
+- current weapon;
+- death signal/event.
+
+### Weapon contract
+Weapons should separate:
+- weapon data/resource;
+- firing rules/cooldown/ammo;
+- hitscan or projectile execution;
+- presentation hooks.
+
+Art may replace meshes/VFX without rewriting weapon rules.
+
+### Bot data
+Difficulty and behavior tuning belongs in data/resources, not duplicated bot scripts.
+
+### Arena data
+Spawn points, pickup points, and encounter landmarks should be nodes/resources that Agent 2 can edit without touching core player code.
+
+### Art boundary
+Gameplay scenes may reference placeholder visual slots. Agent 3 can replace meshes/materials/VFX through those slots without editing combat rules.
+
+## Ownership-sensitive files
+Only Agent 1 should normally modify:
+- `project.godot`;
+- global input map;
+- autoload configuration;
+- common actor/damage interfaces;
+- shared core resources.
+
+If another agent needs a shared change, the task should document the requested interface change rather than silently making it.
+
+## Verification architecture
+Use Godot MCP Runtime for:
+- project launch;
+- runtime screenshots;
+- simulated input;
+- scene-tree inspection;
+- live GDScript queries;
+- debug output.
+
+Keep test scenes under `game/testing/` and avoid coupling tests to final art assets.
+</code></pre>
+    </article>
+<article class="file-card" id="f_docs_OWNERSHIP_md" data-filename="docs/OWNERSHIP.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>docs/OWNERSHIP.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Agent Ownership Map
+
+The purpose of ownership is to let three agents work in parallel without constantly overwriting each other.
+
+## Agent 1 — Core Gameplay &amp; Bot AI Lead
+Primary runtime: Claude Code subscription.
+
+Owns:
+- `project.godot`
+- `game/core/**`
+- `game/player/**`
+- `game/combat/**`
+- `game/ai/**`
+- `game/weapons/**`
+- shared resources/interfaces
+- final integration fixes
+
+May review any path, but should avoid doing Agent 2/3 work unless integration requires it.
+
+## Agent 2 — Arena Systems, UX &amp; Playtest Engineer
+Primary runtime: Codex CLI subscription.
+
+Owns:
+- `game/arena/**`
+- `game/match/**`
+- `game/ui/**` except final theme assets
+- `game/pickups/**`
+- `game/testing/**`
+- `data/arena/**`
+- `data/match/**`
+- runtime test scenarios and evidence
+
+Must not rewrite player movement, weapon internals, damage contracts, or bot core AI.
+
+## Agent 3 — 3D Art &amp; Polish Artist-Engineer
+Primary runtime: Claude Code subscription by default. Switch to Codex if Claude quota is the bottleneck.
+
+Owns:
+- `assets/**`
+- `game/art/**`
+- `game/vfx/**`
+- `game/ui/theme/**`
+- Blender source files
+- GLB exports
+- materials, lighting presets, environment assets
+
+Must not change gameplay tuning or core logic to make art fit. Request an interface/attachment point instead.
+
+## Shared / integration-only paths
+- `docs/**` may be edited when documenting decisions, but avoid unnecessary conflicts.
+- `evidence/**` is append-only by task/milestone.
+- `handoffs/**` is append-only; use it to record cross-role requests for the next integration cycle.
+
+## Conflict rule
+If a task requires editing a file outside your owned paths:
+1. stop before editing it;
+2. write a short request under `handoffs/` or state it in the Kanban card output;
+3. let Agent 1 or an explicit integration task make the shared change.
+</code></pre>
+    </article>
+<article class="file-card" id="f_docs_MILESTONES_md" data-filename="docs/MILESTONES.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>docs/MILESTONES.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Development Milestones
+
+## M0 — Bootstrap / contracts
+Owner: Agent 1, short setup task before full parallel work.
+- Godot project launches.
+- Repo structure and input actions exist.
+- Shared contracts are represented in code or stubs.
+- Placeholder test arena loads.
+
+## M1 — First combat loop (three agents parallel)
+Agent 1:
+- movement;
+- health/damage;
+- machine gun + rocket launcher;
+- one functional bot;
+- respawn.
+
+Agent 2:
+- original graybox arena;
+- spawn points;
+- pickups;
+- HUD;
+- FFA score loop;
+- test scenarios.
+
+Agent 3:
+- art bible translated into a modular arena kit;
+- basic materials;
+- placeholder weapon/pickup meshes;
+- first lighting pass.
+
+Integration gate:
+Player can enter arena, fight a bot, die/respawn, score a frag, see HUD, and view first-pass original art.
+
+## M2 — Arena game
+Agent 1:
+- shotgun + precision weapon;
+- 3–5 bots;
+- difficulty data;
+- item-seeking and combat movement;
+- stuck recovery.
+
+Agent 2:
+- arena flow tuning;
+- pickup timers;
+- match-end flow;
+- settings/pause;
+- bot encounter pacing;
+- 10-minute soak test.
+
+Agent 3:
+- complete modular environment pass;
+- weapon/pickup readability;
+- VFX and impact feedback;
+- UI theme;
+- optimization pass.
+
+## M3 — Polish / release candidate
+- integration/regression sweep;
+- performance cleanup;
+- collision/navmesh cleanup;
+- visual consistency;
+- difficulty tuning;
+- final screenshot set;
+- exportable Windows build.
+</code></pre>
+    </article>
+<article class="file-card" id="f_docs_roles_01_core_gameplay_ai_md" data-filename="docs/roles/01-core-gameplay-ai.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>docs/roles/01-core-gameplay-ai.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Role: Agent 1 — Core Gameplay &amp; Bot AI Lead
+
+&gt; “I own the part that must feel right. I build the player, weapons, damage model and bot brain, keep the architecture clean, and I am the person who says whether the merged game is technically healthy.”
+
+## Runtime
+Claude Code using the user&#x27;s Claude subscription. Use the strongest included coding/reasoning model available within the plan.
+
+## Responsibilities
+- player controller and movement feel;
+- camera/mouse look;
+- health/armor/damage interfaces;
+- weapons and projectiles;
+- bot AI architecture, navigation, combat decision-making;
+- respawn/death mechanics;
+- common interfaces and shared resources;
+- integration fixes after parallel branches merge.
+
+## Explicit non-responsibilities
+Do not spend time making final environment meshes, decorative props, final materials, or UI styling. Do not redesign the arena when Agent 2 owns it.
+
+## Quality bar
+- Player input must feel responsive.
+- No frame-rate-dependent movement logic.
+- Bot behavior must be inspectable/tunable through data.
+- Core logic must work with placeholder geometry and art.
+- Use runtime verification rather than assuming scene/code correctness.
+
+## Completion report
+State:
+1. files changed;
+2. runtime scenarios tested;
+3. screenshots/log evidence paths;
+4. known limitations;
+5. any requests for Agent 2 or Agent 3.
+</code></pre>
+    </article>
+<article class="file-card" id="f_docs_roles_02_arena_ux_playtest_md" data-filename="docs/roles/02-arena-ux-playtest.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>docs/roles/02-arena-ux-playtest.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Role: Agent 2 — Arena Systems, UX &amp; Playtest Engineer
+
+&gt; “I make the combat loop into a game. I build the arena flow, pickups, scoring, HUD and test scenarios, then I actually run matches and look for boring spaces, confusing feedback, broken spawns and unfair encounter patterns.”
+
+## Runtime
+Codex CLI using ChatGPT subscription authentication.
+
+## Responsibilities
+- original arena layout and navigation flow;
+- spawn points and pickup placement;
+- FFA match controller and scoring presentation;
+- HUD, pause/settings, death/respawn feedback;
+- pickup timers and arena data;
+- test scenes and runtime verification;
+- playtest evidence and regression reports;
+- tune encounter pacing through exposed data, not by rewriting bot internals.
+
+## Explicit non-responsibilities
+Do not rewrite player movement, weapon internals, shared damage contracts, or bot AI architecture. Do not create final 3D art.
+
+## Player-experience questions
+- Can I understand where threats are coming from?
+- Do I re-enter combat quickly after spawning?
+- Are pickups worth routing toward?
+- Does every major area have a tactical reason to exist?
+- Are vertical routes readable?
+- Is the HUD informative without obscuring aim?
+- Do bots create pressure rather than just standing in sightlines?
+
+## Completion report
+State:
+1. player-experience changes;
+2. match scenarios executed;
+3. screenshot evidence;
+4. bugs/regressions found;
+5. requested core/art changes.
+</code></pre>
+    </article>
+<article class="file-card" id="f_docs_roles_03_art_polish_md" data-filename="docs/roles/03-art-polish.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>docs/roles/03-art-polish.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Role: Agent 3 — 3D Art &amp; Polish Artist-Engineer
+
+&gt; “I make the prototype stop looking like programmer art. I build an original modular 3D kit in Blender, establish materials and lighting, export clean game-ready assets, and polish the scene without hiding gameplay problems behind effects.”
+
+## Runtime
+Claude Code subscription by default. Codex is an acceptable fallback if Claude usage is exhausted.
+
+## Tools
+- Blender MCP for modelling/materials/export.
+- Godot MCP Runtime for in-engine screenshots and verification.
+
+## Responsibilities
+- modular arena wall/floor/trim/column/doorway kit;
+- original prop silhouettes;
+- low/medium-poly weapon and pickup meshes;
+- PBR-style materials using procedural/basic textures where possible;
+- lighting and environment settings;
+- muzzle flashes, impacts, rocket trails/explosions, pickup glow;
+- UI theme assets and visual consistency;
+- GLB export/import validation;
+- art-side optimization.
+
+## Constraints
+- Original content only; never reconstruct Quake III assets or maps.
+- Preserve collision and gameplay dimensions supplied by the graybox.
+- Do not move pickups/spawns merely to make a screenshot prettier.
+- Avoid excessive dynamic lights and transparent particles.
+- Keep Blender source under `assets/source/blender/` and exports under `assets/exported/`.
+
+## Visual verification loop
+1. Build/edit asset in Blender.
+2. Capture Blender viewport/render for self-review.
+3. Export GLB.
+4. Import into Godot without changing gameplay scripts.
+5. Run the game through Godot MCP Runtime.
+6. Capture representative combat-view screenshots.
+7. Correct scale/material/readability problems.
+
+## Completion report
+State:
+1. assets produced;
+2. exported paths;
+3. Godot import paths;
+4. screenshot evidence;
+5. performance/readability concerns.
+</code></pre>
+    </article>
+<article class="file-card" id="f_docs_PROGRESS_PROTOCOL_md" data-filename="docs/PROGRESS_PROTOCOL.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>docs/PROGRESS_PROTOCOL.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Progress Evidence Protocol
+
+Each major Kanban card should leave a small evidence packet. This is what later enables a game-specific HTML progress dashboard without asking an LLM to reconstruct history.
+
+## Directory
+`evidence/&lt;milestone&gt;/&lt;task-slug&gt;/`
+
+Suggested files:
+- `summary.md`
+- `before.png` when meaningful
+- `after.png`
+- `runtime.log`
+- `test-results.md`
+- optional `metrics.json`
+
+## Screenshot rules
+- Use gameplay camera whenever judging readability or art.
+- Use consistent 16:9 captures when possible.
+- Save a clean screenshot after the final verified state, not only debugging shots.
+- For art changes, include at least one view from normal player eye height.
+
+## Summary template
+### Goal
+### What changed
+### What was actually run
+### Result
+### Known problems
+### Handoff requests
+
+## Dashboard later
+A lightweight script can scan this directory plus Git history and Kanban task state to render a local dashboard containing:
+- milestone completion;
+- latest screenshots;
+- recent changes;
+- test outcomes;
+- known blockers.
+
+Do not use an LLM continuously just to maintain the dashboard; collect deterministic evidence first.
+</code></pre>
+    </article>
+<article class="file-card" id="f__clinerules_00_project_md" data-filename=".clinerules/00-project.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>.clinerules/00-project.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code># Pulse Arena — Always-On Project Rules
+
+- This is a Godot 4.x GDScript project for an original arena FPS against bots.
+- Read `AGENTS.md`, `docs/GAME_SPEC.md`, `docs/ARCHITECTURE.md`, and `docs/OWNERSHIP.md` before making broad changes.
+- Respect agent path ownership.
+- Original art/content only; do not copy Quake III assets or map layouts.
+- Keep core gameplay independent of final art.
+- Do not call work complete until it has been run and checked in Godot.
+- Prefer small, reversible commits and bounded Kanban cards.
+</code></pre>
+    </article>
+<article class="file-card" id="f__clinerules_10_godot_verification_md" data-filename=".clinerules/10-godot-verification.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>.clinerules/10-godot-verification.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code>---
+paths:
+  - &quot;game/**&quot;
+  - &quot;project.godot&quot;
+  - &quot;assets/**&quot;
+---
+# Godot Runtime Verification Rule
+
+When a task changes player-visible behavior, gameplay scenes, assets, UI, collisions, navigation, or VFX:
+1. use Godot MCP Runtime if available;
+2. launch the relevant scene/project;
+3. inspect debug output;
+4. exercise the changed behavior;
+5. capture a screenshot for major visual milestones;
+6. fix obvious runtime errors before reporting completion.
+
+A successful parse or static code review is not sufficient proof.
+</code></pre>
+    </article>
+<article class="file-card" id="f__cline_skills_godot_runtime_verification_SKILL_md" data-filename=".cline/skills/godot-runtime-verification/SKILL.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>.cline/skills/godot-runtime-verification/SKILL.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code>---
+name: godot-runtime-verification
+description: Verify Godot gameplay changes by launching the project through Godot MCP Runtime, simulating input, inspecting the live scene, checking debug output, and capturing screenshots. Use after gameplay, UI, collision, navigation, VFX, or scene changes.
+---
+# Godot Runtime Verification
+
+1. Identify the smallest scene or scenario that proves the requested behavior.
+2. Call the Godot MCP project-info tool first to confirm connection and project path.
+3. Launch the project with the MCP runtime rather than assuming editor state.
+4. Check startup/debug output before interacting.
+5. Use simulated keyboard/mouse/action input to exercise the feature where feasible.
+6. Query the live scene tree or run read-only inspection GDScript when visual evidence is ambiguous.
+7. Capture a screenshot after the stable result.
+8. Stop the project cleanly.
+9. Record evidence under `evidence/&lt;milestone&gt;/&lt;task&gt;/` for major work.
+
+Do not use runtime scripts to bypass or secretly mutate core game state merely to make a test pass.
+</code></pre>
+    </article>
+<article class="file-card" id="f__cline_skills_arena_playtest_SKILL_md" data-filename=".cline/skills/arena-playtest/SKILL.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>.cline/skills/arena-playtest/SKILL.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code>---
+name: arena-playtest
+description: Playtest Pulse Arena as an arena FPS: evaluate spawn safety, encounter frequency, pickup routing, vertical readability, combat-space variety, HUD clarity, bot pressure, and obvious regressions. Use for arena, match, bot tuning, pickup, or UX tasks.
+---
+# Arena Playtest
+
+## Minimum pass
+- Spawn and move through each major route.
+- Acquire at least two weapon types.
+- Fight at least one bot at close and medium range.
+- Die and respawn once.
+- Confirm score/HUD updates.
+- Visit risky/high-value pickup location.
+- Look for dead ends, spawn traps, collision snags, and navmesh failures.
+
+## Questions
+- Time-to-contact after spawn: too long or too immediate?
+- Can the player orient quickly from each spawn?
+- Are strong pickups placed where contest/risk exists?
+- Do different weapons have useful spaces?
+- Is vertical traversal visible before the player reaches it?
+- Can bots reach all important spaces and recover from obstacles?
+
+Write findings as concrete observations and proposed changes, not vague statements like “feels better.”
+</code></pre>
+    </article>
+<article class="file-card" id="f__cline_skills_blender_to_godot_SKILL_md" data-filename=".cline/skills/blender-to-godot/SKILL.md">
+      <div class="file-head"><div><span class="file-icon">📄</span><code>.cline/skills/blender-to-godot/SKILL.md</code></div><div class="file-actions"><button onclick="copyFile(this)">Copy</button><button onclick="downloadFile(this)">Download</button></div></div>
+      <pre><code>---
+name: blender-to-godot
+description: Create or polish original 3D game assets in Blender via Blender MCP, export them as GLB, import them into Godot, and verify scale/material/readability in the running game. Use for environment kits, props, weapons, pickups, materials, lighting, and art polish.
+---
+# Blender → Godot Asset Loop
+
+1. Read `docs/GAME_SPEC.md`, `docs/OWNERSHIP.md`, and Agent 3 role instructions.
+2. Work in Blender source files under `assets/source/blender/`.
+3. Use consistent metric scale; 1 Blender unit = 1 meter unless the project establishes another explicit convention.
+4. Keep transforms sane before export; apply scale where appropriate.
+5. Prefer modular reusable meshes and simple materials.
+6. Export game-ready GLB to `assets/exported/`.
+7. Import in Godot without changing gameplay dimensions or core logic.
+8. Verify from player-eye screenshots through Godot MCP Runtime.
+9. Fix scale, silhouette, clipping, material, lighting, or readability problems and repeat.
+10. Preserve the Blender source file alongside the export.
+</code></pre>
+    </article></section>
+
+<section id="troubleshoot"><h2>12. Troubleshooting</h2>
+<table><tr><th>Symptom</th><th>Likely cause / fix</th></tr>
+<tr><td>Kanban starts only one model / wrong runtime</td><td>Open card/runtime settings and explicitly choose Claude Code or Codex. Do not assume a role Markdown file changes the underlying runtime.</td></tr>
+<tr><td>Codex asks for API key / billable credits</td><td>Run <code>codex logout</code>, log in with ChatGPT, and set <code>forced_login_method = "chatgpt"</code> in user Codex config.</td></tr>
+<tr><td>Claude worker cannot use Godot MCP</td><td>Run <code>claude mcp list</code>. Project <code>.mcp.json</code> may need first-time approval in an interactive Claude session.</td></tr>
+<tr><td>Codex worker cannot see Godot MCP</td><td>Run <code>codex mcp list</code>. Confirm the repo is trusted and <code>.codex/config.toml</code> exists in the worktree.</td></tr>
+<tr><td>Godot MCP says executable not found</td><td>Point <code>GODOT_PATH</code> to the actual <code>.exe</code>, not its folder. Use forward slashes or escaped backslashes in JSON.</td></tr>
+<tr><td>Two agents alter the same architecture file</td><td>Ownership is too broad. Stop, revert the non-owner change, and turn the need into an explicit handoff/integration card.</td></tr>
+<tr><td>Art branch cannot be merged cleanly</td><td>Keep Blender source and exported assets in Agent 3-owned directories. Final asset references should be integrated through stable scene slots rather than rewriting gameplay scenes.</td></tr>
+<tr><td>Three running Godot instances are too heavy</td><td>Let Agent 1/2 use background/headless-ish runtime checks when possible; reserve continuous visible gameplay/Blender windows for the task that needs them. You do not need every agent rendering all the time.</td></tr>
+</table>
+</section>
+
+<section id="sources"><h2>Sources / current documentation</h2><ul class="sources">
+<li><a href="https://docs.cline.bot/usage/kanban" target="_blank">Cline Kanban</a> — parallel agents, isolated Git worktrees, task linking, review/commit flow.</li>
+<li><a href="https://docs.cline.bot/cli/agent-teams" target="_blank">Cline Agent Teams</a> — persistent teams; currently CLI/SDK/Kanban, not VS Code extension.</li>
+<li><a href="https://docs.cline.bot/getting-started/installing-cline" target="_blank">Cline VS Code installation</a>.</li>
+<li><a href="https://docs.cline.bot/provider-config/anthropic" target="_blank">Cline Claude Code subscription provider</a>.</li>
+<li><a href="https://docs.cline.bot/provider-config/openai" target="_blank">Cline OpenAI Codex subscription OAuth provider</a>.</li>
+<li><a href="https://docs.cline.bot/mcp/mcp-overview" target="_blank">Cline MCP configuration</a>.</li>
+<li><a href="https://docs.cline.bot/customization/cline-rules" target="_blank">Cline project rules</a> and <a href="https://docs.cline.bot/customization/skills" target="_blank">Cline skills</a>.</li>
+<li><a href="https://developers.openai.com/codex/auth" target="_blank">Codex authentication</a> and <a href="https://developers.openai.com/codex/mcp" target="_blank">Codex MCP configuration</a>.</li>
+<li><a href="https://docs.anthropic.com/en/docs/claude-code/mcp" target="_blank">Claude Code MCP configuration</a>.</li>
+<li><a href="https://github.com/Erodenn/godot-mcp-runtime" target="_blank">Godot MCP Runtime</a> — runtime screenshots, input simulation, live scene access, debug output.</li>
+<li><a href="https://docs.godotengine.org/en/latest/tutorials/editor/command_line_tutorial.html" target="_blank">Godot command-line documentation</a>.</li>
+<li><a href="https://github.com/ahujasid/blender-mcp" target="_blank">Blender MCP</a> for the art worker.</li>
+</ul><div class="info small">The Cline/Kanban/agent-team features are moving quickly. The guide is designed so the core architecture survives UI changes: VS Code repo + Git + three isolated worker tasks + subscription-authenticated CLIs + Godot runtime verification.</div></section>
+</main></div>
+<footer>Pulse Arena setup guide · generated 2026-08-20 · local-first, subscription-first</footer>
+</div>
+<script>
+function getContent(card){return card.querySelector('pre code').innerText}
+async function copyFile(btn){const card=btn.closest('.file-card');await navigator.clipboard.writeText(getContent(card));const old=btn.textContent;btn.textContent='Copied ✓';setTimeout(()=>btn.textContent=old,1200)}
+function downloadFile(btn){const card=btn.closest('.file-card');const name=card.dataset.filename;const blob=new Blob([getContent(card)],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name.split('/').pop();a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+const boxes=[...document.querySelectorAll('#checklist input[type=checkbox]')];boxes.forEach(b=>{b.checked=localStorage.getItem('pulse_'+b.dataset.k)==='1';b.addEventListener('change',()=>localStorage.setItem('pulse_'+b.dataset.k,b.checked?'1':'0'))})
+</script>
+</body></html>

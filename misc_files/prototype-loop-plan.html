@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prototype Loop — Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EAE7DC;
+  --paper-2:#E2DED1;
+  --ink:#1C2B2D;
+  --ink-soft:#4A5B5C;
+  --rule:#C4BFB0;
+  --pass:#2F6B4F;
+  --human:#C8842B;
+  --stop:#9B3B2E;
+  --gutter:20px;
+  --rail:14px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Newsreader",Georgia,serif;
+  font-size:17.5px;
+  line-height:1.62;
+  font-optical-sizing:auto;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:660px;margin:0 auto;padding:0 var(--gutter) 90px}
+
+/* ---------- masthead ---------- */
+header.mast{padding:44px 0 26px;border-bottom:2px solid var(--ink)}
+.eyebrow{
+  font-family:"JetBrains Mono",monospace;font-size:10.5px;font-weight:700;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);
+  display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap
+}
+h1{
+  font-family:"Bricolage Grotesque",system-ui,sans-serif;
+  font-weight:800;font-size:clamp(34px,10vw,50px);line-height:.96;
+  letter-spacing:-.025em;margin:14px 0 12px;
+}
+h1 em{font-style:normal;color:var(--pass)}
+.standfirst{font-size:18px;color:var(--ink-soft);margin:0;max-width:46ch}
+
+/* ---------- flow diagram ---------- */
+.flow{margin:26px 0 8px;border:1.5px solid var(--rule);background:var(--paper-2);padding:16px 14px}
+.flow-title{font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:14px}
+.node{position:relative;padding:10px 12px;border:1.5px solid var(--ink);background:var(--paper);margin-bottom:0}
+.node .n-k{font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--ink-soft)}
+.node .n-t{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:16px;line-height:1.25;letter-spacing:-.01em}
+.node .n-s{font-size:14px;color:var(--ink-soft);line-height:1.4}
+.arrow{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--ink-soft);text-align:center;padding:6px 0;letter-spacing:.1em}
+.node.loopy{border-style:dashed}
+.loop-back{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--stop);text-align:center;padding:8px 0 2px;letter-spacing:.02em}
+
+/* ---------- sections ---------- */
+section{margin-top:48px}
+.sec-head{display:flex;gap:12px;align-items:baseline;border-top:2px solid var(--ink);padding-top:12px}
+.sec-num{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:13px;color:var(--pass);flex:none;padding-top:6px}
+h2{
+  font-family:"Bricolage Grotesque",sans-serif;font-weight:800;
+  font-size:clamp(25px,6.4vw,32px);line-height:1.06;letter-spacing:-.02em;margin:0;
+}
+.sec-sub{font-family:"JetBrains Mono",monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin:8px 0 0 0}
+h3{
+  font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:19.5px;
+  letter-spacing:-.01em;margin:34px 0 8px;line-height:1.25;
+}
+h3 .h-k{font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;display:block;margin-bottom:3px}
+p{margin:0 0 14px}
+ul,ol{margin:0 0 16px;padding-left:20px}
+li{margin-bottom:7px}
+strong{font-weight:600}
+code{font-family:"JetBrains Mono",monospace;font-size:.82em;background:var(--paper-2);padding:1px 5px;border:1px solid var(--rule);white-space:nowrap}
+
+/* ---------- gate stamp (signature) ---------- */
+.gate{
+  border:1.5px solid var(--ink);border-left:var(--rail) solid var(--pass);
+  background:var(--paper-2);padding:13px 14px;margin:22px 0 8px;
+}
+.gate.human{border-left-color:var(--human)}
+.gate.stop{border-left-color:var(--stop)}
+.gate-k{font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--pass);margin-bottom:5px}
+.gate.human .gate-k{color:var(--human)}
+.gate.stop .gate-k{color:var(--stop)}
+.gate p{margin:0;font-size:16px;line-height:1.5}
+.gate p + p{margin-top:8px}
+
+/* ---------- callouts ---------- */
+.note{border-top:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink);padding:14px 0;margin:22px 0}
+.note-k{font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--stop);margin-bottom:6px}
+.note p:last-child{margin-bottom:0}
+
+/* ---------- tables ---------- */
+.tbl{margin:18px 0 22px;border-top:1.5px solid var(--ink)}
+.row{border-bottom:1px solid var(--rule);padding:11px 0;display:grid;grid-template-columns:1fr;gap:2px}
+.row .r-n{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:16px;letter-spacing:-.01em}
+.row .r-n span{font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:400;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;margin-left:7px}
+.row .r-d{font-size:15px;color:var(--ink-soft);line-height:1.45}
+.row .r-d b{color:var(--ink);font-weight:500}
+
+/* ---------- code / md templates ---------- */
+pre{
+  font-family:"JetBrains Mono",monospace;font-size:12.5px;line-height:1.55;
+  background:var(--ink);color:#DCE4DF;padding:14px 13px;margin:14px 0 20px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:pre;
+}
+pre .c{color:#8FA89B}
+pre .h{color:#E8C46B}
+
+/* ---------- checklist ---------- */
+.chk{list-style:none;padding:0;margin:14px 0 20px}
+.chk li{
+  display:flex;gap:11px;align-items:flex-start;padding:9px 0;
+  border-bottom:1px solid var(--rule);margin:0;cursor:pointer;
+}
+.chk input{
+  appearance:none;-webkit-appearance:none;flex:none;
+  width:19px;height:19px;margin:4px 0 0;border:1.5px solid var(--ink);
+  background:var(--paper);cursor:pointer;position:relative;
+}
+.chk input:checked{background:var(--pass);border-color:var(--pass)}
+.chk input:checked::after{
+  content:"";position:absolute;left:5.5px;top:1.5px;width:5px;height:10px;
+  border:solid var(--paper);border-width:0 2px 2px 0;transform:rotate(42deg);
+}
+.chk input:focus-visible{outline:2px solid var(--human);outline-offset:2px}
+.chk label{font-size:16px;line-height:1.45;cursor:pointer}
+.chk input:checked + label{color:var(--ink-soft);text-decoration:line-through;text-decoration-color:var(--rule)}
+
+footer{margin-top:52px;border-top:2px solid var(--ink);padding-top:14px;
+  font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-soft);line-height:1.7}
+
+@media (min-width:620px){
+  .row{grid-template-columns:190px 1fr;gap:16px;align-items:baseline}
+  body{font-size:18px}
+}
+@media (prefers-reduced-motion:no-preference){
+  section{animation:rise .5s ease both;animation-timeline:view();animation-range:entry 0% entry 22%}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <div class="eyebrow"><span>Build plan</span><span>Rev A</span></div>
+  <h1>Four prototypes,<br>one <em>harness</em>,<br>frozen art.</h1>
+  <p class="standfirst">A precursor and two stages. Every phase ends at a gate. The machine may only pass a gate it can check; everything else stops at you.</p>
+</header>
+
+<div class="flow">
+  <div class="flow-title">Pipeline</div>
+
+  <div class="node">
+    <div class="n-k">STAGE 0 · PRECURSOR</div>
+    <div class="n-t">Art pipeline</div>
+    <div class="n-s">Generate → you approve → freeze</div>
+  </div>
+  <div class="arrow">│<br>▼</div>
+  <div class="node">
+    <div class="n-k">STAGE 1</div>
+    <div class="n-t">Design</div>
+    <div class="n-s">Harness spec + 4 direction briefs → docs you critique</div>
+  </div>
+  <div class="arrow">│<br>▼</div>
+  <div class="node loopy">
+    <div class="n-k">STAGE 2</div>
+    <div class="n-t">Implementation loop</div>
+    <div class="n-s">Build → mechanical gates → checklist → capped critic pass</div>
+  </div>
+  <div class="loop-back">art fails the readability check ──▶ back to Stage 0. Never regenerated in-loop.</div>
+  <div class="arrow">│<br>▼</div>
+  <div class="node">
+    <div class="n-k">HUMAN</div>
+    <div class="n-t">You play all four</div>
+    <div class="n-s">One sitting, randomised order → feel_notes.md</div>
+  </div>
+</div>
+
+<!-- ============ STAGE 0 ============ -->
+<section>
+  <div class="sec-head">
+    <div class="sec-num">00</div>
+    <div>
+      <h2>The art pipeline</h2>
+      <p class="sec-sub">Precursor · runs once · output is frozen</p>
+    </div>
+  </div>
+
+  <h3><span class="h-k">0.1 — Hardware</span>Run this on the 4070, not the EVO-X2</h3>
+  <p>This is the one place I'd argue against your instinct, and it isn't about memory. You were right that generation isn't VRAM-bound; SDXL at 1024px doesn't come close to needing 96 GB. The problem with the EVO-X2 is the software stack underneath it.</p>
+  <p>Strix Halo reports as <code>gfx1151</code>, and that architecture ID decides which precompiled kernels PyTorch can use. Through late 2025 and into 2026 the working setups for it were Linux, Docker or distrobox, built from ROCm nightlies, with an active issue trail about GPU hangs and kernel crashes during diffusion. On Windows it's thinner still. That is exactly the terrain where you told me you've been burned before.</p>
+  <p>The 4070 runs the boring CUDA path that every tutorial, LoRA trainer and ComfyUI node assumes. For 512–1024px game assets it is the right machine. Let the EVO-X2 keep doing what it's already good at: LLMs in LM Studio.</p>
+
+  <div class="note">
+    <div class="note-k">If you want the EVO-X2 anyway</div>
+    <p>There is one clean Windows-native path: <strong>Amuse</strong> (TensorStack, AMD-endorsed). Installer, real GUI, explicitly optimised for Ryzen AI Max+ 395, no Python, no ROCm wrangling. Good for exploration and style hunting.</p>
+    <p>The catch: it's a walled garden. Limited LoRA and ControlNet support means it can't be your consistency engine. Use it to <em>find</em> a look, then reproduce that look on the 4070 where the ecosystem lives.</p>
+  </div>
+
+  <h3><span class="h-k">0.2 — Software</span>What to download</h3>
+  <div class="tbl">
+    <div class="row"><div class="r-n">InvokeAI <span>primary UI</span></div><div class="r-d"><b>The one you live in.</b> Proper installer, gallery and boards, model manager, canvas. Boards map directly onto approve-and-freeze, which ComfyUI has no concept of.</div></div>
+    <div class="row"><div class="r-n">ComfyUI <span>secondary</span></div><div class="r-d">Add later, only for reference-driven editing workflows and batch runs. Node graphs are visual but they are a second job. Install <b>ComfyUI Manager</b> with it.</div></div>
+    <div class="row"><div class="r-n">OneTrainer <span>LoRA GUI</span></div><div class="r-d">Desktop GUI for training an SDXL style LoRA. 12 GB is enough for SDXL LoRA training. This is your consistency mechanism.</div></div>
+    <div class="row"><div class="r-n">rembg / BiRefNet <span>cutout</span></div><div class="r-d">Background removal. Deterministic, runs on everything identically.</div></div>
+    <div class="row"><div class="r-n">ImageMagick <span>cli</span></div><div class="r-d">Trim, pad, resize, palette quantise. One script, written once, never touched again.</div></div>
+    <div class="row"><div class="r-n">free-tex-packer <span>atlas</span></div><div class="r-d">GUI atlas packer, exports Phaser JSON hash format directly.</div></div>
+    <div class="row"><div class="r-n">Aseprite <span>optional</span></div><div class="r-d">Manual cleanup. Raw generation almost never drops in clean, and ten minutes of hand-fixing beats forty re-rolls.</div></div>
+  </div>
+
+  <h3><span class="h-k">0.3 — Models</span>What to actually load</h3>
+  <div class="tbl">
+    <div class="row"><div class="r-n">SDXL 1.0 <span>workhorse</span></div><div class="r-d"><b>Default choice.</b> Not because it's the best model in 2026 — it isn't — but because it has by far the deepest LoRA and ControlNet ecosystem, and your problem is control, not fidelity.</div></div>
+    <div class="row"><div class="r-n">Z-Image Turbo <span>drafts</span></div><div class="r-d">6B, sub-second-ish. Use it for the wide exploration batch in 0.4 where you're throwing away 90% of what you make.</div></div>
+    <div class="row"><div class="r-n">Qwen-Image-Edit <span>consistency</span></div><div class="r-d">Reference-driven editing. Heavy — this is the one job worth pushing to the EVO-X2 if the 4070 chokes. See 0.4, route B.</div></div>
+  </div>
+
+  <h3><span class="h-k">0.4 — Method</span>The consistency recipe</h3>
+  <p>The thing that has probably bitten you before: <strong>consistency does not come from the prompt.</strong> It comes from the reference and from freezing every variable that isn't the subject. Prompt-only style matching drifts within a session and falls apart across days.</p>
+  <ol>
+    <li><strong>Explore wide, cheap.</strong> Z-Image Turbo, many seeds, junk quality. You're hunting a look, not making assets. Keep 3–5.</li>
+    <li><strong>Write <code>style-lock.md</code>.</strong> Exact model file and hash, sampler, steps, CFG, resolution, negative prompt, a prompt template with one <code>{subject}</code> slot, the palette as hex values, and a fixed sentence describing lighting and camera angle. This file is law.</li>
+    <li><strong>Build the anchor set</strong> — 20–40 images that visibly agree with each other. Then pick a route:
+      <br><b>Route A (stronger):</b> train an SDXL style LoRA on them in OneTrainer. Slower to set up, most reliable thereafter.
+      <br><b>Route B (faster):</b> skip training. Use Qwen-Image-Edit and reframe every request as replacement — "keep this style, change the subject." Consistency comes from the template, not the generation.</li>
+    <li><strong>Generate the real set in one sitting.</strong> Not across days. Settings and model behaviour drift between sessions and you will not be able to tell why.</li>
+    <li><strong>Log everything</strong> to <code>generation-log.csv</code>: filename, seed, prompt, model, settings. Non-negotiable — it's the only way to reproduce or extend the set in three weeks.</li>
+    <li><strong>Post-process deterministically.</strong> One script: cutout → trim → pad to power of two → palette quantise → atlas. Identical treatment for every asset, so nothing looks different for reasons unrelated to the art.</li>
+  </ol>
+
+  <div class="gate human">
+    <div class="gate-k">Gate 0 · human approval</div>
+    <p>You can produce eight assets in a row that a stranger would say came from the same game.</p>
+    <p>Approved files land in <code>/art/approved/</code>. That folder is frozen. Nothing enters Stage 2 that isn't in it.</p>
+  </div>
+</section>
+
+<!-- ============ STAGE 1 ============ -->
+<section>
+  <div class="sec-head">
+    <div class="sec-num">01</div>
+    <div>
+      <h2>Design</h2>
+      <p class="sec-sub">Two documents · you fill one, the model fills the other</p>
+    </div>
+  </div>
+
+  <h3><span class="h-k">1.1</span>00-harness.md — you write this</h3>
+  <p>The section you flagged: a place to describe the base you're building on. Claude Code helps fill it, but by <em>asking you questions</em>, not by inventing answers.</p>
+  <pre><span class="c"># Harness spec</span>
+
+<span class="h">## The game, one paragraph</span>
+&lt;you&gt;
+
+<span class="h">## Core loop as it exists today</span>
+&lt;you&gt;
+
+<span class="h">## What the shell must boot into</span>
+scene:
+input:
+state:
+"playable" means:
+
+<span class="h">## Fixed vs. mutable</span>
+A prototype MAY change:
+A prototype MAY NOT change:
+
+<span class="h">## Test harness requirements</span>
+- seed control, deterministic replay
+- live parameter panel (sliders, no rebuild)
+- headless runner: N sessions, no window
+- screenshot capture at named moments
+- session log: moves, states, outcomes
+
+<span class="h">## Codebase constraints</span>
+engine/version:
+file layout:
+do not touch:
+
+<span class="h">## Art contract</span>
+folder:      /art/approved/
+sizes:
+atlas:       Phaser JSON hash
+if an asset fails readability → art-requests.md
+
+<span class="c"># Claude Code: ask me about anything blank.</span>
+<span class="c"># Do not fill gaps with assumptions.</span></pre>
+
+  <h3><span class="h-k">1.2</span>01-directions.md — deliberately vague</h3>
+  <p>Four seeds, loose on purpose. The one thing that must <em>not</em> be loose is the axis, or you'll get four flavours of the same idea back.</p>
+  <pre><span class="h">## Direction A</span>
+working title:
+prompt:        &lt;1–2 vague lines from you&gt;
+must differ on: &lt;named axis&gt;
+out of bounds:  &lt;what it can't become&gt;
+
+<span class="c">## …B, C, D — same shape, different axis</span>
+
+<span class="c"># Axes to pick from: player agency vs. luck ·</span>
+<span class="c"># tempo · planning depth · spatial vs. resource ·</span>
+<span class="c"># solo optimisation vs. reactive pressure</span></pre>
+  <p>Claude Code then expands each into <code>design/0X-name.md</code>, and every one must contain:</p>
+  <ul>
+    <li>Core fantasy, one line</li>
+    <li>Moment-to-moment loop</li>
+    <li><strong>Parameters as numbers</strong>, all of them, tunable</li>
+    <li><strong>Feel targets as measurable quantities</strong> — input-to-feedback ms, animation durations, decisions per minute, ratio of forced to free moves, turns to first meaningful choice</li>
+    <li>Its own predicted failure mode</li>
+    <li>One falsifiable success signal</li>
+    <li>Asset list, drawn only from <code>/art/approved/</code></li>
+  </ul>
+  <p>You critique, it revises, <strong>two rounds maximum</strong>. Then you choose what goes forward — the four it wrote, or your own substitutes, or a mix. Nothing downstream assumes the four survive.</p>
+
+  <div class="gate human">
+    <div class="gate-k">Gate 1 · human approval</div>
+    <p>Four docs that genuinely differ on their named axis, each with a numeric parameter block, measurable feel targets and an asset list.</p>
+  </div>
+</section>
+
+<!-- ============ STAGE 2 ============ -->
+<section>
+  <div class="sec-head">
+    <div class="sec-num">02</div>
+    <div>
+      <h2>Implementation</h2>
+      <p class="sec-sub">The loop · mechanical gates only</p>
+    </div>
+  </div>
+
+  <h3><span class="h-k">2.1</span>Build order</h3>
+  <p>Shell first, then the test harness, then <em>one</em> mechanic. Not four in parallel — the first one teaches you what your rubric is missing, and you'd rather learn that once than four times.</p>
+
+  <h3><span class="h-k">2.2</span>Gates the machine may check itself</h3>
+  <ul>
+    <li>Build and typecheck green</li>
+    <li>Playwright drives a full session, N moves, no crash</li>
+    <li>Headless sim over ~10k runs reports: win rate, move-count distribution, dead-state rate, dominant-strategy check</li>
+    <li>Screenshots captured at every named moment</li>
+    <li>Implemented parameters match the design doc's numeric block exactly</li>
+  </ul>
+
+  <h3><span class="h-k">2.3</span>The heuristic checklist</h3>
+  <p>Your UI/UX list, applied to captured frames rather than to source code. Legitimate, because these are conformance questions with answers:</p>
+  <ul>
+    <li>Contrast and legibility at real device size</li>
+    <li>Is the primary action unambiguous</li>
+    <li>Is current state visible without interaction</li>
+    <li>Does feedback land inside the stated ms window</li>
+    <li><strong>Does the approved sprite still read against its actual background, in its actual placement</strong></li>
+  </ul>
+  <p>You supply the weighting — which items matter most for this game. The model applies the rules; it does not set the priorities.</p>
+
+  <div class="gate stop">
+    <div class="gate-k">Gate 2 · the kick-back rule</div>
+    <p>When an asset fails the readability check, the loop does <strong>not</strong> regenerate art. It writes the failure to <code>art-requests.md</code> and moves on.</p>
+    <p>That file goes back to Stage 0 for your approval. Otherwise generation leaks into the loop through the side door and your comparisons stop meaning anything.</p>
+  </div>
+
+  <h3><span class="h-k">2.4</span>The critic pass</h3>
+  <ul>
+    <li>Runs as a <strong>fresh invocation</strong> — sees the code and the rubric, never the reasoning that produced the code. Self-critique in the same context just defends itself.</li>
+    <li>Default posture is reject. It must justify a pass.</li>
+    <li><strong>Three passes maximum</strong> per prototype. Hard cap, no "until done."</li>
+    <li>Every pass writes a changelog: what changed, which rubric item drove it. This is your early warning for spec drift.</li>
+    <li>Every pass ends with a playable build and a captured GIF, so you can spot-check in sixty seconds without playing.</li>
+  </ul>
+
+  <div class="gate">
+    <div class="gate-k">Gate 3 · mechanical</div>
+    <p>All checks green, cap not exceeded, build runs, GIF captured, changelog written.</p>
+  </div>
+
+  <h3><span class="h-k">2.5</span>Then you</h3>
+  <p>Play all four in one sitting, randomised order, about thirty minutes. Numbered observations into <code>feel_notes.md</code>. The second loop reads that file and nothing else. Small diffs, re-run the gates, two rounds. Then kill two and go deep on two.</p>
+</section>
+
+<!-- ============ RISKS ============ -->
+<section>
+  <div class="sec-head">
+    <div class="sec-num">03</div>
+    <div>
+      <h2>Where this breaks</h2>
+      <p class="sec-sub">Check these first when it goes wrong</p>
+    </div>
+  </div>
+  <div class="tbl">
+    <div class="row"><div class="r-n">Art drifts in</div><div class="r-d">Something regenerates mid-loop and you can no longer tell whether the mechanic improved or the sprites just rolled better.</div></div>
+    <div class="row"><div class="r-n">Harness built last</div><div class="r-d">Prototypes end up with different polish levels and you compare juice instead of mechanics.</div></div>
+    <div class="row"><div class="r-n">Convergent briefs</div><div class="r-d">Four variations on one idea. Symptom of a soft axis in 01-directions.md.</div></div>
+    <div class="row"><div class="r-n">Unbounded loop</div><div class="r-d">Endless polishing of things nobody asked about. The cap exists for this.</div></div>
+    <div class="row"><div class="r-n">Rubric as proof of fun</div><div class="r-d">Every box ticked, still no game. Conformance is real work but it is not the same question.</div></div>
+  </div>
+</section>
+
+<!-- ============ CHECKLIST ============ -->
+<section>
+  <div class="sec-head">
+    <div class="sec-num">04</div>
+    <div>
+      <h2>Setup checklist</h2>
+      <p class="sec-sub">Ticks save on this device</p>
+    </div>
+  </div>
+  <ul class="chk" id="chk">
+    <li><input type="checkbox" id="c1"><label for="c1">InvokeAI installed on the 4070 machine</label></li>
+    <li><input type="checkbox" id="c2"><label for="c2">SDXL 1.0 + Z-Image Turbo downloaded</label></li>
+    <li><input type="checkbox" id="c3"><label for="c3">Exploration batch done, 3–5 keepers picked</label></li>
+    <li><input type="checkbox" id="c4"><label for="c4">style-lock.md written and frozen</label></li>
+    <li><input type="checkbox" id="c5"><label for="c5">Anchor set built (20–40 agreeing images)</label></li>
+    <li><input type="checkbox" id="c6"><label for="c6">Route chosen: LoRA trained, or Qwen-Image-Edit wired up</label></li>
+    <li><input type="checkbox" id="c7"><label for="c7">Post-process script written (cutout → trim → pad → atlas)</label></li>
+    <li><input type="checkbox" id="c8"><label for="c8">/art/approved/ populated and frozen · GATE 0</label></li>
+    <li><input type="checkbox" id="c9"><label for="c9">00-harness.md filled in</label></li>
+    <li><input type="checkbox" id="c10"><label for="c10">01-directions.md written, axes named</label></li>
+    <li><input type="checkbox" id="c11"><label for="c11">Four design docs critiqued and chosen · GATE 1</label></li>
+    <li><input type="checkbox" id="c12"><label for="c12">Shell + test harness built and signed off</label></li>
+    <li><input type="checkbox" id="c13"><label for="c13">Prototype 1 through the loop, caps held</label></li>
+  </ul>
+</section>
+
+<footer>
+  Gates are the whole design. The machine passes what it can verify;<br>
+  everything else stops at you.
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var boxes = document.querySelectorAll('#chk input');
+  var KEY = 'plan:checks';
+  var state = {};
+
+  function save(){
+    try { window.storage && window.storage.set(KEY, JSON.stringify(state)); } catch(e){}
+  }
+  function bind(){
+    boxes.forEach(function(b){
+      b.checked = !!state[b.id];
+      b.addEventListener('change', function(){
+        state[b.id] = b.checked;
+        save();
+      });
+    });
+  }
+  (async function(){
+    try {
+      var r = await window.storage.get(KEY);
+      if (r && r.value) state = JSON.parse(r.value);
+    } catch(e){ state = {}; }
+    bind();
+  })();
+})();
+</script>
+</body>
+</html>

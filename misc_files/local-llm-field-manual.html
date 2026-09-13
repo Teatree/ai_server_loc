@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Local LLM Field Manual — from parameters to MTP</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root{
+  --bg:#10151d;
+  --panel:#161d28;
+  --inset:#1a2230;
+  --line:#2a3547;
+  --ink:#e9edf3;
+  --mut:#93a0b4;
+  --amb:#ffb454;
+  --amb-dim:#8a6a33;
+  --cyn:#6cc3e6;
+  --ok:#82c98b;
+  --bad:#e07a92;
+  --vio:#b39ddb;
+  --disp:'Space Grotesk',system-ui,sans-serif;
+  --body:'Source Serif 4',Georgia,serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:17px;
+  line-height:1.68;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--amb);color:#10151d}
+a{color:var(--cyn);text-decoration:none;border-bottom:1px solid rgba(108,195,230,.35)}
+a:hover{border-bottom-color:var(--cyn)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--amb);outline-offset:2px}
+code{
+  font-family:var(--mono);
+  font-size:.86em;
+  background:var(--inset);
+  border:1px solid var(--line);
+  border-radius:5px;
+  padding:.1em .38em;
+  color:var(--amb);
+  white-space:nowrap;
+}
+strong{font-weight:600;color:#fff}
+
+/* ---------- hero ---------- */
+.hero{
+  max-width:880px;
+  margin:0 auto;
+  padding:88px 24px 56px;
+}
+.eyebrow{
+  font-family:var(--mono);
+  font-size:12px;
+  letter-spacing:.14em;
+  color:var(--mut);
+  text-transform:uppercase;
+  margin-bottom:26px;
+}
+.eyebrow b{color:var(--amb);font-weight:600}
+.tokline{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:center;
+  min-height:120px;
+  align-content:flex-start;
+}
+h1.tokline{font-size:0}
+.tk{
+  font-family:var(--mono);
+  font-weight:600;
+  font-size:clamp(26px,5.4vw,46px);
+  line-height:1.1;
+  padding:.14em .3em .18em;
+  border-radius:9px;
+  border:1px solid;
+}
+.tk small{
+  display:block;
+  font-size:11px;
+  font-weight:400;
+  letter-spacing:.05em;
+  opacity:.55;
+  margin-top:2px;
+}
+.tk-a{color:var(--amb);border-color:rgba(255,180,84,.45);background:rgba(255,180,84,.07)}
+.tk-c{color:var(--cyn);border-color:rgba(108,195,230,.45);background:rgba(108,195,230,.07)}
+.tk-g{color:var(--ok);border-color:rgba(130,201,139,.45);background:rgba(130,201,139,.07)}
+.tk-v{color:var(--vio);border-color:rgba(179,157,219,.45);background:rgba(179,157,219,.07)}
+.tk-r{color:var(--bad);border-color:rgba(224,122,146,.45);background:rgba(224,122,146,.07)}
+.tk.pending{visibility:hidden}
+.caret{
+  display:inline-block;
+  width:.55em;
+  height:1.15em;
+  background:var(--amb);
+  border-radius:2px;
+  animation:blink 1s steps(1) infinite;
+  align-self:center;
+}
+@keyframes blink{50%{opacity:0}}
+.statusline{
+  font-family:var(--mono);
+  font-size:12.5px;
+  color:var(--mut);
+  margin-top:22px;
+  letter-spacing:.02em;
+}
+.statusline .lit{color:var(--amb)}
+.dek{
+  font-size:19px;
+  color:#c4cdd9;
+  max-width:640px;
+  margin-top:26px;
+}
+.dek em{color:var(--amb);font-style:normal}
+
+/* ---------- layout ---------- */
+.wrap{
+  max-width:1180px;
+  margin:0 auto;
+  padding:0 24px 80px;
+  display:grid;
+  grid-template-columns:216px minmax(0,1fr);
+  gap:56px;
+}
+.rail{
+  position:sticky;
+  top:0;
+  align-self:start;
+  max-height:100vh;
+  overflow-y:auto;
+  padding:32px 0 32px;
+  scrollbar-width:thin;
+}
+.rail-title{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--mut);
+  margin-bottom:14px;
+}
+.rail a{
+  display:flex;
+  gap:10px;
+  align-items:baseline;
+  font-family:var(--mono);
+  font-size:12.5px;
+  color:var(--mut);
+  border:0;
+  padding:5px 0;
+  line-height:1.35;
+}
+.rail a .n{color:var(--amb-dim);min-width:20px}
+.rail a:hover{color:var(--ink)}
+.rail a.active{color:var(--amb)}
+.rail a.active .n{color:var(--amb)}
+main{min-width:0;padding-top:8px}
+
+/* ---------- entries ---------- */
+.entry{
+  padding:60px 0 48px;
+  border-top:1px solid var(--line);
+  scroll-margin-top:24px;
+}
+.entry:first-child{border-top:0;padding-top:24px}
+.ehead{margin-bottom:20px}
+.enum{
+  font-family:var(--mono);
+  font-size:13px;
+  color:var(--amb);
+  letter-spacing:.12em;
+}
+.term{
+  font-family:var(--disp);
+  font-weight:700;
+  font-size:clamp(26px,3.4vw,34px);
+  line-height:1.15;
+  margin:6px 0 12px;
+  letter-spacing:-.01em;
+}
+.tags{display:flex;flex-wrap:wrap;gap:8px}
+.tag{
+  font-family:var(--mono);
+  font-size:11.5px;
+  color:var(--mut);
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:3px 10px;
+  letter-spacing:.03em;
+}
+.entry p{margin:0 0 16px;max-width:70ch}
+.entry ul{margin:0 0 16px 22px;max-width:68ch}
+.entry li{margin-bottom:8px}
+
+/* ---------- figures ---------- */
+.fig{
+  background:var(--inset);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:22px 22px 16px;
+  margin:26px 0;
+}
+.fig svg{display:block;width:100%;height:auto}
+.fig figcaption{
+  font-family:var(--mono);
+  font-size:12px;
+  color:var(--mut);
+  margin-top:14px;
+  line-height:1.55;
+}
+.fig figcaption b{color:var(--amb);font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:26px 0}
+.grid2 .fig{margin:0}
+
+/* stat cards used for prose-y comparisons */
+.card{
+  background:var(--inset);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:20px;
+}
+.card h4{
+  font-family:var(--disp);
+  font-size:16px;
+  font-weight:700;
+  margin-bottom:10px;
+}
+.card h4 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:1px}
+.card ul{list-style:none;margin:0;padding:0}
+.card li{
+  font-family:var(--mono);
+  font-size:12.8px;
+  color:var(--mut);
+  padding:5px 0;
+  border-bottom:1px dashed var(--line);
+  margin:0;
+}
+.card li:last-child{border-bottom:0}
+.card li b{color:var(--ink);font-weight:600}
+
+/* "in practice" box */
+.try{
+  border-left:3px solid var(--amb);
+  background:linear-gradient(90deg,rgba(255,180,84,.06),transparent 60%);
+  border-radius:0 10px 10px 0;
+  padding:16px 20px;
+  margin:26px 0 6px;
+}
+.try .lbl{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.16em;
+  color:var(--amb);
+  text-transform:uppercase;
+  display:block;
+  margin-bottom:8px;
+}
+.try p{font-size:15.5px;color:#c4cdd9;margin:0 0 8px}
+.try p:last-child{margin-bottom:0}
+
+/* token chips inside content */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 14px}
+.chip{
+  font-family:var(--mono);
+  font-size:14.5px;
+  padding:6px 10px 8px;
+  border-radius:8px;
+  border:1px solid;
+  line-height:1.2;
+}
+.chip small{display:block;font-size:10px;opacity:.55;margin-top:3px;letter-spacing:.04em}
+
+/* code / template blocks */
+.block{
+  background:#0c1118;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:16px 18px;
+  font-family:var(--mono);
+  font-size:13px;
+  line-height:1.7;
+  color:#c4cdd9;
+  overflow-x:auto;
+  margin:20px 0;
+}
+.block .cm{color:#5b6b82}
+.block .am{color:var(--amb)}
+.block .cy{color:var(--cyn)}
+.block .gr{color:var(--ok)}
+
+/* filename anatomy */
+.fname{
+  font-family:var(--mono);
+  font-size:clamp(14px,2.6vw,19px);
+  background:#0c1118;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:16px 18px;
+  margin:20px 0 8px;
+  overflow-x:auto;
+  white-space:nowrap;
+}
+.fn-legend{display:flex;flex-wrap:wrap;gap:14px;margin:0 0 20px}
+.fn-legend span{font-family:var(--mono);font-size:12px;color:var(--mut)}
+.fn-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+
+/* further reading */
+.further{padding:60px 0 20px;border-top:1px solid var(--line)}
+.further .links{display:grid;gap:12px;margin-top:22px}
+.flink{
+  display:block;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:14px 18px;
+  background:var(--inset);
+}
+.flink b{font-family:var(--disp);color:var(--ink);display:block;font-size:15.5px}
+.flink span{font-family:var(--mono);font-size:12px;color:var(--mut)}
+.flink:hover{border-color:var(--amb-dim)}
+
+footer{
+  max-width:1180px;
+  margin:0 auto;
+  padding:32px 24px 64px;
+  font-family:var(--mono);
+  font-size:12px;
+  color:var(--mut);
+  border-top:1px solid var(--line);
+}
+
+@media (max-width:1080px){
+  .wrap{grid-template-columns:1fr;gap:0}
+  .rail{display:none}
+}
+@media (max-width:640px){
+  .grid2{grid-template-columns:1fr}
+  body{font-size:16px}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <p class="eyebrow"><b>rev 2026.07</b> · compiled for people who run models on their own hardware</p>
+  <h1 class="tokline" id="tokline" aria-label="The Local LLM Field Manual">
+    <span class="tk tk-a pending">The<small>id 791</small></span>
+    <span class="tk tk-c pending">▁Local<small>id 8949</small></span>
+    <span class="tk tk-g pending">▁LL<small>id 20504</small></span>
+    <span class="tk tk-v pending">M<small>id 44</small></span>
+    <span class="tk tk-a pending">▁Field<small>id 9188</small></span>
+    <span class="tk tk-r pending">▁Manual<small>id 27431</small></span>
+    <span class="caret" id="caret" aria-hidden="true"></span>
+  </h1>
+  <p class="statusline" id="statusline">loading weights…</p>
+  <p class="dek">Seventeen concepts, in reading order — a plain-language tour of everything behind running language models at home, from <em>what the “B” means</em> to <em>why Q4_K_M fits on your GPU</em> and <em>how MTP makes it faster</em>. Each entry: what it is, a picture, and a simple example.</p>
+</header>
+
+<div class="wrap">
+<nav class="rail" aria-label="Contents">
+  <p class="rail-title">Index</p>
+  <a href="#s00"><span class="n">00</span>How an LLM works</a>
+  <a href="#s01"><span class="n">01</span>Parameters</a>
+  <a href="#s02"><span class="n">02</span>Tokens</a>
+  <a href="#s03"><span class="n">03</span>Context window</a>
+  <a href="#s04"><span class="n">04</span>Training vs inference</a>
+  <a href="#s05"><span class="n">05</span>VRAM &amp; offloading</a>
+  <a href="#s06"><span class="n">06</span>Tokens per second</a>
+  <a href="#s07"><span class="n">07</span>Temperature &amp; sampling</a>
+  <a href="#s08"><span class="n">08</span>KV cache</a>
+  <a href="#s09"><span class="n">09</span>Base vs instruct</a>
+  <a href="#s10"><span class="n">10</span>Fine-tuning &amp; LoRA</a>
+  <a href="#s11"><span class="n">11</span>Distillation</a>
+  <a href="#s12"><span class="n">12</span>Mixture of Experts</a>
+  <a href="#s13"><span class="n">13</span>GGUF &amp; runtimes</a>
+  <a href="#s14"><span class="n">14</span>Speculative decoding</a>
+  <a href="#s15"><span class="n">15</span>Quantization</a>
+  <a href="#s16"><span class="n">16</span>Multi-Token Prediction</a>
+  <a href="#further"><span class="n">→</span>Further reading</a>
+</nav>
+
+<main>
+
+<!-- ============ 00 HOW AN LLM WORKS ============ -->
+<section class="entry" id="s00">
+  <div class="ehead">
+    <p class="enum">00 / FOUNDATION</p>
+    <h2 class="term">How an LLM actually works</h2>
+    <div class="tags"><span class="tag">next-token prediction</span><span class="tag">transformer</span><span class="tag">attention</span></div>
+  </div>
+
+  <p>Strip away everything else and a large language model is <strong>autocomplete, taken absurdly seriously</strong>. It does exactly one thing: given some text, it predicts what the next little piece of text (a <em>token</em>, entry 02) is most likely to be. It writes one token, sticks it onto the end of the text, and predicts again. Every essay, every code file, every chat reply is produced one token at a time in a loop.</p>
+
+  <p>Where does the “prediction” come from? During training (entry 04) the model read trillions of words and slowly tuned billions of internal numbers — its <em>parameters</em> (entry 01) — until its guesses matched real text. In the process it was forced to absorb grammar, facts, coding patterns, and a surprising amount of reasoning, because you can’t reliably predict the next word of a physics textbook or a Python file without modelling what it’s about.</p>
+
+  <figure class="fig" role="figure" aria-label="Diagram of the token generation loop">
+    <svg viewBox="0 0 760 218" role="img" aria-labelledby="figloop-t">
+      <title id="figloop-t">The generation loop: text is tokenized, run through the transformer, one token is picked and appended, then the loop repeats.</title>
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#93a0b4"/>
+        </marker>
+        <marker id="arrA" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#ffb454"/>
+        </marker>
+      </defs>
+      <!-- input text -->
+      <rect x="8" y="42" width="168" height="54" rx="9" fill="none" stroke="#2a3547"/>
+      <text x="92" y="64" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">"Helsinki is the</text>
+      <text x="92" y="82" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">capital of"</text>
+      <text x="92" y="120" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">your prompt so far</text>
+      <line x1="176" y1="69" x2="212" y2="69" stroke="#93a0b4" marker-end="url(#arr)"/>
+      <!-- tokenizer -->
+      <rect x="214" y="42" width="104" height="54" rx="9" fill="#1a2230" stroke="#2a3547"/>
+      <text x="266" y="74" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#6cc3e6">tokenizer</text>
+      <text x="266" y="120" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">text → numbers</text>
+      <line x1="318" y1="69" x2="354" y2="69" stroke="#93a0b4" marker-end="url(#arr)"/>
+      <!-- transformer -->
+      <rect x="356" y="24" width="150" height="90" rx="9" fill="#1a2230" stroke="#ffb454"/>
+      <text x="431" y="52" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12.5" fill="#ffb454">transformer</text>
+      <line x1="372" y1="64" x2="490" y2="64" stroke="#2a3547"/>
+      <line x1="372" y1="76" x2="490" y2="76" stroke="#2a3547"/>
+      <line x1="372" y1="88" x2="490" y2="88" stroke="#2a3547"/>
+      <text x="431" y="104" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#93a0b4">30–90 stacked layers</text>
+      <text x="431" y="132" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">the billions of parameters live here</text>
+      <line x1="506" y1="69" x2="542" y2="69" stroke="#93a0b4" marker-end="url(#arr)"/>
+      <!-- probabilities -->
+      <rect x="544" y="30" width="120" height="78" rx="9" fill="none" stroke="#2a3547"/>
+      <rect x="556" y="44" width="78" height="9" rx="2" fill="#ffb454"/>
+      <rect x="556" y="60" width="26" height="9" rx="2" fill="#3a4a63"/>
+      <rect x="556" y="76" width="14" height="9" rx="2" fill="#3a4a63"/>
+      <rect x="556" y="92" width="7" height="9" rx="2" fill="#3a4a63"/>
+      <text x="604" y="126" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">odds for every token</text>
+      <line x1="664" y1="69" x2="700" y2="69" stroke="#93a0b4" marker-end="url(#arr)"/>
+      <!-- picked token -->
+      <rect x="702" y="48" width="52" height="42" rx="8" fill="rgba(255,180,84,.1)" stroke="#ffb454"/>
+      <text x="728" y="74" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#ffb454">▁Fin…</text>
+      <!-- loop back -->
+      <path d="M 728 92 L 728 176 L 92 176 L 92 100" fill="none" stroke="#ffb454" stroke-dasharray="5 5" marker-end="url(#arrA)"/>
+      <text x="410" y="196" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11.5" fill="#ffb454">append the new token, run the whole thing again — once per token, forever</text>
+    </svg>
+    <figcaption><b>fig 00-A</b> · The entire product is this loop. “Generating a reply” = running it a few hundred times.</figcaption>
+  </figure>
+
+  <p>The box in the middle is a <strong>transformer</strong> — a stack of identical layers, each doing two jobs. An <strong>attention</strong> step lets every token look back at the earlier tokens and decide which ones matter right now (in “the capital <em>of Finland</em> is…”, the word <em>Finland</em> should matter a lot). A <strong>feed-forward</strong> step then transforms what attention gathered — this is where most of the stored knowledge sits. Thirty to ninety of these layers run in sequence, and out the top comes a score for <em>every token in the vocabulary</em>.</p>
+
+  <figure class="fig" role="figure" aria-label="Bar chart of next-token probabilities">
+    <svg viewBox="0 0 760 226" role="img" aria-labelledby="figprob-t">
+      <title id="figprob-t">Probability distribution over the next token after the prompt: Helsinki dominates.</title>
+      <text x="10" y="24" font-family="JetBrains Mono,monospace" font-size="13" fill="#93a0b4">prompt:</text>
+      <text x="88" y="24" font-family="JetBrains Mono,monospace" font-size="13" fill="#e9edf3">The capital of Finland is</text>
+      <rect x="298" y="10" width="12" height="19" fill="#ffb454"><animate attributeName="opacity" values="1;0;1" dur="1.2s" repeatCount="indefinite"/></rect>
+      <text x="10" y="52" font-family="JetBrains Mono,monospace" font-size="11" fill="#5b6b82">model’s odds for the next token ↓</text>
+      <!-- bars -->
+      <text x="118" y="87" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="12.5" fill="#e9edf3">▁Helsinki</text>
+      <rect x="130" y="74" width="520" height="17" rx="3" fill="#ffb454"/>
+      <text x="658" y="87" font-family="JetBrains Mono,monospace" font-size="12" fill="#ffb454">93.7%</text>
+      <text x="118" y="119" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="12.5" fill="#93a0b4">▁the</text>
+      <rect x="130" y="106" width="17" height="17" rx="3" fill="#3a4a63"/>
+      <text x="155" y="119" font-family="JetBrains Mono,monospace" font-size="12" fill="#93a0b4">2.9%</text>
+      <text x="118" y="151" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="12.5" fill="#93a0b4">▁located</text>
+      <rect x="130" y="138" width="9" height="17" rx="3" fill="#3a4a63"/>
+      <text x="147" y="151" font-family="JetBrains Mono,monospace" font-size="12" fill="#93a0b4">1.5%</text>
+      <text x="118" y="183" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="12.5" fill="#93a0b4">▁Espoo</text>
+      <rect x="130" y="170" width="4" height="17" rx="3" fill="#3a4a63"/>
+      <text x="142" y="183" font-family="JetBrains Mono,monospace" font-size="12" fill="#93a0b4">0.6%</text>
+      <text x="118" y="215" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="12.5" fill="#93a0b4">▁banana</text>
+      <rect x="130" y="202" width="2" height="17" rx="3" fill="#5b3a44"/>
+      <text x="140" y="215" font-family="JetBrains Mono,monospace" font-size="12" fill="#93a0b4">0.001%</text>
+    </svg>
+    <figcaption><b>fig 00-B</b> · One forward pass = one of these charts, over the model’s whole vocabulary (~150,000 tokens). A <em>sampler</em> (entry 07) then picks one bar. Nothing is ever “retrieved” — the answer is reconstructed from patterns baked into the weights.</figcaption>
+  </figure>
+
+  <p>Running a model <strong>locally</strong> just means this loop happens on your machine instead of a datacenter. Concretely, you download two things: a <strong>big file of numbers</strong> (the weights, e.g. a <code>.gguf</code> file — entry 13) and a <strong>small program that does the matrix math</strong> (an engine like llama.cpp, wrapped by LM Studio or Ollama). Everything else in this manual — VRAM, quantization, t/s, MTP — is about making that loop fit in your memory and run fast.</p>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>Watch the loop with your own eyes: in LM Studio, ask any local model a question and watch the reply stutter out word-fragment by word-fragment. Each fragment you see appear is one full trip through fig 00-A — billions of multiplications per token.</p>
+  </div>
+</section>
+
+<!-- ============ 01 PARAMETERS ============ -->
+<section class="entry" id="s01">
+  <div class="ehead">
+    <p class="enum">01</p>
+    <h2 class="term">Parameters — what the “B” means</h2>
+    <div class="tags"><span class="tag">B = billion</span><span class="tag">a.k.a. weights</span><span class="tag">unit of model size</span></div>
+  </div>
+
+  <p>A <strong>parameter</strong> is one learned number inside the model — a single knob, something like <code>0.0231</code> or <code>-1.87</code>. Each one nudges signals up or down as data flows through the layers in fig 00-A. Training is the process of setting all the knobs; the finished model is nothing more than the full list of them. “Weights” and “parameters” mean the same thing in everyday use.</p>
+
+  <p>The number in a model’s name — Qwen3.5-<strong>9B</strong>, Gemma-4-<strong>31B</strong>, Llama-3.1-<strong>70B</strong> — is the count of those knobs in billions. More parameters means more capacity to store knowledge and patterns, but also linearly more memory to hold and more math per token, so the “B” is the single fastest predictor of <em>can my machine run this, and how fast</em>.</p>
+
+  <figure class="fig" role="figure" aria-label="Relative sizes of common model classes">
+    <svg viewBox="0 0 760 236" role="img" aria-labelledby="figpar-t">
+      <title id="figpar-t">Circles proportional to parameter count, from 0.6 billion to 70 billion, with unquantized memory sizes.</title>
+      <line x1="10" y1="168" x2="750" y2="168" stroke="#2a3547"/>
+      <circle cx="58" cy="163" r="5" fill="#6cc3e6"/>
+      <circle cx="150" cy="155" r="13" fill="#6cc3e6" opacity=".85"/>
+      <circle cx="268" cy="149" r="19" fill="#82c98b" opacity=".85"/>
+      <circle cx="420" cy="135" r="33" fill="#ffb454" opacity=".9"/>
+      <circle cx="622" cy="115" r="53" fill="#e07a92" opacity=".8"/>
+      <text x="58" y="192" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">0.6B</text>
+      <text x="150" y="192" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">4B</text>
+      <text x="268" y="192" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">9B</text>
+      <text x="420" y="192" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">27B</text>
+      <text x="622" y="192" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">70B</text>
+      <text x="58" y="212" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">1.2 GB</text>
+      <text x="150" y="212" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">8 GB</text>
+      <text x="268" y="212" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">18 GB</text>
+      <text x="420" y="212" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">54 GB</text>
+      <text x="622" y="212" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">140 GB</text>
+      <text x="10" y="230" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">GB shown = raw fp16 size (2 bytes × every parameter) — before quantization (entry 15) shrinks it</text>
+      <text x="10" y="30" font-family="JetBrains Mono,monospace" font-size="11.5" fill="#93a0b4">same architecture, more knobs →</text>
+    </svg>
+    <figcaption><b>fig 01</b> · Rough 2026 vibes per class: 0.6–4B = autocomplete &amp; phone-grade helpers · 7–9B = capable daily driver on one consumer GPU · 14–32B = strong coding/reasoning on 16–24 GB · 70B+ = workstation or multi-GPU territory.</figcaption>
+  </figure>
+
+  <p>One caution: parameter count is capacity, not quality. Training data, architecture and post-training improved so fast that a good 2026-era 9B beats a 2023-era 70B on many everyday tasks. Compare models of the same generation by B; across generations, trust benchmarks and your own tests over raw size.</p>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>Quick mental math: <strong>parameters × bytes-per-parameter = memory needed</strong>. A 9B model at full fp16 precision is 9 × 2 = 18 GB — too big for most GPUs, which is exactly why quantization (entry 15) exists.</p>
+  </div>
+</section>
+
+<!-- ============ 02 TOKENS ============ -->
+<section class="entry" id="s02">
+  <div class="ehead">
+    <p class="enum">02</p>
+    <h2 class="term">Tokens &amp; tokenization</h2>
+    <div class="tags"><span class="tag">subword pieces</span><span class="tag">≈ ¾ of a word</span><span class="tag">BPE</span></div>
+  </div>
+
+  <p>Models never see letters or words — they see <strong>tokens</strong>: chunks of text from a fixed menu (the <em>vocabulary</em>, typically 32k–256k entries) learned before training by finding the most common character sequences. Frequent words get their own token; rarer words are assembled from pieces. Every token has an ID number, and those IDs are what actually enter the model.</p>
+
+  <div class="chips" aria-label="Example sentence split into tokens">
+    <span class="chip tk-a">Local<small>id 7469</small></span>
+    <span class="chip tk-c">▁LL<small>id 20504</small></span>
+    <span class="chip tk-g">Ms<small>id 21607</small></span>
+    <span class="chip tk-v">▁run<small>id 1629</small></span>
+    <span class="chip tk-a">▁off<small>id 1022</small></span>
+    <span class="chip tk-r">line<small>id 1074</small></span>
+    <span class="chip tk-c">▁on<small>id 389</small></span>
+    <span class="chip tk-g">▁quant<small>id 30690</small></span>
+    <span class="chip tk-v">ized<small>id 1506</small></span>
+    <span class="chip tk-a">▁weights<small>id 14661</small></span>
+    <span class="chip tk-r">.<small>id 13</small></span>
+  </div>
+  <p style="font-family:var(--mono);font-size:12px;color:var(--mut);max-width:none">▁ marks a leading space — “ offline” and “offline” are different tokens. 6 words → 11 tokens here because the rarer words got split.</p>
+
+  <p>Rules of thumb for English: <strong>1 token ≈ 4 characters ≈ ¾ of a word</strong>, so 1,000 tokens ≈ 750 words. Code and non-English languages (Finnish very much included — long compound words get shredded into many pieces) cost more tokens per idea. Token counts are the currency of everything downstream: context window size (03), KV-cache memory (08), and speed (06) are all measured in tokens.</p>
+
+  <p>Tokenization also explains classic LLM blind spots: a model asked how many r’s are in “strawberry” isn’t looking at letters at all — it sees maybe two opaque chunks like <code>▁straw</code>+<code>berry</code>, and has to <em>remember</em> the spelling rather than count it.</p>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>Local runtimes show token counts everywhere: LM Studio displays them live under the chat box, and llama.cpp logs <code>prompt eval: N tokens</code>. Paste the same paragraph in English and Finnish and compare the counts — the difference is the tokenizer at work.</p>
+  </div>
+</section>
+
+<!-- ============ 03 CONTEXT WINDOW ============ -->
+<section class="entry" id="s03">
+  <div class="ehead">
+    <p class="enum">03</p>
+    <h2 class="term">Context window</h2>
+    <div class="tags"><span class="tag">unit: tokens</span><span class="tag">a.k.a. ctx / n_ctx</span><span class="tag">working memory</span></div>
+  </div>
+
+  <p>The <strong>context window</strong> is the maximum number of tokens the model can consider at once — its entire working memory. Everything must fit inside it: the system prompt, the whole conversation so far, any pasted files, and the reply being written. The model has no memory outside this window; “remembering” earlier chat is literally re-reading it on every single token.</p>
+
+  <figure class="fig" role="figure" aria-label="Context window as a capacity bar">
+    <svg viewBox="0 0 760 190" role="img" aria-labelledby="figctx-t">
+      <title id="figctx-t">A 32k context bar filling with system prompt, chat history and the current reply, and a second bar showing overflow eviction.</title>
+      <text x="10" y="20" font-family="JetBrains Mono,monospace" font-size="12" fill="#93a0b4">ctx = 32,768 tokens</text>
+      <rect x="10" y="30" width="740" height="34" rx="7" fill="none" stroke="#2a3547"/>
+      <rect x="12" y="32" width="30" height="30" rx="5" fill="#b39ddb" opacity=".85"/>
+      <rect x="44" y="32" width="440" height="30" rx="5" fill="#3a4a63"/>
+      <rect x="486" y="32" width="110" height="30" rx="5" fill="#6cc3e6" opacity=".85"/>
+      <rect x="598" y="32" width="70" height="30" rx="5" fill="#ffb454" opacity=".9"/>
+      <text x="27" y="84" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#b39ddb">system</text>
+      <text x="264" y="84" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">chat history · 19k tok</text>
+      <text x="541" y="84" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#6cc3e6">pasted file</text>
+      <text x="633" y="84" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#ffb454">reply</text>
+      <text x="708" y="84" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">free</text>
+      <text x="10" y="120" font-family="JetBrains Mono,monospace" font-size="12" fill="#e07a92">…and when it overflows:</text>
+      <rect x="10" y="130" width="740" height="34" rx="7" fill="none" stroke="#2a3547"/>
+      <rect x="12" y="132" width="120" height="30" rx="5" fill="#5b3a44"/>
+      <rect x="134" y="132" width="614" height="30" rx="5" fill="#3a4a63"/>
+      <text x="72" y="184" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#e07a92">oldest messages silently dropped</text>
+      <text x="440" y="184" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">what the model still “knows”</text>
+    </svg>
+    <figcaption><b>fig 03</b> · When a long chat overruns the window, runtimes trim from the top. That’s the moment a model “forgets” your name or the rules you set an hour ago.</figcaption>
+  </figure>
+
+  <p>Two catches for local use. First, spec-sheet numbers are maximums: many 2026 models advertise 128k–256k, but you choose the actual size at load time, and bigger windows cost real memory (the KV cache, entry 08) and slow down the initial prompt-reading pass. Second, quality degrades before the limit — models are noticeably better at using the start and end of a huge context than the middle.</p>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>In LM Studio the context length is a slider in the model-load settings; llama.cpp uses <code>-c 32768</code>. A sane default for chat and coding on a single GPU is 16k–32k. Raise it only when you actually paste big things — every extra token of window is VRAM you can’t spend elsewhere.</p>
+  </div>
+</section>
+
+<!-- ============ 04 TRAINING VS INFERENCE ============ -->
+<section class="entry" id="s04">
+  <div class="ehead">
+    <p class="enum">04</p>
+    <h2 class="term">Training vs inference</h2>
+    <div class="tags"><span class="tag">learning vs using</span><span class="tag">you run inference</span></div>
+  </div>
+
+  <p><strong>Training</strong> is setting the knobs: show the model trillions of tokens, compare its next-token guess to the real next token, and nudge all the parameters slightly toward the right answer (gradient descent), repeated quadrillions of times. It needs thousands of datacenter GPUs for weeks or months and is the expensive part labs pay for. The output of all that effort is just the weights file.</p>
+
+  <p><strong>Inference</strong> is using the knobs: load the finished weights, freeze them, and run the fig 00-A loop on your prompt. Nothing is learned — the model that finishes your chat is bit-for-bit identical to the one that started it. Running LLMs locally means running <em>inference</em>; the only training hobbyists commonly do at home is light fine-tuning (entry 10).</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h4><span class="dot" style="background:var(--bad)"></span>Training (the lab’s job)</h4>
+      <ul>
+        <li>input · <b>trillions of tokens</b> of text</li>
+        <li>hardware · <b>1,000s of GPUs</b>, months</li>
+        <li>weights · <b>constantly changing</b></li>
+        <li>cost · <b>$10M–$1B+</b> per frontier run</li>
+        <li>output · <b>the weights file</b></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="dot" style="background:var(--ok)"></span>Inference (your job)</h4>
+      <ul>
+        <li>input · <b>your prompt</b></li>
+        <li>hardware · <b>one PC / Mac</b>, milliseconds–seconds</li>
+        <li>weights · <b>frozen, read-only</b></li>
+        <li>cost · <b>electricity</b></li>
+        <li>output · <b>tokens on your screen</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>This split is why “open-weights” releases matter: when Qwen, Gemma or Llama publish weights, the billion-dollar part is done and gifted to you — the part left for your machine is comparatively tiny. It’s also why your chats can’t “teach” a local model anything across sessions: inference never writes to the file.</p>
+  </div>
+</section>
+
+<!-- ============ 05 VRAM ============ -->
+<section class="entry" id="s05">
+  <div class="ehead">
+    <p class="enum">05</p>
+    <h2 class="term">VRAM, RAM &amp; GPU offloading</h2>
+    <div class="tags"><span class="tag">unit: GB</span><span class="tag">n_gpu_layers</span><span class="tag">unified memory</span></div>
+  </div>
+
+  <p>To generate each token the hardware must read <em>essentially every parameter</em> from memory (see entry 06 for why that dominates speed). So the first question of local AI is brutally simple: <strong>where do the weights sit?</strong> Three tiers, from fast to slow: <strong>VRAM</strong> — memory on the GPU, huge bandwidth (350–1,800 GB/s), scarce; <strong>system RAM</strong> — plentiful, but ~50–120 GB/s through the CPU; <strong>disk</strong> — if the model spills here, it’s effectively unusable.</p>
+
+  <figure class="fig" role="figure" aria-label="Model memory needs versus common GPU VRAM sizes">
+    <svg viewBox="0 0 760 268" role="img" aria-labelledby="figvram-t">
+      <title id="figvram-t">Horizontal bars of model memory footprints at Q4 against dashed lines for 8, 12, 16, 24 and 32 gigabyte GPUs.</title>
+      <!-- gridlines: scale 16px per GB, x0=150 -->
+      <line x1="278" y1="14" x2="278" y2="218" stroke="#2a3547" stroke-dasharray="4 4"/>
+      <line x1="342" y1="14" x2="342" y2="218" stroke="#2a3547" stroke-dasharray="4 4"/>
+      <line x1="406" y1="14" x2="406" y2="218" stroke="#2a3547" stroke-dasharray="4 4"/>
+      <line x1="534" y1="14" x2="534" y2="218" stroke="#2a3547" stroke-dasharray="4 4"/>
+      <line x1="662" y1="14" x2="662" y2="218" stroke="#2a3547" stroke-dasharray="4 4"/>
+      <text x="278" y="238" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">8 GB</text>
+      <text x="342" y="238" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">12 GB</text>
+      <text x="406" y="238" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">16 GB</text>
+      <text x="534" y="238" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">24 GB</text>
+      <text x="662" y="238" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">32 GB</text>
+      <!-- bars, all Q4_K_M -->
+      <text x="142" y="34" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">4B</text>
+      <rect x="150" y="22" width="40" height="17" rx="3" fill="#82c98b"/>
+      <text x="198" y="34" font-family="JetBrains Mono,monospace" font-size="11" fill="#93a0b4">2.5 GB</text>
+      <text x="142" y="72" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">9B</text>
+      <rect x="150" y="60" width="88" height="17" rx="3" fill="#82c98b"/>
+      <text x="246" y="72" font-family="JetBrains Mono,monospace" font-size="11" fill="#93a0b4">5.5 GB</text>
+      <text x="142" y="110" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">14B</text>
+      <rect x="150" y="98" width="144" height="17" rx="3" fill="#82c98b"/>
+      <text x="302" y="110" font-family="JetBrains Mono,monospace" font-size="11" fill="#93a0b4">9 GB</text>
+      <text x="142" y="148" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">27B</text>
+      <rect x="150" y="136" width="264" height="17" rx="3" fill="#ffb454"/>
+      <text x="422" y="148" font-family="JetBrains Mono,monospace" font-size="11" fill="#93a0b4">16.5 GB</text>
+      <text x="142" y="186" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="12" fill="#e9edf3">70B</text>
+      <rect x="150" y="174" width="600" height="17" rx="3" fill="#e07a92"/>
+      <text x="700" y="168" font-family="JetBrains Mono,monospace" font-size="11" fill="#e07a92">42 GB →</text>
+      <text x="10" y="262" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">footprints at Q4_K_M quantization (entry 15) · add ~1–3 GB on top for KV cache + runtime overhead</text>
+    </svg>
+    <figcaption><b>fig 05-A</b> · The whole local-LLM game in one chart: pick the biggest bar that fits under your GPU’s dashed line — <em>with room to spare</em> for context.</figcaption>
+  </figure>
+
+  <p>When a model doesn’t quite fit, engines can <strong>offload</strong>: keep as many transformer layers as possible in VRAM and run the remainder from system RAM on the CPU. It works — but speed collapses toward the slowest link, so a 90/10 split can still cut your tokens-per-second in half. Apple Silicon sidesteps the split entirely: its <strong>unified memory</strong> is one pool shared by CPU and GPU, which is why a 64–128 GB Mac quietly runs models that embarrass much pricier discrete GPUs.</p>
+
+  <figure class="fig" role="figure" aria-label="Layer offloading split between GPU and CPU">
+    <svg viewBox="0 0 760 96" role="img" aria-labelledby="figoff-t">
+      <title id="figoff-t">A model's 48 layers split: 40 on the GPU in VRAM, 8 on the CPU in system RAM.</title>
+      <text x="10" y="20" font-family="JetBrains Mono,monospace" font-size="12" fill="#93a0b4">48-layer model, 16 GB card: n_gpu_layers = 40</text>
+      <rect x="10" y="32" width="616" height="30" rx="7" fill="rgba(130,201,139,.16)" stroke="#82c98b"/>
+      <rect x="630" y="32" width="120" height="30" rx="7" fill="rgba(224,122,146,.14)" stroke="#e07a92"/>
+      <text x="318" y="52" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11.5" fill="#82c98b">layers 1–40 · GPU / VRAM · fast</text>
+      <text x="690" y="46" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#e07a92">41–48 · CPU</text>
+      <text x="690" y="58" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#e07a92">slow lane</text>
+      <text x="10" y="88" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">every token must walk through ALL layers → the 8 slow ones set the pace far more than their share suggests</text>
+    </svg>
+    <figcaption><b>fig 05-B</b> · Offloading is a graceful fallback, not a free lunch.</figcaption>
+  </figure>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>LM Studio shows a green/orange/red “will it fit” estimate before you even download a file, and exposes <em>GPU offload layers</em> as a slider. If generation feels inexplicably slow, check whether the runtime silently offloaded — the fix is usually a smaller quant (entry 15), not a smaller model.</p>
+  </div>
+</section>
+
+<!-- ============ 06 TOKENS PER SECOND ============ -->
+<section class="entry" id="s06">
+  <div class="ehead">
+    <p class="enum">06</p>
+    <h2 class="term">Tokens per second (t/s)</h2>
+    <div class="tags"><span class="tag">a.k.a. tok/s, tps</span><span class="tag">memory-bandwidth bound</span><span class="tag">prefill vs decode</span></div>
+  </div>
+
+  <p><strong>t/s</strong> is the speed rating of local AI: how many tokens the model emits per second. For feel: 5 t/s is a slow reader you wait on, 20 t/s is comfortable chat, 60+ t/s is instant-feeling, and coding agents happily eat hundreds. The surprising part is <em>what</em> limits it — not GPU compute, but <strong>memory bandwidth</strong>, because generating one token means streaming (roughly) the entire weights file from memory through the chip.</p>
+
+  <div class="card" style="margin:26px 0">
+    <h4><span class="dot" style="background:var(--amb)"></span>Back-of-envelope speed limit</h4>
+    <ul>
+      <li>rule of thumb · <b>t/s ceiling ≈ memory bandwidth ÷ model size in memory</b></li>
+      <li>RTX 4090 (1,008 GB/s) ÷ 5.5 GB model · <b>≈ 180 t/s ceiling</b></li>
+      <li>RTX 3060 (360 GB/s) ÷ 5.5 GB · <b>≈ 65 t/s</b></li>
+      <li>M4 Pro Mac (273 GB/s) ÷ 5.5 GB · <b>≈ 50 t/s</b></li>
+      <li>CPU + DDR5 (≈ 90 GB/s) ÷ 5.5 GB · <b>≈ 16 t/s</b></li>
+      <li>real world · <b>expect ~50–80% of the ceiling</b> (overheads, KV cache reads)</li>
+    </ul>
+  </div>
+
+  <p>This one formula explains most local-LLM folk wisdom: why halving a model’s bytes via quantization roughly doubles speed, why a used 3090 with fat bandwidth beats some newer cards, why CPU-only inference of big dense models crawls, and why MoE (entry 12) and MTP (entry 16) feel like cheating — they reduce, or amortize, the bytes read per emitted token.</p>
+
+  <p>One more distinction worth knowing: reading your prompt (<strong>prefill</strong> / “prompt processing”) is a different phase from writing the answer (<strong>decode</strong>). Prefill crunches many tokens in parallel and is compute-bound — often thousands of t/s on a GPU — while decode is the bandwidth-bound one-at-a-time loop above. That’s why a huge pasted document pauses briefly before the first word, then streams normally.</p>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>Every runtime reports both numbers after a reply (LM Studio shows them under the message; llama.cpp prints <code>prompt eval</code> and <code>eval</code> rates). When benchmarking models against each other, keep quant, context size and GPU-offload identical — otherwise you’re measuring your settings, not the model.</p>
+  </div>
+</section>
+
+<!-- ============ 07 SAMPLING ============ -->
+<section class="entry" id="s07">
+  <div class="ehead">
+    <p class="enum">07</p>
+    <h2 class="term">Temperature, top-p &amp; top-k</h2>
+    <div class="tags"><span class="tag">sampling</span><span class="tag">the randomness dials</span></div>
+  </div>
+
+  <p>The model outputs a probability chart (fig 00-B); the <strong>sampler</strong> decides which bar to pick. <strong>Temperature</strong> reshapes the chart before picking: below 1.0 it sharpens the peaks (the favourite wins almost every time — predictable, focused, sometimes repetitive), above 1.0 it flattens them (underdogs get real chances — creative, varied, eventually unhinged). Temperature 0 means “always take the top bar”: the same prompt then yields the same answer every time.</p>
+
+  <figure class="fig" role="figure" aria-label="Effect of temperature on the token distribution">
+    <svg viewBox="0 0 760 218" role="img" aria-labelledby="figtemp-t">
+      <title id="figtemp-t">Two bar charts over the same five candidate tokens: sharp distribution at temperature 0.2, flat distribution at temperature 1.3, with a top-p bracket.</title>
+      <!-- left: T=0.2 -->
+      <text x="95" y="22" font-family="JetBrains Mono,monospace" font-size="12.5" fill="#6cc3e6">temp 0.2 · focused</text>
+      <rect x="40" y="46" width="34" height="118" rx="4" fill="#6cc3e6"/>
+      <rect x="86" y="150" width="34" height="14" rx="4" fill="#3a4a63"/>
+      <rect x="132" y="158" width="34" height="6" rx="4" fill="#3a4a63"/>
+      <rect x="178" y="161" width="34" height="3" rx="4" fill="#3a4a63"/>
+      <rect x="224" y="162" width="34" height="2" rx="4" fill="#3a4a63"/>
+      <line x1="30" y1="164" x2="290" y2="164" stroke="#2a3547"/>
+      <text x="57" y="182" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">▁the</text>
+      <text x="103" y="182" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">▁a</text>
+      <text x="149" y="182" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">▁one</text>
+      <text x="195" y="182" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">▁this</text>
+      <text x="241" y="182" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">▁our</text>
+      <text x="160" y="206" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">favourite wins ~always</text>
+      <!-- right: T=1.3 -->
+      <text x="545" y="22" font-family="JetBrains Mono,monospace" font-size="12.5" fill="#ffb454">temp 1.3 · adventurous</text>
+      <rect x="470" y="106" width="34" height="58" rx="4" fill="#ffb454"/>
+      <rect x="516" y="118" width="34" height="46" rx="4" fill="#ffb454" opacity=".8"/>
+      <rect x="562" y="128" width="34" height="36" rx="4" fill="#ffb454" opacity=".6"/>
+      <rect x="608" y="138" width="34" height="26" rx="4" fill="#3a4a63"/>
+      <rect x="654" y="146" width="34" height="18" rx="4" fill="#3a4a63"/>
+      <line x1="460" y1="164" x2="720" y2="164" stroke="#2a3547"/>
+      <text x="487" y="182" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">▁the</text>
+      <text x="533" y="182" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">▁a</text>
+      <text x="579" y="182" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">▁one</text>
+      <text x="625" y="182" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">▁this</text>
+      <text x="671" y="182" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">▁our</text>
+      <!-- top-p bracket over first three bars -->
+      <path d="M 470 96 L 470 88 L 596 88 L 596 96" fill="none" stroke="#82c98b"/>
+      <text x="533" y="80" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#82c98b">top-p 0.9 keeps only these</text>
+      <text x="590" y="206" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">underdogs get real chances</text>
+    </svg>
+    <figcaption><b>fig 07</b> · Temperature reshapes the odds; top-p / top-k then fence off the long tail so “▁banana” never sneaks in.</figcaption>
+  </figure>
+
+  <p>The fences: <strong>top-k</strong> keeps only the k highest bars (e.g. k=40) before sampling; <strong>top-p</strong> (“nucleus”) keeps the smallest set of bars whose combined probability reaches p (e.g. 0.9) — adaptive, so it keeps 1 candidate when the model is sure and 30 when it isn’t. They exist because at higher temperatures the thousands of tiny-probability junk tokens collectively add up to a real chance of derailment.</p>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>Good defaults: <code>temp 0.7</code>, <code>top-p 0.9</code> for chat; drop toward <code>temp 0.2–0.4</code> for code and data extraction; raise toward <code>1.0–1.2</code> for brainstorming. If a local model loops or rambles where the cloud version didn’t, suspect the sampler settings before blaming the model — runtime defaults vary and model cards often recommend specific values.</p>
+  </div>
+</section>
+
+<!-- ============ 08 KV CACHE ============ -->
+<section class="entry" id="s08">
+  <div class="ehead">
+    <p class="enum">08</p>
+    <h2 class="term">KV cache</h2>
+    <div class="tags"><span class="tag">key/value cache</span><span class="tag">why long chats eat VRAM</span></div>
+  </div>
+
+  <p>Attention (entry 00) lets each new token look back at all earlier tokens. Done naively, that means reprocessing the entire conversation for every single generated token — quadratic, ruinous. The fix: the first time each token is processed, the model saves the two vectors attention needs from it (its <strong>K</strong>ey and <strong>V</strong>alue) and never recomputes them. That stash is the <strong>KV cache</strong>.</p>
+
+  <figure class="fig" role="figure" aria-label="KV cache growth with context length">
+    <svg viewBox="0 0 760 150" role="img" aria-labelledby="figkv-t">
+      <title id="figkv-t">Bars showing KV cache size growing linearly with tokens in context for a 9B-class model.</title>
+      <text x="10" y="20" font-family="JetBrains Mono,monospace" font-size="12" fill="#93a0b4">KV cache size · 9B-class model · fp16 cache ≈ 0.13 MB per token</text>
+      <text x="120" y="52" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="11.5" fill="#e9edf3">2k tok</text>
+      <rect x="130" y="40" width="18" height="15" rx="3" fill="#6cc3e6"/>
+      <text x="156" y="52" font-family="JetBrains Mono,monospace" font-size="11" fill="#93a0b4">0.3 GB</text>
+      <text x="120" y="82" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="11.5" fill="#e9edf3">8k tok</text>
+      <rect x="130" y="70" width="72" height="15" rx="3" fill="#6cc3e6"/>
+      <text x="210" y="82" font-family="JetBrains Mono,monospace" font-size="11" fill="#93a0b4">1.1 GB</text>
+      <text x="120" y="112" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="11.5" fill="#e9edf3">32k tok</text>
+      <rect x="130" y="100" width="288" height="15" rx="3" fill="#ffb454"/>
+      <text x="426" y="112" font-family="JetBrains Mono,monospace" font-size="11" fill="#93a0b4">4.3 GB — on top of the 5.5 GB model!</text>
+      <text x="10" y="142" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">grows linearly with tokens actually in context · freed when you start a new chat · quantizing the cache to q8 halves it</text>
+    </svg>
+    <figcaption><b>fig 08</b> · The hidden second tenant in your VRAM. “Model fits at load, crashes an hour into the chat” is almost always this.</figcaption>
+  </figure>
+
+  <p>Consequences you’ll actually feel: the cache is why token #500 generates as fast as token #5 (no re-reading), why VRAM use creeps up during long sessions, and why doubling your context window setting reserves real gigabytes even before you use them. Modern architectures shrink it with tricks like grouped-query attention (several attention heads sharing one K/V set), and runtimes let you store the cache itself at 8-bit with little quality loss.</p>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>If a long coding session slows down or OOMs: start a fresh chat (empties the cache), lower the context slider, or enable KV-cache quantization (<code>q8_0</code> is the safe pick — in LM Studio it’s under the model-load “advanced” panel, in llama.cpp <code>--cache-type-k q8_0 --cache-type-v q8_0</code>).</p>
+  </div>
+</section>
+
+<!-- ============ 09 BASE VS INSTRUCT ============ -->
+<section class="entry" id="s09">
+  <div class="ehead">
+    <p class="enum">09</p>
+    <h2 class="term">Base vs instruct models</h2>
+    <div class="tags"><span class="tag">-instruct / -it / -chat</span><span class="tag">chat template</span><span class="tag">system prompt</span></div>
+  </div>
+
+  <p>Fresh out of pre-training, a <strong>base model</strong> is a pure next-token engine with no concept of “you” and “me”. Ask it “What is quantization?” and it may reply “What is distillation? What is pruning?” — because a list of questions is a statistically plausible continuation. It’s a magnificent autocomplete, not an assistant.</p>
+
+  <p>An <strong>instruct model</strong> (suffixes <code>-instruct</code>, <code>-it</code>, <code>-chat</code>) is that same base after <em>post-training</em>: fine-tuned on question→answer conversations and preference-tuned (RLHF and friends) to follow instructions, converse in turns, and refuse the worst stuff. This is the kind you want in a chat UI, and it’s what runtimes assume by default.</p>
+
+  <p>Turn-taking works through the <strong>chat template</strong>: special tokens that wrap each speaker’s text so the model can tell who said what. The UI hides this scaffolding, but it’s always there — including the <strong>system prompt</strong>, an invisible first message that sets persona and rules:</p>
+
+  <div class="block"><span class="cm">## what the model actually receives (Qwen-style template)</span>
+<span class="am">&lt;|im_start|&gt;</span><span class="cy">system</span>
+You are a concise assistant for game economy design.<span class="am">&lt;|im_end|&gt;</span>
+<span class="am">&lt;|im_start|&gt;</span><span class="cy">user</span>
+What does ARPDAU stand for?<span class="am">&lt;|im_end|&gt;</span>
+<span class="am">&lt;|im_start|&gt;</span><span class="cy">assistant</span>
+<span class="gr">Average Revenue Per Daily Active User — total daily revenue ÷ DAU.</span><span class="am">&lt;|im_end|&gt;</span></div>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>Symptoms of a wrong or missing template: the model answers <em>as you</em>, continues your question instead of answering, or leaks tags like <code>&lt;|im_end|&gt;</code> into replies. GGUF files carry the correct template inside them, so modern runtimes get this right automatically — it mostly bites when APIs or scripts assemble prompts by hand. Grab a <em>base</em> model only for raw completion tasks and fine-tuning projects (entry 10).</p>
+  </div>
+</section>
+
+<!-- ============ 10 FINE-TUNING & LORA ============ -->
+<section class="entry" id="s10">
+  <div class="ehead">
+    <p class="enum">10</p>
+    <h2 class="term">Fine-tuning &amp; LoRA</h2>
+    <div class="tags"><span class="tag">post-training at home</span><span class="tag">low-rank adapters</span><span class="tag">QLoRA</span></div>
+  </div>
+
+  <p><strong>Fine-tuning</strong> is continuing a model’s training on your own examples to change its behaviour — your studio’s tone of voice, a data format it must always emit, a niche domain. It shifts <em>style and skills</em> reliably; it’s a poor tool for injecting <em>facts</em> (for “answer from my documents”, retrieval/RAG-style setups work better). Full fine-tuning updates every parameter, which for a 9B model means datacenter-class memory — out of reach at home.</p>
+
+  <p><strong>LoRA</strong> (Low-Rank Adaptation) is the trick that made home fine-tuning real: freeze all the original weights, and next to each big weight matrix train a pair of skinny matrices whose product is the <em>change</em> you want. Those adapters are typically <strong>&lt;1% of the model’s size</strong>, so they train on a single consumer GPU and ship as tiny files you can stack or share. <strong>QLoRA</strong> pushes further by holding the frozen base in 4-bit (entry 15) while training the adapters — a 9B fine-tune inside ~8–12 GB of VRAM.</p>
+
+  <figure class="fig" role="figure" aria-label="LoRA adapter diagram">
+    <svg viewBox="0 0 760 208" role="img" aria-labelledby="figlora-t">
+      <title id="figlora-t">A large frozen weight matrix plus two small trainable matrices A and B whose product forms the weight update.</title>
+      <rect x="40" y="30" width="150" height="150" rx="10" fill="#1a2230" stroke="#2a3547"/>
+      <text x="115" y="98" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="13" fill="#93a0b4">W</text>
+      <text x="115" y="118" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">original weights</text>
+      <text x="115" y="134" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">❄ frozen</text>
+      <text x="230" y="112" text-anchor="middle" font-family="Space Grotesk,sans-serif" font-size="26" fill="#93a0b4">+</text>
+      <rect x="280" y="30" width="26" height="150" rx="6" fill="rgba(255,180,84,.14)" stroke="#ffb454"/>
+      <text x="293" y="108" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#ffb454">A</text>
+      <text x="342" y="112" text-anchor="middle" font-family="Space Grotesk,sans-serif" font-size="22" fill="#93a0b4">×</text>
+      <rect x="378" y="92" width="150" height="26" rx="6" fill="rgba(255,180,84,.14)" stroke="#ffb454"/>
+      <text x="453" y="109" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#ffb454">B</text>
+      <text x="583" y="112" text-anchor="middle" font-family="Space Grotesk,sans-serif" font-size="26" fill="#93a0b4">=</text>
+      <rect x="620" y="30" width="120" height="150" rx="10" fill="none" stroke="#ffb454" stroke-dasharray="6 5"/>
+      <text x="680" y="98" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="13" fill="#ffb454">ΔW</text>
+      <text x="680" y="118" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">your change</text>
+      <text x="404" y="52" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#ffb454">🔥 trainable · ~0.5% of the parameters</text>
+      <text x="380" y="200" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">at inference: output = W·x + A·B·x — the adapter rides along, or gets merged into W permanently</text>
+    </svg>
+    <figcaption><b>fig 10</b> · Why a hobbyist GPU can “retrain” a 9-billion-parameter model: it never touches the 9 billion — only the skinny amber bits.</figcaption>
+  </figure>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>The usual home pipeline: a few hundred–few thousand example conversations in JSONL → QLoRA with a library like Unsloth or Axolotl on a 12–24 GB GPU (or rented cloud GPU) for minutes–hours → merge → export to GGUF → load in LM Studio like any other model. Before committing, always test whether a good system prompt plus examples gets you 90% of the way — it often does, for free.</p>
+  </div>
+</section>
+
+<!-- ============ 11 DISTILLATION ============ -->
+<section class="entry" id="s11">
+  <div class="ehead">
+    <p class="enum">11</p>
+    <h2 class="term">Distillation</h2>
+    <div class="tags"><span class="tag">teacher → student</span><span class="tag">why small models got good</span></div>
+  </div>
+
+  <p><strong>Distillation</strong> trains a small “student” model to imitate a big “teacher”. Instead of learning only from raw internet text, the student learns from the teacher’s <em>behaviour</em> — either its full probability charts (fig 00-B, the “soft targets”: not just <em>the answer is Helsinki</em> but <em>Helsinki 93.7%, the 2.9%…</em>, which carries far more signal per example) or, more commonly today, from large synthetic datasets of questions, answers and step-by-step reasoning that the teacher writes.</p>
+
+  <figure class="fig" role="figure" aria-label="Distillation from teacher to student">
+    <svg viewBox="0 0 760 168" role="img" aria-labelledby="figdist-t">
+      <title id="figdist-t">A large teacher model produces reasoning traces and probability distributions that train a small student model.</title>
+      <circle cx="130" cy="80" r="56" fill="rgba(224,122,146,.12)" stroke="#e07a92"/>
+      <text x="130" y="76" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12.5" fill="#e07a92">teacher</text>
+      <text x="130" y="94" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">~600B, datacenter</text>
+      <line x1="196" y1="80" x2="470" y2="80" stroke="#93a0b4" marker-end="url(#arr)"/>
+      <text x="333" y="62" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#e9edf3">millions of worked examples</text>
+      <text x="333" y="100" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">answers + reasoning + soft probabilities</text>
+      <circle cx="530" cy="80" r="30" fill="rgba(130,201,139,.12)" stroke="#82c98b"/>
+      <text x="530" y="78" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11.5" fill="#82c98b">student</text>
+      <text x="530" y="93" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#93a0b4">9B</text>
+      <text x="646" y="72" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">→ runs on</text>
+      <text x="646" y="88" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">your GPU</text>
+      <text x="380" y="152" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">the student inherits a distilled slice of the teacher’s skill — not its full breadth</text>
+    </svg>
+    <figcaption><b>fig 11</b> · Compression of skill rather than compression of bytes (that’s quantization, entry 15). The two stack: most local models are distilled <em>and</em> quantized.</figcaption>
+  </figure>
+
+  <p>This is the open secret behind small models punching above their weight class: nearly every strong 1–9B model you can download was taught, at least partly, by a frontier-scale system. It’s also why families ship in size ladders (0.6B → 397B in one release) — one teacher, one recipe, many students, so you can pick the largest size your VRAM allows and get consistent behaviour.</p>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>You’ll meet the word on model cards: “distilled from…”, or names like <code>DeepSeek-R1-Distill-Qwen-7B</code> — reasoning behaviour from a giant, transplanted into a 7B body. When a tiny model narrates chain-of-thought suspiciously well, distillation is why.</p>
+  </div>
+</section>
+
+<!-- ============ 12 MIXTURE OF EXPERTS ============ -->
+<section class="entry" id="s12">
+  <div class="ehead">
+    <p class="enum">12</p>
+    <h2 class="term">Mixture of Experts (MoE)</h2>
+    <div class="tags"><span class="tag">A3B = ~3B active</span><span class="tag">sparse models</span><span class="tag">vs “dense”</span></div>
+  </div>
+
+  <p>In a standard (<strong>dense</strong>) model, every token flows through every parameter. A <strong>Mixture-of-Experts</strong> model replaces each layer’s big feed-forward block with a panel of smaller parallel blocks — the <em>experts</em> — plus a tiny <strong>router</strong> that, per token, activates only the best-suited few (say 2–8 of 64+). The result: the knowledge capacity of a huge model, the per-token compute of a small one.</p>
+
+  <figure class="fig" role="figure" aria-label="MoE router selecting experts">
+    <svg viewBox="0 0 760 226" role="img" aria-labelledby="figmoe-t">
+      <title id="figmoe-t">A token passes through a router which activates two of eight experts; the rest stay idle.</title>
+      <rect x="20" y="88" width="86" height="40" rx="8" fill="none" stroke="#2a3547"/>
+      <text x="63" y="113" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11.5" fill="#e9edf3">token</text>
+      <line x1="106" y1="108" x2="152" y2="108" stroke="#93a0b4" marker-end="url(#arr)"/>
+      <rect x="154" y="80" width="96" height="56" rx="8" fill="#1a2230" stroke="#6cc3e6"/>
+      <text x="202" y="105" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11.5" fill="#6cc3e6">router</text>
+      <text x="202" y="122" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9.5" fill="#93a0b4">picks top-2</text>
+      <line x1="250" y1="96" x2="322" y2="38" stroke="#ffb454" marker-end="url(#arrA)"/>
+      <line x1="250" y1="118" x2="322" y2="148" stroke="#ffb454" marker-end="url(#arrA)"/>
+      <g font-family="JetBrains Mono,monospace" font-size="10.5" text-anchor="middle">
+        <rect x="326" y="18"  width="120" height="38" rx="7" fill="rgba(255,180,84,.14)" stroke="#ffb454"/><text x="386" y="41" fill="#ffb454">expert 1 ⚡</text>
+        <rect x="326" y="62"  width="120" height="38" rx="7" fill="#151b26" stroke="#2a3547"/><text x="386" y="85" fill="#5b6b82">expert 2</text>
+        <rect x="326" y="106" width="120" height="38" rx="7" fill="#151b26" stroke="#2a3547"/><text x="386" y="129" fill="#5b6b82">expert 3</text>
+        <rect x="326" y="150" width="120" height="38" rx="7" fill="rgba(255,180,84,.14)" stroke="#ffb454"/><text x="386" y="173" fill="#ffb454">expert 4 ⚡</text>
+        <rect x="470" y="18"  width="120" height="38" rx="7" fill="#151b26" stroke="#2a3547"/><text x="530" y="41" fill="#5b6b82">expert 5</text>
+        <rect x="470" y="62"  width="120" height="38" rx="7" fill="#151b26" stroke="#2a3547"/><text x="530" y="85" fill="#5b6b82">expert 6</text>
+        <rect x="470" y="106" width="120" height="38" rx="7" fill="#151b26" stroke="#2a3547"/><text x="530" y="129" fill="#5b6b82">expert 7</text>
+        <rect x="470" y="150" width="120" height="38" rx="7" fill="#151b26" stroke="#2a3547"/><text x="530" y="173" fill="#5b6b82">expert 8</text>
+      </g>
+      <text x="676" y="90" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#e9edf3">all stored</text>
+      <text x="676" y="108" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#ffb454">few compute</text>
+      <text x="380" y="216" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">a different pair may fire for the very next token — “experts” are learned micro-specialties, not tidy human subjects</text>
+    </svg>
+    <figcaption><b>fig 12</b> · Naming decodes as total-vs-active: <b>35B-A3B</b> = 35B parameters stored, ~3B active per token. Memory cost follows the 35; speed follows the 3.</figcaption>
+  </figure>
+
+  <p>For local use that trade is unusually sweet <em>if</em> you have the memory: all experts must be loaded (VRAM/RAM pays for total parameters), but each token only reads the active slice, so t/s tracks the small number. A 35B-A3B can feel nearly as fast as a 3–4B dense model while being far smarter. MoE + unified-memory Macs and MoE + partial CPU offload are particularly happy pairings, since capacity is what those setups have and bandwidth-per-token is what they lack.</p>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>Reading model names: Qwen3.6-<code>35B-A3B</code>, Qwen3.5-<code>122B-A10B</code>, Mixtral <code>8x7B</code> (8 experts × 7B, the 2023 original that popularized the idea). When comparing an MoE against a dense model, compare <em>active</em> params for speed expectations and <em>total</em> params for the fig 05-A memory check.</p>
+  </div>
+</section>
+
+<!-- ============ 13 GGUF & RUNTIMES ============ -->
+<section class="entry" id="s13">
+  <div class="ehead">
+    <p class="enum">13</p>
+    <h2 class="term">GGUF, llama.cpp &amp; runtimes</h2>
+    <div class="tags"><span class="tag">.gguf</span><span class="tag">LM Studio · Ollama</span><span class="tag">safetensors</span></div>
+  </div>
+
+  <p><strong>GGUF</strong> is the file format of local AI: one self-contained file holding the quantized weights <em>plus</em> everything needed to run them — tokenizer, chat template, architecture metadata. Download it, point an engine at it, done. It’s the native format of <strong>llama.cpp</strong>, the open-source C++ engine that actually executes the math on almost every consumer setup (NVIDIA, AMD, Apple Silicon, plain CPUs).</p>
+
+  <p>Most people don’t drive llama.cpp directly; they use a <strong>runtime</strong> wrapped around it. <strong>LM Studio</strong>: desktop app — model browser, chat UI, load-settings panel, local API server. <strong>Ollama</strong>: terminal-first — <code>ollama run &lt;model&gt;</code>, popular for scripting and self-hosted services. Others (Jan, Koboldcpp, llama-server’s own web UI) sit on the same engine. The other format you’ll see, <strong>safetensors</strong>, holds full-precision weights for the Python/GPU-server world (Transformers, vLLM) — that’s what GGUFs are converted <em>from</em>.</p>
+
+  <div class="fname"><span style="color:var(--cyn)">qwen3.5</span><span style="color:var(--ink)">-</span><span style="color:var(--ok)">9b</span><span style="color:var(--ink)">-</span><span style="color:var(--vio)">instruct</span><span style="color:var(--ink)">-</span><span style="color:var(--amb)">Q4_K_M</span><span style="color:var(--mut)">.gguf</span></div>
+  <div class="fn-legend">
+    <span><i style="background:var(--cyn)"></i>family + generation</span>
+    <span><i style="background:var(--ok)"></i>parameters (entry 01)</span>
+    <span><i style="background:var(--vio)"></i>post-training (entry 09)</span>
+    <span><i style="background:var(--amb)"></i>quantization (entry 15)</span>
+  </div>
+
+  <figure class="fig" role="figure" aria-label="The local LLM software stack">
+    <svg viewBox="0 0 760 170" role="img" aria-labelledby="figstack-t">
+      <title id="figstack-t">Three-layer stack: the GGUF model file at the bottom, the llama.cpp engine in the middle, and chat apps or APIs on top.</title>
+      <rect x="150" y="14" width="460" height="40" rx="8" fill="#1a2230" stroke="#b39ddb"/>
+      <text x="380" y="39" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#b39ddb">you · chat window · scripts · editor plugins via local API</text>
+      <rect x="150" y="62" width="460" height="40" rx="8" fill="#1a2230" stroke="#6cc3e6"/>
+      <text x="380" y="87" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#6cc3e6">runtime · LM Studio / Ollama / Jan — wraps the engine below</text>
+      <rect x="150" y="110" width="460" height="40" rx="8" fill="#1a2230" stroke="#ffb454"/>
+      <text x="380" y="135" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="#ffb454">engine + file · llama.cpp executing model.gguf</text>
+      <text x="640" y="39" font-family="JetBrains Mono,monospace" font-size="10" fill="#5b6b82">talk</text>
+      <text x="640" y="87" font-family="JetBrains Mono,monospace" font-size="10" fill="#5b6b82">manage</text>
+      <text x="640" y="135" font-family="JetBrains Mono,monospace" font-size="10" fill="#5b6b82">compute</text>
+    </svg>
+    <figcaption><b>fig 13</b> · Runtimes come and go; the engine + GGUF layer is the common ground. Most runtimes also expose an OpenAI-compatible API at <code>localhost</code>, so any tool that can talk to a cloud model can talk to your local one.</figcaption>
+  </figure>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>On Hugging Face, one model has many GGUF uploads (Unsloth, Bartowski and others quantize each release at every level within hours). LM Studio’s built-in search shows the same thing as a list of sizes with fit indicators — picking between them is entry 15’s whole subject.</p>
+  </div>
+</section>
+
+<!-- ============ 14 SPECULATIVE DECODING ============ -->
+<section class="entry" id="s14">
+  <div class="ehead">
+    <p class="enum">14</p>
+    <h2 class="term">Speculative decoding</h2>
+    <div class="tags"><span class="tag">draft + verify</span><span class="tag">free speed, same output</span></div>
+  </div>
+
+  <p>The decode loop’s bottleneck (entry 06) is reading the whole model once <em>per token</em>. But verifying several proposed tokens in one pass costs barely more than generating one — the expensive memory read is shared. <strong>Speculative decoding</strong> exploits that: a small, fast <strong>draft model</strong> guesses the next few tokens, then the big <strong>target model</strong> checks them all in a single forward pass, keeping the guesses up to the first mistake.</p>
+
+  <figure class="fig" role="figure" aria-label="Draft and verify cycle">
+    <svg viewBox="0 0 760 196" role="img" aria-labelledby="figspec-t">
+      <title id="figspec-t">A draft model proposes four tokens; the target model verifies them, accepting three and rejecting one.</title>
+      <text x="10" y="24" font-family="JetBrains Mono,monospace" font-size="12" fill="#6cc3e6">draft model (0.6B) proposes, in 4 cheap steps:</text>
+      <g font-family="JetBrains Mono,monospace" font-size="12" text-anchor="middle">
+        <rect x="10" y="36" width="92" height="30" rx="7" fill="rgba(108,195,230,.1)" stroke="#6cc3e6"/><text x="56" y="56" fill="#6cc3e6">▁the</text>
+        <rect x="110" y="36" width="92" height="30" rx="7" fill="rgba(108,195,230,.1)" stroke="#6cc3e6"/><text x="156" y="56" fill="#6cc3e6">▁cache</text>
+        <rect x="210" y="36" width="92" height="30" rx="7" fill="rgba(108,195,230,.1)" stroke="#6cc3e6"/><text x="256" y="56" fill="#6cc3e6">▁grows</text>
+        <rect x="310" y="36" width="92" height="30" rx="7" fill="rgba(108,195,230,.1)" stroke="#6cc3e6"/><text x="356" y="56" fill="#6cc3e6">▁quick</text>
+      </g>
+      <text x="10" y="106" font-family="JetBrains Mono,monospace" font-size="12" fill="#ffb454">target model (27B) verifies all four in ONE pass:</text>
+      <g font-family="JetBrains Mono,monospace" font-size="12" text-anchor="middle">
+        <rect x="10" y="118" width="92" height="30" rx="7" fill="rgba(130,201,139,.12)" stroke="#82c98b"/><text x="56" y="138" fill="#82c98b">▁the ✓</text>
+        <rect x="110" y="118" width="92" height="30" rx="7" fill="rgba(130,201,139,.12)" stroke="#82c98b"/><text x="156" y="138" fill="#82c98b">▁cache ✓</text>
+        <rect x="210" y="118" width="92" height="30" rx="7" fill="rgba(130,201,139,.12)" stroke="#82c98b"/><text x="256" y="138" fill="#82c98b">▁grows ✓</text>
+        <rect x="310" y="118" width="92" height="30" rx="7" fill="rgba(224,122,146,.12)" stroke="#e07a92"/><text x="356" y="138" fill="#e07a92">▁quick ✗</text>
+        <rect x="410" y="118" width="112" height="30" rx="7" fill="rgba(255,180,84,.12)" stroke="#ffb454"/><text x="466" y="138" fill="#ffb454">▁linearly</text>
+      </g>
+      <text x="466" y="168" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#93a0b4">target’s own fix, free</text>
+      <text x="10" y="188" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">result: 4 tokens for the price of ~1 big-model pass · rejected guesses are replaced, so final text = exactly what the big model alone would write</text>
+    </svg>
+    <figcaption><b>fig 14</b> · A lossless bet: math guarantees the output distribution is unchanged. Wrong guesses only cost speed, never quality.</figcaption>
+  </figure>
+
+  <p>The speedup depends on the <strong>acceptance rate</strong> — how often the small model guesses what the big one would say. Predictable text (code, boilerplate, lists) accepts beautifully and can run ~1.5–2.5× faster; wild creative prose accepts less. Costs: the draft model occupies extra memory, and it must share the target’s tokenizer — which usually means picking a tiny sibling from the same family (a 0.6B drafting for a 27B).</p>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>In LM Studio, speculative decoding lives in the model-load settings: pick a compatible small draft model next to your main one. In llama.cpp it’s <code>-md &lt;draft.gguf&gt;</code>. If juggling two files sounds clumsy — agreed, and that’s exactly the itch MTP (entry 16) scratches by building the drafter <em>into</em> the model.</p>
+  </div>
+</section>
+
+<!-- ============ 15 QUANTIZATION ============ -->
+<section class="entry" id="s15">
+  <div class="ehead">
+    <p class="enum">15</p>
+    <h2 class="term">Quantization</h2>
+    <div class="tags"><span class="tag">Q4_K_M and friends</span><span class="tag">bits per weight</span><span class="tag">the great enabler</span></div>
+  </div>
+
+  <p><strong>Quantization</strong> stores each of the model’s billions of numbers with fewer bits. Training uses 16-bit precision (~2 bytes per parameter, billions of finely-tuned decimals like <code>0.02317</code>); for inference, that precision is mostly wasted. Quantization rounds weights onto a coarser grid — 8, 6, 4, even 2 bits — and keeps a small <em>scale factor</em> per block of weights so the grid stays anchored to the right range. The insight that created the entire local-LLM hobby: <strong>models barely mind</strong>. Sloppier individual weights largely cancel out across billions of operations.</p>
+
+  <figure class="fig" role="figure" aria-label="Precision ladder with file sizes">
+    <svg viewBox="0 0 760 290" role="img" aria-labelledby="figq-t">
+      <title id="figq-t">Bars showing one 9B model’s file size at each quantization level from FP16 down to Q2.</title>
+      <text x="10" y="20" font-family="JetBrains Mono,monospace" font-size="12" fill="#93a0b4">one identical 9B model, six ways · bar = file size</text>
+      <g font-family="JetBrains Mono,monospace" font-size="12">
+        <text x="96" y="52" text-anchor="end" fill="#e9edf3">FP16</text>
+        <rect x="106" y="40" width="540" height="17" rx="3" fill="#e07a92"/>
+        <text x="654" y="52" fill="#93a0b4">18.0 GB · 16 bits/w</text>
+        <text x="96" y="90" text-anchor="end" fill="#e9edf3">Q8_0</text>
+        <rect x="106" y="78" width="287" height="17" rx="3" fill="#b39ddb"/>
+        <text x="401" y="90" fill="#93a0b4">9.6 GB · ~8.5</text>
+        <text x="96" y="128" text-anchor="end" fill="#e9edf3">Q6_K</text>
+        <rect x="106" y="116" width="222" height="17" rx="3" fill="#6cc3e6"/>
+        <text x="336" y="128" fill="#93a0b4">7.4 GB · ~6.6</text>
+        <text x="96" y="166" text-anchor="end" fill="#e9edf3">Q5_K_M</text>
+        <rect x="106" y="154" width="192" height="17" rx="3" fill="#82c98b"/>
+        <text x="306" y="166" fill="#93a0b4">6.4 GB · ~5.7</text>
+        <text x="96" y="204" text-anchor="end" fill="#ffb454">Q4_K_M</text>
+        <rect x="106" y="192" width="163" height="17" rx="3" fill="#ffb454"/>
+        <text x="277" y="204" fill="#ffb454">5.4 GB · ~4.8 ← sweet spot</text>
+        <text x="96" y="242" text-anchor="end" fill="#e9edf3">Q2_K</text>
+        <rect x="106" y="230" width="102" height="17" rx="3" fill="#5b3a44"/>
+        <text x="216" y="242" fill="#93a0b4">3.4 GB · ~3.0 · noticeably dumber</text>
+      </g>
+      <text x="10" y="278" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">same architecture, same knowledge, same speed rule (entry 06): fewer bytes = fits smaller GPUs AND generates faster</text>
+    </svg>
+    <figcaption><b>fig 15-A</b> · The 18 GB → 5.4 GB trip is what moves a 9B model from “datacenter card” to “mid-range gaming GPU” — at a quality cost most people cannot detect in normal use.</figcaption>
+  </figure>
+
+  <p>Decoding the cryptic suffix on every GGUF file, using <code>Q4_K_M</code>: <strong>Q</strong> = quantized · <strong>4</strong> = ~4 bits per weight (the headline compression) · <strong>K</strong> = the modern “k-quant” scheme — weights packed in small blocks, each block carrying its own scale, which preserves far more fidelity than one global grid · <strong>M</strong> = medium mix: the layers most sensitive to damage (embeddings, attention output) are quietly kept at higher precision, S/M/L variants trading a few hundred MB for care. You’ll also meet <strong>IQ</strong> quants (<code>IQ4_XS</code>…): built using an <em>importance matrix</em> from calibration text so the bit budget goes to the weights that matter most — the strong choice below 4 bits.</p>
+
+  <figure class="fig" role="figure" aria-label="Quality versus bits per weight curve">
+    <svg viewBox="0 0 760 212" role="img" aria-labelledby="figqc-t">
+      <title id="figqc-t">Curve of model quality against bits per weight: flat from 16 down to about 5 bits, bending at 4, falling off a cliff below 3.</title>
+      <line x1="60" y1="20" x2="60" y2="164" stroke="#2a3547"/>
+      <line x1="60" y1="164" x2="740" y2="164" stroke="#2a3547"/>
+      <text x="30" y="30" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4" transform="rotate(-90 30 30)" text-anchor="end">quality →</text>
+      <text x="400" y="200" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4">bits per weight →</text>
+      <g font-family="JetBrains Mono,monospace" font-size="10.5" fill="#93a0b4" text-anchor="middle">
+        <text x="110" y="180">2</text><text x="230" y="180">3</text><text x="350" y="180">4</text><text x="470" y="180">5</text><text x="560" y="180">6</text><text x="650" y="180">8</text><text x="726" y="180">16</text>
+      </g>
+      <path d="M 726 40 L 560 41 L 470 43 L 350 52 L 290 68 L 230 104 L 170 148 L 110 160" fill="none" stroke="#ffb454" stroke-width="2.5"/>
+      <circle cx="350" cy="52" r="5" fill="#ffb454"/>
+      <text x="350" y="34" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#ffb454">Q4_K_M: ~97% of the quality, ~30% of the bytes</text>
+      <circle cx="230" cy="104" r="4" fill="#e07a92"/>
+      <text x="216" y="126" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#e07a92">the cliff: below ~3 bits</text>
+      <text x="216" y="140" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#e07a92">degradation gets obvious</text>
+    </svg>
+    <figcaption><b>fig 15-B</b> · Measured with <em>perplexity</em> (how surprised the model is by real text — lower is better). Community rule: <b>a bigger model at Q4 beats a smaller model at Q8</b> — capacity survives quantization better than precision-hoarding.</figcaption>
+  </figure>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>Default playbook: take <code>Q4_K_M</code>. Spare VRAM after the fig 05-A check? Step up to <code>Q5_K_M</code>/<code>Q6_K</code> — or better, a bigger model at Q4. Squeezed? <code>IQ4_XS</code>, then <code>Q3_K_M</code>, accepting visible trade-offs. <code>Q8_0</code> is for “I want it near-lossless and have the room”; below Q3 is for emergencies. And note it’s all inference-side — the quantized file is made <em>once</em> from the fp16 original; your machine just runs it.</p>
+  </div>
+</section>
+
+<!-- ============ 16 MTP ============ -->
+<section class="entry" id="s16">
+  <div class="ehead">
+    <p class="enum">16</p>
+    <h2 class="term">Multi-Token Prediction (MTP)</h2>
+    <div class="tags"><span class="tag">self-speculative</span><span class="tag">built-in draft heads</span><span class="tag">2026’s speed unlock</span></div>
+  </div>
+
+  <p>Everything so far assumed the loop’s iron law: one forward pass, one token. <strong>MTP</strong> bends it. An MTP model is trained with small extra <strong>prediction heads</strong> that, from the same internal state, also guess token n+2, n+3… ahead. Originally (DeepSeek-V3, late 2024) this was a training trick — forcing the model to plan ahead makes it learn better — but the heads pay off twice: at inference they become a built-in drafter for <strong>self-speculative decoding</strong>. Draft with your own heads, verify with your own body: speculative decoding (entry 14) with no second model to download, load, or keep in VRAM.</p>
+
+  <figure class="fig" role="figure" aria-label="Standard decoding versus MTP decoding">
+    <svg viewBox="0 0 760 250" role="img" aria-labelledby="figmtp-t">
+      <title id="figmtp-t">Top: standard decoding takes three full passes for three tokens. Bottom: MTP drafts ahead with prediction heads and verifies, emitting three tokens in about one pass.</title>
+      <text x="10" y="22" font-family="JetBrains Mono,monospace" font-size="12" fill="#93a0b4">standard · 3 tokens = 3 full passes</text>
+      <g font-family="JetBrains Mono,monospace" font-size="11" text-anchor="middle">
+        <rect x="10" y="34" width="104" height="30" rx="7" fill="#1a2230" stroke="#3a4a63"/><text x="62" y="54" fill="#93a0b4">pass 1</text>
+        <rect x="122" y="34" width="76" height="30" rx="7" fill="none" stroke="#6cc3e6"/><text x="160" y="54" fill="#6cc3e6">▁The</text>
+        <rect x="214" y="34" width="104" height="30" rx="7" fill="#1a2230" stroke="#3a4a63"/><text x="266" y="54" fill="#93a0b4">pass 2</text>
+        <rect x="326" y="34" width="76" height="30" rx="7" fill="none" stroke="#6cc3e6"/><text x="364" y="54" fill="#6cc3e6">▁hoop</text>
+        <rect x="418" y="34" width="104" height="30" rx="7" fill="#1a2230" stroke="#3a4a63"/><text x="470" y="54" fill="#93a0b4">pass 3</text>
+        <rect x="530" y="34" width="76" height="30" rx="7" fill="none" stroke="#6cc3e6"/><text x="568" y="54" fill="#6cc3e6">▁scores</text>
+      </g>
+      <line x1="10" y1="92" x2="750" y2="92" stroke="#2a3547" stroke-dasharray="4 4"/>
+      <text x="10" y="118" font-family="JetBrains Mono,monospace" font-size="12" fill="#ffb454">MTP · ~1 pass, heads draft ahead, body verifies</text>
+      <g font-family="JetBrains Mono,monospace" font-size="11" text-anchor="middle">
+        <rect x="10" y="130" width="104" height="66" rx="7" fill="rgba(255,180,84,.08)" stroke="#ffb454"/>
+        <text x="62" y="158" fill="#ffb454">pass 1</text>
+        <text x="62" y="176" fill="#93a0b4" font-size="9.5">+ head-2 + head-3</text>
+        <rect x="122" y="130" width="76" height="30" rx="7" fill="none" stroke="#6cc3e6"/><text x="160" y="150" fill="#6cc3e6">▁The</text>
+        <rect x="206" y="130" width="76" height="30" rx="7" fill="rgba(255,180,84,.12)" stroke="#ffb454" stroke-dasharray="4 3"/><text x="244" y="150" fill="#ffb454">▁hoop</text>
+        <rect x="290" y="130" width="76" height="30" rx="7" fill="rgba(255,180,84,.12)" stroke="#ffb454" stroke-dasharray="4 3"/><text x="328" y="150" fill="#ffb454">▁scores</text>
+        <text x="244" y="176" fill="#5b6b82" font-size="9.5">drafted by the extra heads</text>
+        <rect x="382" y="130" width="140" height="30" rx="7" fill="rgba(130,201,139,.12)" stroke="#82c98b"/><text x="452" y="150" fill="#82c98b">verify: ✓ ✓</text>
+        <text x="588" y="150" font-family="JetBrains Mono,monospace" font-size="11" fill="#e9edf3">→ 3 tokens out</text>
+      </g>
+      <text x="10" y="226" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#5b6b82">accepted drafts skip whole passes; a miss just falls back to normal speed — output stays identical to non-MTP decoding</text>
+      <text x="10" y="242" font-family="JetBrains Mono,monospace" font-size="10.5" fill="#ffb454">typical gain on supported models: ≈1.4–2.2× t/s · benchmark: Qwen3.6-27B, 38 → 65 t/s (1.71×)</text>
+    </svg>
+    <figcaption><b>fig 16</b> · The heads add roughly one extra layer’s worth of weights and ~2 GB of runtime headroom — cheap next to a whole separate draft model.</figcaption>
+  </figure>
+
+  <p>The catches: the heads must be <strong>baked in at training time</strong> — a runtime can’t bolt MTP onto an ordinary model, so it only works on checkpoints shipped with heads (Qwen 3.5/3.6’s <code>-MTP</code> GGUFs across the ladder, Google’s separate Gemma 4 MTP variants, DeepSeek V3-family). Gains are biggest exactly where local users hurt most — bandwidth-starved decoding of dense models — and, as with all speculation, on predictable text like code. Support went mainstream in 2026: llama.cpp merged it (behind a <code>--mtp</code> flag, still maturing) and LM Studio exposed it as a load-time toggle from 0.4.14.</p>
+
+  <div class="try">
+    <span class="lbl">In practice</span>
+    <p>LM Studio recipe: update to ≥0.4.14 (llama.cpp engine ≥2.15.0) → download an MTP build, e.g. <code>Qwen3.5-9B-MTP</code> → flip the MTP switch in the load settings → compare t/s on the same prompt with it off. Leave ~2 GB of memory headroom, and if you’re tuning llama.cpp directly, try draft lengths around <code>--spec-draft-n-max 2</code> and adjust from there — the optimum is hardware-dependent.</p>
+    <p>And with that, the loop from entry 00 comes full circle: parameters give the model its mind, quantization fits that mind into your VRAM, and MTP makes the loop itself run faster than one-token-per-turn. That’s the whole stack.</p>
+  </div>
+</section>
+
+<!-- ============ FURTHER READING ============ -->
+<section class="further" id="further">
+  <div class="ehead">
+    <p class="enum">APPENDIX</p>
+    <h2 class="term">Further reading</h2>
+  </div>
+  <p style="max-width:70ch">Nothing online walks this exact path in one page, but these are the best companions — the first for going deeper on entry 00, the middle two as A→Z references for terms this manual skipped, the last two for hands-on MTP.</p>
+  <div class="links">
+    <a class="flink" href="https://bbycroft.net/llm" target="_blank" rel="noopener"><b>LLM Visualization — Brendan Bycroft</b><span>fig 00-A as an explorable 3D machine: fly through a real transformer, every add and multiply animated</span></a>
+    <a class="flink" href="https://www.local-llm.net/learn/glossary/" target="_blank" rel="noopener"><b>Local AI Glossary — local-llm.net</b><span>80+ terms, alphabetical, self-contained definitions — good for anything not covered here</span></a>
+    <a class="flink" href="https://localaimaster.com/glossary" target="_blank" rel="noopener"><b>AI Glossary — Local AI Master</b><span>100+ terms with concrete hardware numbers (bandwidths, VRAM specs) per entry</span></a>
+    <a class="flink" href="https://unsloth.ai/docs/models/mtp" target="_blank" rel="noopener"><b>How to run MTP models — Unsloth docs</b><span>the MTP GGUF catalogue plus recommended llama.cpp / LM Studio settings, kept current</span></a>
+    <a class="flink" href="https://www.datacamp.com/tutorial/multi-token-prediction-llama-cpp" target="_blank" rel="noopener"><b>MTP benchmark walkthrough — DataCamp</b><span>the 38 → 65 t/s experiment from entry 16, reproduced step by step</span></a>
+  </div>
+</section>
+
+</main>
+</div>
+
+<footer>
+  the local llm field manual · rev 2026.07 · sizes, speeds and version numbers are honest approximations for mid-2026 hardware &amp; software — the concepts age far slower than the numbers · generated with claude
+</footer>
+
+<script>
+(function(){
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var toks = Array.prototype.slice.call(document.querySelectorAll('#tokline .tk'));
+  var status = document.getElementById('statusline');
+  var caret = document.getElementById('caret');
+  var total = toks.length;
+  function statusText(n, tps){
+    return 'ctx: 17 entries · gen: ' + n + '/' + total + ' tok · ' + tps.toFixed(1) + ' tok/s · engine: your own machine';
+  }
+  if (reduce) {
+    toks.forEach(function(t){ t.classList.remove('pending'); });
+    status.textContent = statusText(total, 24.0);
+    if (caret) caret.style.animation = 'none';
+    return;
+  }
+  var i = 0;
+  status.textContent = 'loading weights… done · prefill: 6 tok';
+  var timer = setInterval(function(){
+    if (i >= total) {
+      clearInterval(timer);
+      status.textContent = statusText(total, 23.8) + ' · scroll to begin ↓';
+      return;
+    }
+    toks[i].classList.remove('pending');
+    i++;
+    status.textContent = statusText(i, 21 + Math.random() * 6);
+  }, 340);
+})();
+
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+  var map = {};
+  links.forEach(function(a){
+    var id = a.getAttribute('href').slice(1);
+    map[id] = a;
+  });
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  if (!('IntersectionObserver' in window)) return;
+  var current = null;
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if (e.isIntersecting) {
+        if (current) current.classList.remove('active');
+        current = map[e.target.id];
+        if (current) current.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(function(s){ io.observe(s); });
+})();
+</script>
+</body>
+</html>
