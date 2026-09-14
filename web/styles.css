@@ -309,8 +309,11 @@ dialog pre { margin: 0; padding: 20px; height: calc(100% - 78px); overflow: auto
   .gpu-row > div { padding: 8px 10px; }
   .gpu-index { grid-row: 1; }
   .gpu-identity { border-right: 0 !important; }
-  .gpu-gauge { grid-column: auto; border-top: 1px solid var(--line); }
-  .gpu-gauge:nth-of-type(4) { border-right: 0; }
+  .gpu-row > .gpu-gauge { grid-column: 1 / -1; border-top: 1px solid var(--line); border-right: 0; }
+  .gpu-gauge > div { flex-wrap: wrap; align-items: baseline; }
+  .gpu-gauge strong { max-width: 100%; overflow-wrap: anywhere; }
+  .gpu-gauge progress { min-width: 0; }
+  .gpu-identity h3, .gpu-vitals strong { overflow-wrap: anywhere; }
   .gpu-vitals { grid-column: 1 / -1; border-top: 1px solid var(--line); }
 }
 .connection-status { border:1px solid var(--line); border-left:4px solid #d4ac54; padding:16px 20px; margin:16px 0; background:var(--panel); }
