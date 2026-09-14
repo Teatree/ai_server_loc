@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Server Command Library</title><link rel="icon" href="assets/control-center.svg" type="image/svg+xml"><link rel="stylesheet" href="styles.css?v=18">
+  <style>
+    .command-shell{max-width:1100px;margin:auto;padding:40px 24px 70px}.back{color:var(--green);text-decoration:none}
+    .command-head{margin:38px 0 24px;border-bottom:1px solid var(--line);padding-bottom:24px}
+    .command-head h1{font-size:42px;margin:8px 0}.command-head p{color:var(--muted)}
+    .command-group{border:1px solid var(--line);background:var(--panel);margin-top:14px}
+    .command-group header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+    .command-group h2{font-size:13px;letter-spacing:.04em;margin:0}.command-group button{border:0;background:transparent;color:var(--green)}
+    .command-group pre{padding:18px;margin:0;overflow:auto;color:#c4cfcc;font:12px/1.7 Consolas,monospace;white-space:pre-wrap}
+    .safety{padding:16px;border-left:3px solid var(--amber);background:rgba(244,184,93,.06);color:#e3cda9;font:12px/1.6 Consolas,monospace}
+    @media(max-width:760px){
+      .command-shell{padding:22px 12px 48px}.command-head{margin:28px 0 18px;padding-bottom:18px}
+      .command-head h1{font-size:32px;overflow-wrap:anywhere}.command-group header{padding:10px 12px}
+      .command-group header button{min-width:64px;min-height:44px}.command-group pre{padding:14px;font-size:10px}
+      .safety{padding:12px;font-size:10px;overflow-wrap:anywhere}
+    }
+  </style>
+</head>
+<body><div class="scanline"></div><main class="command-shell">
+  <a class="back" href="/">← CONTROL CENTER</a>
+  <section class="command-head"><p class="eyebrow">SAVED PROCEDURES / NO SECRETS DISPLAYED</p>
+    <h1 id="title">Command Library</h1><p id="subtitle"></p></section>
+  <aside class="safety">The control commands below use the managed workload layer. Starting one heavy workload stops the other GPU workloads first. “Start requested” is not proof of readiness—return to the dashboard for verified status.</aside>
+  <section id="commands"></section>
+</main><script src="commands.js?v=10"></script></body>
+</html>

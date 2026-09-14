@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Server Control Center</title>
+  <link rel="icon" href="assets/control-center.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#090d0c">
+  <link rel="stylesheet" href="styles.css?v=27">
+</head>
+<body>
+  <div class="scanline"></div>
+  <main>
+    <header class="masthead">
+      <div>
+        <p class="eyebrow" id="server-address">LOCAL AI OPERATIONS / DISCOVERING SERVER</p>
+        <h1>AI SERVER <span>Control Center</span></h1>
+      </div>
+      <div class="host-controls">
+        <div class="host-state unknown" id="host-state">
+          <i></i><div><strong>VERIFYING</strong><small>Waiting for first check</small></div>
+        </div>
+        <button class="shutdown-button" id="shutdown-button" disabled>⏻ SHUTDOWN</button>
+      </div>
+    </header>
+
+    <section class="alert hidden" id="alert"></section>
+    <section class="telemetry" id="telemetry">
+      <div class="cpu-identity"><small>HOST CPU</small><strong id="cpu-model">—</strong></div>
+      <div><small>CPU LOAD</small><strong id="cpu-load">—</strong></div>
+      <div><small>CPU TEMP</small><strong id="cpu-temp">—</strong></div>
+      <div><small>SYSTEM FAN</small><strong id="cpu-fan">—</strong></div>
+      <div><small>RAM USAGE</small><strong id="memory">—</strong></div>
+      <div><small>GPU MEMORY</small><strong id="gtt">—</strong></div>
+      <div><small>FREE DISK</small><strong id="disk">—</strong></div>
+      <div><small>ACTIVE APPS</small><strong id="load">—</strong></div>
+      <button id="open-terminal">⌘ SERVER TERMINAL</button>
+      <button id="open-remote" disabled>▣ REMOTE DESKTOP</button>
+      <button id="refresh">↻ VERIFY NOW</button>
+    </section>
+
+    <section class="gpu-panel" aria-labelledby="gpu-heading">
+      <header class="gpu-heading">
+        <div><p class="eyebrow">LIVE HARDWARE BUS</p><h2 id="gpu-heading">Compute devices</h2></div>
+        <small id="gpu-summary">AWAITING GPU INVENTORY</small>
+      </header>
+      <div class="gpu-list" id="gpu-list" aria-live="polite">
+        <p class="gpu-empty">GPU identity and workload are unverified.</p>
+      </div>
+    </section>
+
+    <section class="service-grid" id="service-grid"></section>
+
+    <section class="lower-grid">
+      <article class="panel event-panel">
+        <div class="panel-title"><span>CONTROL ACTIVITY</span><button id="clear-events">CLEAR</button></div>
+        <div class="event-list" id="events"><p>Control center initialized. No state has been assumed.</p></div>
+      </article>
+      <article class="panel doctrine">
+        <div class="panel-title"><span>STATUS DOCTRINE</span></div>
+        <p><b>READY</b> requires both a real process/container and a successful HTTP response.</p>
+        <p><b>STARTING</b> means a process exists but the interface is not ready yet.</p>
+        <p><b>BUSY / IDLE</b> comes from each app's own queue or processing endpoint.</p>
+        <p><b>UNKNOWN</b> appears whenever live evidence is unavailable. The dashboard never guesses.</p>
+      </article>
+    </section>
+  </main>
+
+  <dialog id="logs-dialog">
+    <header><div><small>REMOTE OUTPUT</small><h2 id="logs-title">Logs</h2></div><button id="close-logs">×</button></header>
+    <pre id="logs-output">Loading…</pre>
+  </dialog>
+  <dialog id="download-dialog" class="download-dialog">
+    <header><div><small id="download-app">MODEL LIBRARY</small><h2 id="download-title">Add a model</h2></div><button id="close-download">×</button></header>
+    <form id="download-form">
+      <p id="download-help"></p>
+      <label><span>HUGGING FACE FILE LINK</span>
+        <input id="download-url" type="url" required placeholder="https://huggingface.co/.../blob/.../model.file">
+      </label>
+      <button class="download-submit" id="download-start" type="submit">START DOWNLOAD</button>
+      <div class="download-readout" id="download-readout" data-phase="idle">
+        <div><strong id="download-label">READY FOR A LINK</strong><span id="download-percent">—</span></div>
+        <progress id="download-progress" max="100" value="0"></progress>
+        <small id="download-detail">No active transfer.</small><code id="download-file"></code>
+        <button type="button" id="download-cancel" hidden>PAUSE DOWNLOAD</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="remote.js"></script>
+  <script src="app.js?v=27"></script>
+</body>
+</html>
