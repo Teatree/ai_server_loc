@@ -313,3 +313,8 @@ dialog pre { margin: 0; padding: 20px; height: calc(100% - 78px); overflow: auto
   .gpu-gauge:nth-of-type(4) { border-right: 0; }
   .gpu-vitals { grid-column: 1 / -1; border-top: 1px solid var(--line); }
 }
+.connection-status { border:1px solid var(--line); border-left:4px solid #d4ac54; padding:16px 20px; margin:16px 0; background:var(--panel); }
+.connection-status strong { display:block; font-size:16px; color:var(--ink); }
+.connection-status p { color:var(--muted); margin:8px 0 0; line-height:1.6; overflow-wrap:anywhere; }
+.connection-status[data-state="live"] { border-left-color:#70d5a3; }
+.connection-status[data-state="offline"] { border-left-color:#ee8b80; }

@@ -140,6 +140,12 @@ Set-Location C:\AI\AI-Server-Remote-Gateway
 ```
 
 It should print `Connected` for the configured apps. Keep this window open.
+The online page shows live load and running apps only while this connector and the
+local dashboard are running. A working GitHub login alone does not connect the AI server.
+If a connector was started in the background, `Start-Connector.ps1` detects it and
+avoids opening a duplicate. To disconnect that background connector explicitly, run
+`C:\AI\AI-Server-Remote-Gateway\Stop-Connector.ps1`. This stops only this project's
+connector process; AI services remain running. No automatic launch after reboot is installed.
 To save shared free hours, you can instead connect a chosen set (all apps support this equally):
 
 ```powershell
@@ -199,6 +205,11 @@ No passwords, gateway tokens, allowed origins, or app services were changed by t
 - `403` at login: check numeric GitHub owner ID and GitHub MFA. Other accounts are intentionally rejected.
 - `421`: the actual hostname differs from `GATEWAY_ORIGINS`; fix the exact mapping.
 - `503 Local connector offline`: run the connector for that app. Commands are not queued.
+- Blank/unverified load readings: read the connection notice above the hardware metrics.
+  It distinguishes connector offline, local dashboard unavailable, server unreachable,
+  and session expiry. Old readings are cleared when verification fails.
+- One app rejects its connector: copy that app's exact local `private\SERVICE-NAME.env`
+  token into its Render `CONNECTOR_TOKEN`, then save and deploy that Render service.
 - `502`: check the app is already running and its native login/origin rules. Verify local access first.
 - SSH-forward failure: check existing passwordless SSH and that local port 32148 is unused.
   The connector refuses unknown SSH host keys and never kills an existing listener.

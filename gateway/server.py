@@ -64,7 +64,7 @@ async def route(request):
             raise PermissionError('This action must be accessed locally.')
         if not path.startswith('/api/'):
             filename = 'index.html' if path == '/' else path.lstrip('/')
-            allowed = {'index.html', 'app.js', 'styles.css', 'remote.js',
+            allowed = {'index.html', 'app.js', 'styles.css', 'remote.js', 'status.js',
                        'commands.html', 'commands.js'}
             allowed |= {'assets/' + p.name for p in (WEB_ROOT / 'assets').glob('*') if p.is_file()}
             if filename in allowed and request.method in {'GET', 'HEAD'}:

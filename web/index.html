@@ -24,6 +24,10 @@
       </div>
     </header>
 
+    <section class="connection-status" id="connection-status" data-state="checking" aria-live="polite">
+      <strong id="connection-title">CONNECTING TO YOUR AI SERVER</strong>
+      <p id="connection-detail">Waiting for live load readings and app status through the Windows connector.</p>
+    </section>
     <section class="alert hidden" id="alert"></section>
     <section class="telemetry" id="telemetry">
       <div class="cpu-identity"><small>HOST CPU</small><strong id="cpu-model">—</strong></div>
@@ -86,6 +90,7 @@
       </div>
     </form>
   </dialog>
+  <script src="status.js"></script>
   <script src="remote.js"></script>
   <script src="app.js?v=27"></script>
 </body>

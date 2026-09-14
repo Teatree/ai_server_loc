@@ -354,6 +354,7 @@ function renderStatus(data) {
 
   for (const [id, state] of Object.entries(data.services)) {
     const card = document.querySelector(`#card-${id}`);
+    if (!card) continue;
     const badge = card.querySelector("[data-status]");
     const displayState = pending.has(id) ? "verifying" : state.state;
     badge.className = `badge ${displayState}`;
@@ -376,18 +377,27 @@ async function refreshStatus(manual = false) {
   if (refreshing) return;
   refreshing = true;
   document.querySelector("#refresh").classList.add("working");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
   try {
-    const response = await fetch("/api/status", {cache: "no-store"});
+    const response = await fetch("/api/status", {cache: "no-store", signal: controller.signal});
     if (!response.ok) throw new Error(`Dashboard backend returned ${response.status}`);
-    renderStatus(await response.json());
+    const data = await response.json();
+    renderStatus(data);
+    window.dashboardStatus?.(data);
     if (manual) addEvent("Live state verified from the AI server.", "good");
   } catch (error) {
+    window.dashboardStatus?.(null, error);
     const host = document.querySelector("#host-state");
     host.className = "host-state unknown";
     host.querySelector("strong").textContent = "DASHBOARD DISCONNECTED";
     host.querySelector("small").textContent = error.message;
     document.querySelector("#open-remote").disabled = true;
     shutdownButton.disabled = true;
+    for (const id of ["cpu-model", "cpu-load", "cpu-temp", "cpu-fan", "memory", "gtt", "disk", "load"]) {
+      document.querySelector(`#${id}`).textContent = "UNVERIFIED";
+    }
+    document.querySelectorAll("[data-action]").forEach(button => { button.disabled = true; });
     for (const id of Object.keys(SERVICES)) {
       const card = document.querySelector(`#card-${id}`);
       card.dataset.state = "unknown";
@@ -400,6 +410,7 @@ async function refreshStatus(manual = false) {
     renderGpus(null);
     if (manual) addEvent(`Verification failed: ${error.message}`, "bad");
   } finally {
+    clearTimeout(timeout);
     refreshing = false;
     document.querySelector("#refresh").classList.remove("working");
   }

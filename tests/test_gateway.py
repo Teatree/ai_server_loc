@@ -43,6 +43,15 @@ class GatewayTests(unittest.IsolatedAsyncioTestCase):
         await self.server.close()
         await self.mock.close()
 
+    async def test_dashboard_connection_display_is_served_only_after_login(self):
+        self.settings.origins[self.public] = 'dashboard'
+        async with await self.request('GET', '/status.js') as response:
+            self.assertEqual(response.status, 200)
+            self.assertIn('WINDOWS CONNECTOR OFFLINE', await response.text())
+        async with await self.request('GET', '/status.js', headers={}) as response:
+            self.assertNotEqual(response.status, 200)
+        self.assertNotIn('/status.js', self.calls)
+
     def headers(self, **extra):
         return {'Cookie': COOKIE + '=' + self.sid, 'Origin': self.public, **extra}
 
