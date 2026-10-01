@@ -16,7 +16,7 @@ It is safe to run twice; it leaves an existing companion running.
 2. Under Settings, confirm its deployment branch is **codex/render-gateway**
    in **Teatree/ai_server_loc**. Keep your existing environment variables.
 3. Open **Manual Deploy → Deploy latest commit**. The commit title for this
-   feature is **Add persistent read-only usage metrics and portrait charts**.
+   current update is **Fix chart navigation and service-account GPU attribution**.
 4. Wait for the deployment to become Live. Sign into the dashboard again if asked.
 5. Refresh and click **Usage Metrics**, or visit
    https://garry-ai-remote-0913-dashboard.onrender.com/usage.html.
@@ -33,8 +33,14 @@ Render deployment may end your dashboard login; Ubuntu jobs and recording contin
 Choose 8h, 24h, 7d, 30d, 1y, 10y or any custom range, in local time or UTC.
 Resource selections show separate synchronized GPU, CPU and RAM plots; percentages
 are never added across unlike devices. Stacked bars are default; switch to lines.
-Pan, zoom, inspect with touch/mouse/arrow keys, select an app, toggle legend series,
-export the selected resources to CSV, or return to Live. Live reads every 15 seconds.
+Scrolling and swiping always move the page. Each chart has instant Earlier/Later,
+Zoom and Reset chart buttons; they stay inside the page's selected time range and
+do not request data from the server. Live refresh preserves individual zoom positions.
+Reset all restores the latest eight hours and clears filters. Page navigation clamps
+to recorded history; the date picker still permits explicit empty date ranges.
+Inspect with touch/mouse/arrow keys, select an app, toggle legend series,
+export to CSV, or return to Live. Live reads every 15 seconds.
+System / Unattributed is always shown, even when filtering to one application.
 The top nine apps have individual colors; remaining apps are grouped as Other.
 Select any app from the Application list for its individual chart, even if grouped.
 Application totals always cover all apps and all resources in the selected range.
@@ -58,10 +64,19 @@ Rules affect new measurements; they do not silently rewrite old history.
 
 GPU totals use driver counters. DRM engine-time counters estimate per-app shares.
 On the current AMD ROCm driver, compute clients expose resident VRAM but no engine-time
-counters. The default fallback splits residual utilization by resident VRAM; an idle
+counters. Public KFD per-process/per-device allocation files include applications
+running under separate service accounts, including Ollama, without privileged access.
+These totals replace matching DRM aliases to avoid double-counting allocations.
+Unknown KFD owners retain their share as System / Unattributed.
+The default fallback splits residual utilization by resident VRAM; an idle
 loaded model can therefore receive a share. This cannot establish exact simultaneous
 per-app GPU utilization. Disable **Estimate ROCm app shares** to keep that part
 unattributed. Both modes are retained in history. No profiler or driver change is used.
+The original recorder could not inspect protected Ollama GPU clients and could
+incorrectly credit other visible apps. Old and mixed-version time buckets now display
+the stored counter-supported shares instead, with unknown load unattributed. Their
+missing per-app history cannot be reconstructed; measured device totals are unchanged.
+New samples contain an attribution-quality version and coverage marker.
 Multiple DRM GPUs are discovered automatically; unsupported utilization/power sensors
 remain missing. This collector currently reads Linux DRM/sysfs, not NVIDIA NVML.
 

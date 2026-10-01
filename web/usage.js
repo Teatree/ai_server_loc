@@ -1,7 +1,7 @@
 "use strict";
 const $=id=>document.getElementById(id);
 const U={start:Date.now()/1000-28800,end:Date.now()/1000,live:true,mode:'bars',data:null,
-  hidden:new Set(),charts:[],loading:false,request:0};
+  hidden:new Set(),charts:[],chartMap:new Map(),views:new Map(),loading:false,request:0};
 const costFields=['rate','currency','cpu-idle','cpu-max','overhead','efficiency'];
 try{const saved=JSON.parse(localStorage.getItem('ai-usage-cost')||'{}');for(const key of costFields)if(saved[key]!==undefined)$(key).value=saved[key];}catch{}
 if(location.hostname==='127.0.0.1'||location.hostname==='localhost')$('back').href='http://127.0.0.1:32146/';
@@ -12,12 +12,23 @@ function error(message){$('error').hidden=!message;$('error').textContent=messag
 function selectedResources(){return (U.data?.catalog||[]).filter(r=>['gpu','cpu','ram'].includes(r.type)).filter(r=>{
   const choice=$('resources').value;return choice==='all'||choice==='gpus_cpu'&&r.type!=='ram'||choice==='gpus'&&r.type==='gpu'||choice===r.type||choice===r.id;
 }).sort((a,b)=>['gpu','cpu','ram'].indexOf(a.type)-['gpu','cpu','ram'].indexOf(b.type));}
-function metric(point,id){const key=id.startsWith('gpu:')&&!$('estimate').checked?'measured:'+id:id;return point.metrics[key];}
+function attributionSafe(point,id){const q=point.metrics['quality:gpu-attribution'];return q?.value>=2&&q.seconds+.001>=(point.metrics[id]?.seconds||0);}
+function metric(point,id){const key=id.startsWith('gpu:')&&(!$('estimate').checked||!attributionSafe(point,id))?'measured:'+id:id;return point.metrics[key];}
 function appNames(){return Object.fromEntries((U.data?.catalog||[]).filter(r=>r.type==='app').map(r=>[r.id.slice(4),r.label]));}
-function navigate(start,end){const span=Math.max(600,Math.min(100*366*86400,end-start));U.end=Math.min(Date.now()/1000,Math.max(span,end));U.start=Math.max(0,U.end-span);U.live=false;syncRange();load();}
+function clearViews(){for(const view of U.views.values()){view.range=null;view.cursor=null;}}
+function navigate(start,end,constrain=true){
+  let span=Math.max(600,Math.min(100*366*86400,end-start));end=Math.min(Date.now()/1000,Math.max(span,end));start=Math.max(0,end-span);
+  if(constrain&&U.data?.metadata?.first_sample){const lower=U.data.metadata.first_sample,upper=Math.max(lower+60,U.data.metadata.last_sample);span=Math.min(span,upper-lower);start=Math.max(lower,Math.min(upper-span,start));end=start+span;}
+  U.start=start;U.end=end;U.live=false;clearViews();syncRange();load();
+}
 function pan(amount){const span=U.end-U.start;navigate(U.start+span*amount,U.end+span*amount);}
 function zoom(factor){const mid=(U.start+U.end)/2,half=(U.end-U.start)*factor/2;navigate(mid-half,mid+half);}
-function disposeCharts(){for(const stop of U.charts)stop();U.charts=[];}
+function disposeCharts(){for(const stop of U.chartMap.values())stop();U.chartMap.clear();U.charts=[];}
+function putChart(key,container,config){
+  if(!U.views.has(key))U.views.set(key,{});config.view=U.views.get(key);U.seen?.add(key);
+  const existing=U.chartMap.get(key);if(existing?.update)existing.update(config);
+  else {existing?.();U.chartMap.set(key,UsageCharts.chart(container,config));}
+}
 async function load(){
   const request=++U.request;U.controller?.abort();U.controller=new AbortController();U.loading=true;
   const controller=U.controller,timer=setTimeout(()=>controller.abort(),30000);
@@ -40,6 +51,7 @@ async function load(){
     const latest=data.metadata.last_sample,lag=latest?Date.now()/1000-latest:Infinity;
     $('connection').textContent=lag<60?'● Recording · updates every 15s':latest?'Recording delayed · last sample '+new Date(latest*1000).toLocaleString():'Waiting for first sample';
     $('history-start').textContent=data.metadata.first_sample?'History begins '+new Date(data.metadata.first_sample*1000).toLocaleString()+'. Earlier periods contain no recorded data.':'The first measurement appears after the collector’s second sample.';
+    if(data.points.some(p=>Object.keys(p.metrics).some(id=>id.startsWith('gpu:')&&!attributionSafe(p,id))))$('history-start').textContent+=' Older GPU app estimates missed protected service accounts. Those intervals now show counter-supported shares and System / Unattributed; the missing per-app history cannot be reconstructed.';
     const health=data.metadata.health||{};$('collector-health').textContent=`Read-only history · Collector: ${health.collection_ms??'—'} ms/sample · ${health.processes??'—'} inspected processes · No automatic history deletion. ${health.last_backup?'Daily backup: '+new Date(health.last_backup*1000).toLocaleString()+'. ':''}${health.backup_warning||''}${health.disk_free_bytes!==undefined?' Free disk: '+(health.disk_free_bytes/1024**3).toFixed(1)+' GiB.':''}`;
     render();
   }catch(e){if(request===U.request){U.data=null;disposeCharts();$('charts').replaceChildren();$('cost-chart').replaceChildren();$('app-totals').replaceChildren();for(const id of ['compute-hours','peak-load','coverage','cost-total'])$(id).textContent='—';$('connection').textContent='History unavailable';error(e.name==='AbortError'?'History request timed out. Try a shorter range or check the AI server connection.':e.message);}}
@@ -50,27 +62,29 @@ function seriesFor(resources){
   for(const point of U.data.points)for(const r of resources){const m=metric(point,r.id);if(m)for(const [id,value] of Object.entries(m.apps))scores[id]=(scores[id]||0)+value*m.seconds;}
   const focused=$('app').value;
   const ids=focused!=='all'?[focused]:Object.keys(scores).filter(id=>id!=='unattributed').sort((a,b)=>scores[b]-scores[a]).slice(0,9);
-  if(focused==='all')ids.push('unattributed','other');
-  return ids.map(id=>({id,label:id==='other'?'Other applications':names[id]||id}));
+  if(!ids.includes('unattributed'))ids.push('unattributed');if(focused==='all')ids.push('other');
+  return ids.map(id=>({id,label:id==='unattributed'?'System / Unattributed':id==='other'?'Other applications':names[id]||id}));
 }
 function groupedValues(m,series){
   const values={};for(const s of series)values[s.id]=0;
   for(const [id,value] of Object.entries(m.apps||{})){
-    const target=Object.hasOwn(values,id)?id:'other';if(Object.hasOwn(values,target)&&!U.hidden.has(target))values[target]+=value;
+    const target=Object.hasOwn(values,id)?id:'other';if(Object.hasOwn(values,target)&&(target==='unattributed'||!U.hidden.has(target)))values[target]+=value;
   }return values;
 }
 function render(){
-  if(!U.data)return;disposeCharts();$('charts').replaceChildren();$('cost-chart').replaceChildren();$('legend').replaceChildren();
+  if(!U.data)return;U.seen=new Set();$('legend').replaceChildren();
   const resources=selectedResources(),series=seriesFor(resources);
-  for(const s of series){const button=document.createElement('button');button.textContent=s.label;button.style.borderColor=UsageCharts.color(s.id);button.setAttribute('aria-pressed',String(!U.hidden.has(s.id)));button.onclick=()=>{U.hidden.has(s.id)?U.hidden.delete(s.id):U.hidden.add(s.id);render();};$('legend').append(button);}
-  const visible=series.filter(s=>!U.hidden.has(s.id));
+  for(const s of series){const button=document.createElement('button');button.textContent=s.label;button.style.borderColor=UsageCharts.color(s.id);button.setAttribute('aria-pressed',String(s.id==='unattributed'||!U.hidden.has(s.id)));if(s.id==='unattributed'){button.title='Always shown, including when an application is selected';button.setAttribute('aria-disabled','true');}else button.onclick=()=>{U.hidden.has(s.id)?U.hidden.delete(s.id):U.hidden.add(s.id);render();};$('legend').append(button);}
+  const visible=series.filter(s=>s.id==='unattributed'||!U.hidden.has(s.id));
   $('resolution').textContent=`${intervalLabel(U.data.step)} bars · ${$('zone').value==='utc'?'UTC':Intl.DateTimeFormat().resolvedOptions().timeZone} · Each device has its own 0–100% scale`;
   for(const r of resources){
     const points=U.data.points.flatMap(p=>{const m=metric(p,r.id);return m?[{time:p.time,values:groupedValues(m,series),note:`Device total ${m.value.toFixed(1)}%; ${Math.round(m.seconds)}s observed`}]:[];});
-    U.charts.push(UsageCharts.chart($('charts'),{title:r.label+' · %',points,start:U.start,end:U.end,step:U.data.step,max:100,mode:U.mode,series:visible,unit:'%',utc:$('zone').value==='utc',pan,zoom}));
+    putChart(r.id,$('charts'),{title:r.label+' · %',points,start:U.data.start,end:U.data.end,step:U.data.step,max:100,mode:U.mode,series:visible,unit:'%',utc:$('zone').value==='utc'});
   }
-  if(!resources.length)$('charts').textContent='No matching devices recorded yet.';
   summaries();electricity();applicationTotals();
+  for(const [key,stop] of U.chartMap)if(!U.seen.has(key)){stop();U.chartMap.delete(key);}
+  $('charts').querySelector('.empty')?.remove();
+  if(!resources.length){const empty=document.createElement('p');empty.className='empty';empty.textContent='No matching devices recorded yet.';$('charts').append(empty);}
 }
 function summaries(){
   let hours=0,peak=0,seconds=0,observedGPU=false;
@@ -96,7 +110,7 @@ function electricity(){
   });
   $('cost-total').textContent=points.length?cost.toFixed(4)+' '+s.unit:'—';
   $('energy-note').textContent=`${energy.toFixed(4)} kWh estimated during recorded periods only · Rate ${s.rate} ${s.unit}/kWh. ${missing?'Partial estimate: one or more GPUs have missing power readings.':''}`;
-  U.charts.push(UsageCharts.chart($('cost-chart'),{title:`Estimated cost per ${intervalLabel(U.data.step)} · ${s.unit}`,points,start:U.start,end:U.end,step:U.data.step,max:Math.max(.001,...points.map(p=>Object.values(p.values).reduce((a,b)=>a+b,0)))*1.1,mode:U.mode,series:[{id:'gpu',label:'GPU'},{id:'cpu',label:'CPU model'},{id:'system',label:'System overhead'}],unit:' '+s.unit,utc:$('zone').value==='utc',pan,zoom}));
+  putChart('electricity',$('cost-chart'),{title:`Estimated cost per ${intervalLabel(U.data.step)} · ${s.unit}`,points,start:U.data.start,end:U.data.end,step:U.data.step,max:Math.max(.001,...points.map(p=>Object.values(p.values).reduce((a,b)=>a+b,0)))*1.1,mode:U.mode,series:[{id:'gpu',label:'GPU'},{id:'cpu',label:'CPU model'},{id:'system',label:'System overhead'}],unit:' '+s.unit,utc:$('zone').value==='utc'});
 }
 function applicationTotals(){
   const totals={},names=appNames();let ramSeconds=0;
@@ -113,15 +127,15 @@ function exportCSV(){
   const url=URL.createObjectURL(new Blob([lines.map(row=>row.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
   const a=document.createElement('a');a.href=url;a.download='ai-server-usage.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-for(const button of document.querySelectorAll('[data-hours]'))button.onclick=()=>{U.end=Date.now()/1000;U.start=U.end-Number(button.dataset.hours)*3600;U.live=true;syncRange();load();};
-$('range-form').onsubmit=e=>{e.preventDefault();const suffix=$('zone').value==='utc'?'Z':'';const start=Date.parse($('from').value+suffix)/1000,end=Date.parse($('to').value+suffix)/1000;if(!Number.isFinite(start+end)||end<=start){error('Choose an end date after the start date.');return;}navigate(start,end);};
+for(const button of document.querySelectorAll('[data-hours]'))button.onclick=()=>{clearViews();U.end=Date.now()/1000;U.start=U.end-Number(button.dataset.hours)*3600;U.live=true;syncRange();load();};
+$('range-form').onsubmit=e=>{e.preventDefault();const suffix=$('zone').value==='utc'?'Z':'';const start=Date.parse($('from').value+suffix)/1000,end=Date.parse($('to').value+suffix)/1000;if(!Number.isFinite(start+end)||end<=start){error('Choose an end date after the start date.');return;}navigate(start,end,false);};
 $('earlier').onclick=()=>pan(-.5);$('later').onclick=()=>pan(.5);
 $('zoom-in').onclick=()=>zoom(.5);$('zoom-out').onclick=()=>zoom(2);
 $('interval').onchange=load;for(const id of ['resources','app','estimate'])$(id).onchange=render;
 $('zone').onchange=()=>{syncRange();render();};
 $('live').onclick=()=>{U.live=!U.live;if(U.live){const span=U.end-U.start;U.end=Date.now()/1000;U.start=U.end-span;load();}syncRange();};
 $('mode').onclick=()=>{U.mode=U.mode==='bars'?'lines':'bars';$('mode').textContent=U.mode==='bars'?'Line chart':'Stacked bars';$('mode').setAttribute('aria-pressed',String(U.mode==='lines'));render();};
-$('reset').onclick=()=>{U.end=Date.now()/1000;U.start=U.end-28800;U.live=true;U.mode='bars';U.hidden.clear();$('resources').value='gpus';$('app').value='all';$('interval').value='auto';$('mode').textContent='Line chart';$('mode').setAttribute('aria-pressed','false');syncRange();load();};
+$('reset').onclick=()=>{clearViews();U.end=Date.now()/1000;U.start=U.end-28800;U.live=true;U.mode='bars';U.hidden.clear();$('resources').value='gpus';$('app').value='all';$('interval').value='auto';$('mode').textContent='Line chart';$('mode').setAttribute('aria-pressed','false');syncRange();load();};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else if($('workspace').requestFullscreen)await $('workspace').requestFullscreen();else error('Full screen is unavailable in this browser.');}catch{error('This browser could not open full screen.');}};
 $('export').onclick=exportCSV;
 $('cost-form').onsubmit=e=>{e.preventDefault();try{powerSettings();const values=Object.fromEntries(costFields.map(id=>[id,$(id).value]));localStorage.setItem('ai-usage-cost',JSON.stringify(values));error('');render();}catch(e){error(e.message);}};

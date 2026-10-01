@@ -29,3 +29,18 @@ test('missing GPU power is flagged and invalid assumptions rejected',()=>{
   assert.equal(els['cost-total'].textContent,'0.4000 c');
   element('efficiency').value='0';assert.throws(()=>vm.runInContext('powerSettings()',context),/valid power/);
 });
+test('legacy and mixed buckets never attribute unknown service load to another app',()=>{
+  const {context}=page();
+  vm.runInContext("U.data.points[0].metrics['measured:gpu:test']={value:50,seconds:3600,apps:{unattributed:50}}",context);
+  assert.equal(vm.runInContext("metric(U.data.points[0],'gpu:test').apps.unattributed",context),50);
+  vm.runInContext("U.data.points[0].metrics['quality:gpu-attribution']={value:2,seconds:30}",context);
+  assert.equal(vm.runInContext("metric(U.data.points[0],'gpu:test').apps.unattributed",context),50);
+  vm.runInContext("U.data.points[0].metrics['quality:gpu-attribution'].seconds=3600",context);
+  assert.equal(vm.runInContext("metric(U.data.points[0],'gpu:test').apps.test",context),50);
+});
+test('System / Unattributed remains visible with one app selected and hidden flag set',()=>{
+  const {context,element}=page();element('app').value='test';
+  const ids=vm.runInContext("seriesFor([{id:'cpu'}]).map(s=>s.id).join(',')",context);
+  assert.equal(ids,'test,unattributed');
+  assert.equal(vm.runInContext("U.hidden.add('unattributed');groupedValues({apps:{unattributed:30}},[{id:'unattributed'}]).unattributed",context),30);
+});

@@ -14,7 +14,7 @@ Desktop adds horizontal control space, but never combines CPU, RAM, and GPU
 percentages into a misleading shared total. Small multiples share the time range.
 
 Controls: 8h through 10y presets, custom start/end, minute/hour/day resolution,
-pan earlier/later, zoom in/out, drag pan, wheel zoom, touch inspection, live follow,
+explicit earlier/later and zoom buttons, touch inspection, live follow,
 bar/line toggle, app visibility, reset, fullscreen, CSV export, and UTC/local time.
 Cost settings live in the browser and never modify the server's history.
 
@@ -34,3 +34,11 @@ The Windows read-only companion serves the local page and queries SQLite over SS
 A separate authenticated metrics tunnel exposes the same GET API through Render.
 Neither transport accepts SQL, shell commands, or history mutations from browsers.
 Original app connections do not need to be stopped to add metrics.
+# Navigation revision
+
+Keep the dashboard's established colors and typography. Replace implicit wheel/drag
+navigation with a visible toolbar on every plot: Earlier, Zoom, Later, Reset chart.
+Scroll belongs to the document. Chart navigation uses already-loaded data and clamps
+to the chosen range. Live refresh updates existing canvases, preserving focus and zoom.
+Keep System / Unattributed explicit in the legend and each resource plot; historical
+uncertainty must not be disguised as activity attributed to a known application.

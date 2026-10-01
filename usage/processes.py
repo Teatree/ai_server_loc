@@ -74,6 +74,8 @@ def scan(registry=None):
         row['owner'] = app
         names[app] = label
         inspect_clients(pid, app, clients)
+    from .kfd import augment
+    augment(rows,clients)
     return rows, clients, names
 
 def inspect_clients(pid, app, clients):
@@ -93,7 +95,7 @@ def inspect_clients(pid, app, clients):
                 memory = fields.get('drm-resident-vram','0').strip().split()
                 units = {'KiB':1024,'MiB':1024**2,'GiB':1024**3}
                 vram = int(memory[0])*units.get(memory[1] if len(memory)>1 else '',1)
-                candidate = {'owner':app, 'engines':engines, 'vram':vram,
+                candidate = {'owner':app, 'pid':pid, 'engines':engines, 'vram':vram,
                     'compute':Path(f'/sys/class/kfd/kfd/proc/{pid}').exists()}
                 # Shared FDs count once. Prefer identified applications to generic parents.
                 if key not in clients or clients[key]['owner'].startswith(('process:','project:')):

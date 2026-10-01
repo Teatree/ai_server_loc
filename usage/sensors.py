@@ -87,7 +87,8 @@ class Sensors:
             if fallback:
                 total_vram = sum(fallback.values())
                 for app,used in fallback.items():
-                    shares[app] = shares.get(app,0)+remaining*used/total_vram
+                    if app!='unattributed':
+                        shares[app] = shares.get(app,0)+remaining*used/total_vram
             metrics['measured:'+device['id']] = {'value':device['value'],'apps':strict}
             metrics[device['id']] = {'value':device['value'],'apps':partition(device['value'],shares)}
             catalog.append({'id':device['id'],'type':'gpu','label':device['label'],'unit':'%',
@@ -97,6 +98,8 @@ class Sensors:
             metrics[power_id] = {'value':device['power']}
             catalog.append({'id':power_id,'type':'power','label':device['label']+' board power','unit':'W'})
         apps['unattributed'] = 'System / unattributed'
+        metrics['quality:gpu-attribution'] = {'value':2}
         catalog += [{'id':'app:'+key,'type':'app','label':label} for key,label in apps.items()]
         return elapsed, metrics, catalog, {'processes':len(rows),'gpu_clients':len(clients),
-            'interval_seconds':15,'attribution':'GPU: estimated engine time; CPU: process counters; RAM: readable PSS. Unattributed includes protected processes and kernel/cache usage.'}
+            'interval_seconds':15,'kfd_clients':sum(c.get('source')=='kfd' for c in clients.values()),
+            'attribution':'GPU: DRM counters and public KFD process allocations (including service accounts); CPU: process counters; RAM: readable PSS. GPU app shares are estimates.'}

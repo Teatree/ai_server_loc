@@ -21,10 +21,11 @@
 <option value="14400">4 hours</option><option value="86400">1 day</option><option value="604800">1 week</option></select></label>
 <label>Application<select id="app"><option value="all">All applications</option></select></label>
 <label>Time zone<select id="zone"><option value="local">This device’s time zone</option><option value="utc">UTC</option></select></label></div>
-<div class="tools" aria-label="Chart controls"><button id="earlier" title="Previous half-window">← Earlier</button>
+<p class="hint">Page controls set the time range for all charts. Each chart also has instant zoom and its own Reset chart button.</p>
+<div class="tools" aria-label="Page time range controls"><button id="earlier" title="Previous half-window">← Earlier</button>
 <button id="zoom-in" title="Zoom in">＋ Zoom</button><button id="zoom-out" title="Zoom out">− Zoom</button>
 <button id="later" title="Next half-window">Later →</button><button id="live" aria-pressed="true">● Live</button>
-<button id="mode" aria-pressed="false">Line chart</button><button id="reset">Reset</button>
+<button id="mode" aria-pressed="false">Line chart</button><button id="reset">Reset all · latest 8h</button>
 <button id="fullscreen">Full screen</button><button id="export">Export CSV</button></div>
 <div class="chart-options"><label><input id="estimate" type="checkbox" checked> Estimate ROCm app shares</label>
 <span id="resolution"></span></div>
@@ -32,7 +33,7 @@
 <div id="error" role="alert" hidden></div><p id="history-start" class="muted"></p>
 <div id="legend" class="legend" aria-label="Application colors; select to hide or show"></div>
 <div id="charts"><p class="empty">Loading recorded history…</p></div>
-<p class="hint">Tap or hover to inspect a time. Drag horizontally to pan; use zoom buttons or the mouse wheel to zoom. Arrow keys inspect chart values. Gaps mean no measurement.</p>
+<p class="hint">Scroll and swipe always move the page. Use each chart’s buttons to zoom or move within the selected range; Reset chart restores that range. Tap or hover to inspect values; arrow keys step through time. Gaps mean no measurement.</p>
 </section>
 <section class="indicators" aria-label="Usage summary"><article><h2>GPU compute-hours</h2><strong id="compute-hours">—</strong><p>Load-weighted device hours in this range.</p></article>
 <article><h2>Peak GPU load</h2><strong id="peak-load">—</strong><p>Highest sampled utilization, any GPU.</p></article>
