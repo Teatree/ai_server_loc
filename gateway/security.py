@@ -66,7 +66,10 @@ class Security:
         path = request.path
         if path in {PREFIX + '/health', PREFIX + '/login', PREFIX + '/callback'}:
             return await handler(request)
-        if path == PREFIX + '/connector' or path.startswith(PREFIX + '/stream/'):
+        if (path in {PREFIX+'/connector',PREFIX+'/usage-connector'} or
+                path.startswith((PREFIX+'/stream/',PREFIX+'/usage-stream/'))):
+            if '/usage-' in path and request['app_id']!='dashboard':
+                raise web.HTTPNotFound()
             self.machine(request)
             return await handler(request)
         sid = request.cookies.get(COOKIE, '')

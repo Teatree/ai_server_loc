@@ -52,6 +52,36 @@ class GatewayTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotEqual(response.status, 200)
         self.assertNotIn('/status.js', self.calls)
 
+    async def test_usage_connection_is_authenticated_isolated_and_read_only(self):
+        self.settings.origins[self.public] = 'dashboard'
+        normal_control = self.app['relay'].control
+        for path in ('/usage.html','/api/usage','/_gateway/usage-connector'):
+            async with await self.request('GET',path,headers={}) as response:
+                self.assertNotEqual(response.status,200)
+        async with await self.request('GET','/api/usage') as response:
+            self.assertEqual(response.status,503)
+        bridge = Connector(self.bridge.config,testing=True,channel='usage-')
+        runner = asyncio.create_task(bridge.run())
+        try:
+            for _ in range(100):
+                if self.app['usage_relay'].control is not None: break
+                await asyncio.sleep(.01)
+            async with await self.request('GET','/api/usage?start=100&end=200') as response:
+                self.assertEqual(response.status,200)
+                self.assertEqual((await response.json())['path'],'/api/usage?start=100&end=200')
+            async with await self.request('POST','/api/usage') as response:
+                self.assertEqual(response.status,403)
+            async with await self.request('GET','/usage.html') as response:
+                self.assertEqual(response.status,200)
+                self.assertIn('Usage Metrics',await response.text())
+            self.assertIs(self.app['relay'].control,normal_control)
+            with self.assertRaises(PermissionError):
+                await bridge.stream(None,self.bridge.config['endpoints'][0],
+                    {'id':'bad','public':self.public,'app':'dashboard','method':'POST','path':'/api/start','upgrade':False})
+        finally:
+            runner.cancel()
+            await asyncio.gather(runner,return_exceptions=True)
+
     def headers(self, **extra):
         return {'Cookie': COOKIE + '=' + self.sid, 'Origin': self.public, **extra}
 

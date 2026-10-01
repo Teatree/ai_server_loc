@@ -31,7 +31,7 @@ def check_request(app_id: str, method: str, path: str) -> None:
         return
     if route in LOCAL_ONLY:
         raise PermissionError('This action must be accessed locally.')
-    allowed_get = {'/api/status', '/api/model-download', '/api/ollama/models'}
+    allowed_get = {'/api/status', '/api/model-download', '/api/ollama/models', '/api/usage'}
     allowed_post = {'/api/action', '/api/model-download',
                     '/api/model-download/cancel', '/api/ollama/chat'}
     if method == 'GET' and (route in allowed_get or

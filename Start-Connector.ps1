@@ -3,6 +3,9 @@ $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $pythonPath = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 $configPath = Join-Path $PSScriptRoot 'private\connector.json'
+if (-not $Apps -or 'dashboard' -in $Apps.Split(',')) {
+    & (Join-Path $PSScriptRoot 'Start-Usage-Metrics.ps1')
+}
 if (-not (Test-Path -LiteralPath $pythonPath)) {
     throw 'Run python -m venv .venv, then .\.venv\Scripts\python.exe -m pip install -r requirements.txt'
 }
@@ -18,7 +21,7 @@ if ($existing.Count) {
     exit 0
 }
 Write-Host 'Connecting only. No AI apps will be started, stopped, or restarted.'
-Write-Host 'Close this window or press Ctrl+C to cut remote access and leave AI jobs running.'
+Write-Host 'Close this window to disconnect app controls. Use Stop-Connector.ps1 to also stop the separate metrics connection.'
 $connectorArgs = @('-m', 'gateway.connector', '--config', $configPath)
 if ($Apps) { $connectorArgs += @('--apps', $Apps) }
 & $pythonPath @connectorArgs

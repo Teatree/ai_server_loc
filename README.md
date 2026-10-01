@@ -6,6 +6,10 @@ The connector runs on Windows, beside the existing dashboard. Ubuntu runs the AI
 
 ## What is ready
 
+**Usage Metrics:** portrait-friendly resource/app history, electricity estimates and
+permanent Ubuntu recording. See [USAGE.md](USAGE.md) for the existing-service Render
+update steps, measurement limitations, data location and backups.
+
 The gateway supports ComfyUI, Unsloth, llama.cpp, Ollama, InvokeAI, Open WebUI, and OpenClaw equally.
 It preserves each app's root URL, HTTP APIs, uploads, downloads, streaming, and WebSockets.
 The dashboard reuses your existing controls through an allowlisted local API.
@@ -26,7 +30,9 @@ One OAuth registration supports all eight exact callback URLs.
 **750 free hours are shared across the entire Render workspace, not per service.**
 Keeping eight services connected continuously can consume the allowance in about 94 hours
 (just under four days). The connector's keepalives may keep services awake.
-Close the connector when it is not needed, or connect a selected subset with `-Apps` below.
+Use `Stop-Connector.ps1` when remote access is not needed; closing only the app-connector
+window leaves the separate metrics channel connected. Reopening the local dashboard
+starts metrics access again. Connect selected apps with `-Apps` below.
 Even disconnected services may remain awake for Render's 15-minute idle period.
 The free allowance does not promise unlimited bandwidth or uninterrupted availability.
 No paid plan or database is required. [Render's current free limits](https://render.com/docs/free).

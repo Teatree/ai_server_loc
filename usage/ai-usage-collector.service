@@ -1,0 +1,19 @@
+[Unit]
+Description=Read-only AI server usage history collector
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/share/ai-usage-collector
+ExecStart=/usr/bin/python3 -m usage.collector
+Restart=on-failure
+RestartSec=30
+Nice=10
+CPUQuota=10%
+MemoryMax=192M
+UMask=0077
+NoNewPrivileges=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

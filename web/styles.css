@@ -44,6 +44,8 @@ h1 span { color: var(--muted); font-weight: 400; }
 .telemetry button { border: 0; padding: 0 20px; background: transparent; color: var(--green); }
 .telemetry button:hover { background: rgba(100,237,171,.08); }
 .telemetry button.working { animation: blink 1s infinite; }
+.telemetry .usage-link { grid-column: 1 / -1; display:flex; align-items:center; justify-content:center; min-height:46px; color:var(--cyan); text-decoration:none; border-top:1px solid var(--line); }
+.telemetry .usage-link:hover { background:rgba(84,216,231,.08); }
 .service-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .service-card { --accent: var(--green); position: relative; overflow: hidden; padding: 22px; min-height: 390px;
   background: linear-gradient(145deg, rgba(255,255,255,.02), transparent 45%), var(--panel);

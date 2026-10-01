@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Usage Metrics · AI Server</title><link rel="stylesheet" href="usage.css"></head>
+<body><main class="usage">
+<header class="page-head"><div><a id="back" href="/">← Dashboard</a><h1>Usage Metrics</h1>
+<p>Your server’s working history, by device and application.</p></div><span id="connection" role="status">Connecting…</span></header>
+<section class="workspace" id="workspace" aria-label="Usage timeline">
+<div class="range-presets" aria-label="Date range">
+<button data-hours="8">8 hours</button><button data-hours="24">24 hours</button>
+<button data-hours="168">7 days</button><button data-hours="720">30 days</button>
+<button data-hours="8760">1 year</button><button data-hours="87660">10 years</button>
+</div>
+<form id="range-form" class="range-form"><label>From<input id="from" type="datetime-local" required></label>
+<label>To<input id="to" type="datetime-local" required></label><button type="submit">Apply range</button></form>
+<div class="controls"><label>Resources<select id="resources"><option value="gpus">All GPUs</option>
+<option value="gpus_cpu">All GPUs + CPU</option><option value="all">All GPUs + CPU + RAM</option>
+<option value="cpu">CPU only</option><option value="ram">RAM only</option></select></label>
+<label>Interval<select id="interval"><option value="auto">Automatic</option><option value="60">1 minute</option>
+<option value="300">5 minutes</option><option value="900">15 minutes</option><option value="3600">1 hour</option>
+<option value="14400">4 hours</option><option value="86400">1 day</option><option value="604800">1 week</option></select></label>
+<label>Application<select id="app"><option value="all">All applications</option></select></label>
+<label>Time zone<select id="zone"><option value="local">This device’s time zone</option><option value="utc">UTC</option></select></label></div>
+<div class="tools" aria-label="Chart controls"><button id="earlier" title="Previous half-window">← Earlier</button>
+<button id="zoom-in" title="Zoom in">＋ Zoom</button><button id="zoom-out" title="Zoom out">− Zoom</button>
+<button id="later" title="Next half-window">Later →</button><button id="live" aria-pressed="true">● Live</button>
+<button id="mode" aria-pressed="false">Line chart</button><button id="reset">Reset</button>
+<button id="fullscreen">Full screen</button><button id="export">Export CSV</button></div>
+<div class="chart-options"><label><input id="estimate" type="checkbox" checked> Estimate ROCm app shares</label>
+<span id="resolution"></span></div>
+<p class="explanation">GPU totals are measured. App shares are estimates; ROCm fallback uses resident VRAM, so an idle loaded model can receive a share. Turn estimates off to leave unsupported usage unattributed.</p>
+<div id="error" role="alert" hidden></div><p id="history-start" class="muted"></p>
+<div id="legend" class="legend" aria-label="Application colors; select to hide or show"></div>
+<div id="charts"><p class="empty">Loading recorded history…</p></div>
+<p class="hint">Tap or hover to inspect a time. Drag horizontally to pan; use zoom buttons or the mouse wheel to zoom. Arrow keys inspect chart values. Gaps mean no measurement.</p>
+</section>
+<section class="indicators" aria-label="Usage summary"><article><h2>GPU compute-hours</h2><strong id="compute-hours">—</strong><p>Load-weighted device hours in this range.</p></article>
+<article><h2>Peak GPU load</h2><strong id="peak-load">—</strong><p>Highest sampled utilization, any GPU.</p></article>
+<article><h2>Recording coverage</h2><strong id="coverage">—</strong><p>Observed time / selected range.</p></article></section>
+<section class="workspace"><div class="section-head"><h2>Electricity estimate</h2><strong id="cost-total">—</strong></div>
+<p class="explanation">Measured GPU board power + a CPU load model + system overhead, adjusted for power-supply efficiency. This is an estimate, not a wall-meter reading. Missing GPU power is excluded and flagged.</p>
+<details><summary>Electricity rate and power assumptions</summary><form id="cost-form" class="cost-settings">
+<label>Price per kWh<input id="rate" type="number" min="0" max="100000" step="0.01" value="4" required></label>
+<label>Currency / unit<input id="currency" value="c" maxlength="12" required></label>
+<label>CPU idle watts<input id="cpu-idle" type="number" min="0" max="1000" value="10" required></label>
+<label>CPU full-load watts<input id="cpu-max" type="number" min="0" max="2000" value="91" required></label>
+<label>Other system watts<input id="overhead" type="number" min="0" max="2000" value="35" required></label>
+<label>PSU efficiency (%)<input id="efficiency" type="number" min="10" max="100" value="90" required></label>
+<button type="submit">Save on this browser</button></form></details>
+<div id="cost-chart"></div><p id="energy-note" class="muted"></p></section>
+<section class="workspace"><h2>Application totals</h2><p class="explanation">GPU compute-hours use the selected attribution mode. CPU hours represent all cores at full capacity for one hour. RAM is average percent of installed memory. These describe resource use, not completed jobs or generated outputs.</p>
+<div class="table-wrap"><table><thead><tr><th>Application</th><th>GPU hours</th><th>CPU hours</th><th>RAM avg.</th></tr></thead><tbody id="app-totals"></tbody></table></div></section>
+<details class="workspace"><summary>How the history works</summary>
+<p>Collection runs on the AI server every 15 seconds, including when this page is closed. A live minute bar grows as measurements arrive. Every minute’s recorded averages and peaks are retained indefinitely, alongside hourly and daily summaries. Large ranges automatically use a coarser interval; zoom in for minute detail.</p>
+<p>Recording starts at installation. There is no invented data for earlier years or for downtime. CPU is based on process time; RAM uses proportional set size where permitted. GPU engine counters are used when exposed by the driver. Protected processes, kernel use and unmeasurable activity remain unattributed. Short-lived processes between samples may be missed. New apps are discovered from processes; generic workers inherit recognized parent app names.</p>
+<p>All history stays on Ubuntu. This page has read-only access over the authenticated dashboard connection. Cost preferences are saved only in this browser and recalculate the selected history; they are not historical electricity bills. “Forever” means no automatic deletion; daily snapshots keep two backup copies on the same disk. Copy backups elsewhere for protection against disk failure.</p>
+</details><footer id="collector-health"></footer>
+</main><script src="usage-charts.js"></script><script src="usage.js"></script></body></html>

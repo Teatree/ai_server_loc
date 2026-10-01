@@ -15,7 +15,10 @@ log = logging.getLogger('connector')
 
 
 class Connector:
-    def __init__(self, config: dict, testing: bool = False):
+    def __init__(self, config: dict, testing: bool = False, channel: str = ''):
+        if channel not in ('','usage-'):
+            raise ValueError('Unknown connector channel')
+        self.channel = channel
         self.testing = testing
         self.config = config
         self.targets = config['targets']
@@ -46,7 +49,10 @@ class Connector:
         stream_id = metadata.get('id', '')
         if not stream_id or len(stream_id) > 64 or not all(c.isalnum() or c in '-_' for c in stream_id):
             raise ValueError('Invalid stream identifier')
-        url = endpoint['origin'] + PREFIX + '/stream/' + stream_id
+        if self.channel and (expected!='dashboard' or metadata['method']!='GET' or
+                metadata['path'].split('?',1)[0]!='/api/usage' or metadata.get('upgrade')):
+            raise PermissionError('Metrics channel only permits history reads')
+        url = endpoint['origin'] + PREFIX + '/' + self.channel + 'stream/' + stream_id
         async with client.ws_connect(url, headers={'Authorization': 'Bearer ' + endpoint['token']},
                 heartbeat=30, max_msg_size=8 * 1024 * 1024) as tunnel:
             try:
@@ -84,7 +90,7 @@ class Connector:
         while True:
             live = set()
             try:
-                async with client.ws_connect(endpoint['origin'] + PREFIX + '/connector',
+                async with client.ws_connect(endpoint['origin'] + PREFIX + '/' + self.channel + 'connector',
                         headers={'Authorization': 'Bearer ' + endpoint['token']},
                         heartbeat=30, max_msg_size=65536) as control:
                     log.info('Connected: %s', ', '.join(endpoint['origins'].values()))
