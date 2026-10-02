@@ -69,6 +69,11 @@ def query(path, params):
                 metrics[key] = {'value':value['sum']/seconds if seconds else None,
                     'seconds':seconds,'peak':value['peak'],
                     'apps':{app:amount/seconds for app,amount in value['apps'].items()} if seconds else {}}
+            # Repair presentation for every client, including older Render pages.
+            # Original stored estimates remain untouched for audit/recovery.
+            for key, value in metrics.items():
+                if key.startswith('gpu:') and 'measured:'+key in metrics:
+                    value['apps'] = dict(metrics['measured:'+key]['apps'])
             points.append({'time':timestamp,'metrics':metrics})
         return {'ok':True,'schema':version,'start':start,'end':end,'step':step,
                 'catalog':catalog,'metadata':metadata,'points':points}

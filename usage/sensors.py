@@ -3,6 +3,7 @@ import os
 import subprocess
 from pathlib import Path
 from .processes import read, number, scan, partition
+from .probe import augment as augment_probe
 
 def cpu_counters():
     values = [int(x) for x in read('/proc/stat').splitlines()[0].split()[1:9]]
@@ -43,6 +44,7 @@ class Sensors:
         cpu = cpu_counters()
         total_ram, used_ram = memory()
         rows, clients, apps = scan(registry)
+        probe_status = augment_probe(rows,clients)
         devices = self.devices()
         current = (monotonic, cpu, rows, clients)
         previous, self.previous = self.previous, current
@@ -65,12 +67,10 @@ class Sensors:
         catalog = [{'id':'cpu','type':'cpu','label':'CPU','unit':'%','cores':os.cpu_count()},
                    {'id':'ram','type':'ram','label':'RAM','unit':'%','capacity':total_ram}]
         for device in devices:
-            shares, fallback = {}, {}
+            shares = {}
             for key, client in clients.items():
                 if key[0]!=device['bus']:
                     continue
-                if client['compute'] and not client['engines'] and client['vram']>0:
-                    fallback[client['owner']] = fallback.get(client['owner'],0)+client['vram']
                 old = previous[3].get(key)
                 if not old:
                     continue
@@ -80,26 +80,26 @@ class Sensors:
                     deltas.append(max(0,count-before))
                     # Driver counters may temporarily regress; preserve the high-water mark.
                     client['engines'][engine] = max(count,before)
-                amount = max(deltas,default=0)/1e9/elapsed*100
+                counter_elapsed = client.get('sample_time',monotonic)-old.get('sample_time',previous[0])
+                if client.get('source')!=old.get('source'):
+                    continue
+                amount = max(deltas,default=0)/1e9/counter_elapsed*100 if counter_elapsed>0 else 0
                 shares[client['owner']] = shares.get(client['owner'],0)+amount
             strict = partition(device['value'],shares)
-            remaining = strict.get('unattributed',0)
-            if fallback:
-                total_vram = sum(fallback.values())
-                for app,used in fallback.items():
-                    if app!='unattributed':
-                        shares[app] = shares.get(app,0)+remaining*used/total_vram
+            # Allocated VRAM is not evidence of GPU execution. Never assign residual
+            # load to a visible idle model while another account/backend is hidden.
             metrics['measured:'+device['id']] = {'value':device['value'],'apps':strict}
             metrics[device['id']] = {'value':device['value'],'apps':partition(device['value'],shares)}
             catalog.append({'id':device['id'],'type':'gpu','label':device['label'],'unit':'%',
-                            'attribution':'Engine time; ROCm fallback uses resident VRAM weights',
+                            'attribution':'Measured engine-time counters; unknown load stays unattributed',
                             'supported':device['value'] is not None})
             power_id = 'power:'+device['id']
             metrics[power_id] = {'value':device['power']}
             catalog.append({'id':power_id,'type':'power','label':device['label']+' board power','unit':'W'})
         apps['unattributed'] = 'System / unattributed'
-        metrics['quality:gpu-attribution'] = {'value':2}
+        metrics['quality:gpu-attribution'] = {'value':3}
         catalog += [{'id':'app:'+key,'type':'app','label':label} for key,label in apps.items()]
         return elapsed, metrics, catalog, {'processes':len(rows),'gpu_clients':len(clients),
             'interval_seconds':15,'kfd_clients':sum(c.get('source')=='kfd' for c in clients.values()),
-            'attribution':'GPU: DRM counters and public KFD process allocations (including service accounts); CPU: process counters; RAM: readable PSS. GPU app shares are estimates.'}
+            'gpu_probe':probe_status,
+            'attribution':'GPU: engine-time counters only; no VRAM-based load inference. Missing counters remain unattributed.'}

@@ -12,8 +12,8 @@ function error(message){$('error').hidden=!message;$('error').textContent=messag
 function selectedResources(){return (U.data?.catalog||[]).filter(r=>['gpu','cpu','ram'].includes(r.type)).filter(r=>{
   const choice=$('resources').value;return choice==='all'||choice==='gpus_cpu'&&r.type!=='ram'||choice==='gpus'&&r.type==='gpu'||choice===r.type||choice===r.id;
 }).sort((a,b)=>['gpu','cpu','ram'].indexOf(a.type)-['gpu','cpu','ram'].indexOf(b.type));}
-function attributionSafe(point,id){const q=point.metrics['quality:gpu-attribution'];return q?.value>=2&&q.seconds+.001>=(point.metrics[id]?.seconds||0);}
-function metric(point,id){const key=id.startsWith('gpu:')&&(!$('estimate').checked||!attributionSafe(point,id))?'measured:'+id:id;return point.metrics[key];}
+function attributionSafe(point,id){const q=point.metrics['quality:gpu-attribution'];return q?.value>=3&&q.seconds+.001>=(point.metrics[id]?.seconds||0);}
+function metric(point,id){return point.metrics[id.startsWith('gpu:')?'measured:'+id:id];}
 function appNames(){return Object.fromEntries((U.data?.catalog||[]).filter(r=>r.type==='app').map(r=>[r.id.slice(4),r.label]));}
 function clearViews(){for(const view of U.views.values()){view.range=null;view.cursor=null;}}
 function navigate(start,end,constrain=true){
@@ -53,6 +53,7 @@ async function load(){
     $('history-start').textContent=data.metadata.first_sample?'History begins '+new Date(data.metadata.first_sample*1000).toLocaleString()+'. Earlier periods contain no recorded data.':'The first measurement appears after the collector’s second sample.';
     if(data.points.some(p=>Object.keys(p.metrics).some(id=>id.startsWith('gpu:')&&!attributionSafe(p,id))))$('history-start').textContent+=' Older GPU app estimates missed protected service accounts. Those intervals now show counter-supported shares and System / Unattributed; the missing per-app history cannot be reconstructed.';
     const health=data.metadata.health||{};$('collector-health').textContent=`Read-only history · Collector: ${health.collection_ms??'—'} ms/sample · ${health.processes??'—'} inspected processes · No automatic history deletion. ${health.last_backup?'Daily backup: '+new Date(health.last_backup*1000).toLocaleString()+'. ':''}${health.backup_warning||''}${health.disk_free_bytes!==undefined?' Free disk: '+(health.disk_free_bytes/1024**3).toFixed(1)+' GiB.':''}`;
+    $('probe-status').textContent=health.gpu_probe||'GPU attribution uses available engine-time counters; unknown load remains unattributed.';
     render();
   }catch(e){if(request===U.request){U.data=null;disposeCharts();$('charts').replaceChildren();$('cost-chart').replaceChildren();$('app-totals').replaceChildren();for(const id of ['compute-hours','peak-load','coverage','cost-total'])$(id).textContent='—';$('connection').textContent='History unavailable';error(e.name==='AbortError'?'History request timed out. Try a shorter range or check the AI server connection.':e.message);}}
   finally{clearTimeout(timer);if(request===U.request)U.loading=false;}

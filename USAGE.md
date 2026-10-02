@@ -16,7 +16,7 @@ It is safe to run twice; it leaves an existing companion running.
 2. Under Settings, confirm its deployment branch is **codex/render-gateway**
    in **Teatree/ai_server_loc**. Keep your existing environment variables.
 3. Open **Manual Deploy → Deploy latest commit**. The commit title for this
-   current update is **Fix chart navigation and service-account GPU attribution**.
+   current update is **Replace VRAM attribution with protected GPU counter monitoring**.
 4. Wait for the deployment to become Live. Sign into the dashboard again if asked.
 5. Refresh and click **Usage Metrics**, or visit
    https://garry-ai-remote-0913-dashboard.onrender.com/usage.html.
@@ -63,22 +63,46 @@ on Linux under home/opt/srv. Optional literal matching rules go in Ubuntu's
 Rules affect new measurements; they do not silently rewrite old history.
 
 GPU totals use driver counters. DRM engine-time counters estimate per-app shares.
-On the current AMD ROCm driver, compute clients expose resident VRAM but no engine-time
-counters. Public KFD per-process/per-device allocation files include applications
-running under separate service accounts, including Ollama, without privileged access.
-These totals replace matching DRM aliases to avoid double-counting allocations.
-Unknown KFD owners retain their share as System / Unattributed.
-The default fallback splits residual utilization by resident VRAM; an idle
-loaded model can therefore receive a share. This cannot establish exact simultaneous
-per-app GPU utilization. Disable **Estimate ROCm app shares** to keep that part
-unattributed. Both modes are retained in history. No profiler or driver change is used.
+Allocated VRAM is no longer used to assign GPU load. The running Ollama workers did
+not appear in the ROCm/KFD allocation interface, while an idle ComfyUI client did;
+the previous fallback therefore gave activity to the wrong application.
+Only engine-time counters now contribute app shares. Counter shares are normalized
+to measured device load and are not exact per-kernel occupancy measurements.
+Missing counters stay System / Unattributed. Some ROCm clients expose no engine
+counters even with sufficient permissions; those remain unattributed.
 The original recorder could not inspect protected Ollama GPU clients and could
 incorrectly credit other visible apps. Old and mixed-version time buckets now display
 the stored counter-supported shares instead, with unknown load unattributed. Their
 missing per-app history cannot be reconstructed; measured device totals are unchanged.
-New samples contain an attribution-quality version and coverage marker.
+The API also sanitizes old estimated app shares for older online clients without
+altering the original stored samples. New samples use attribution version 3.
 Multiple DRM GPUs are discovered automatically; unsupported utilization/power sensors
 remain missing. This collector currently reads Linux DRM/sysfs, not NVIDIA NVML.
+
+## One-time installation for protected GPU process counters
+
+Files have been prepared on Ubuntu. In the AI Server Terminal, run:
+
+```bash
+sudo bash ~/.local/share/ai-usage-collector/usage/install-gpu-probe.sh
+```
+
+This requires the Ubuntu administrator password in that terminal. It installs and
+starts only `ai-usage-gpu-probe.service`; it never restarts Ollama, ComfyUI or other
+AI apps. The existing collector discovers the helper automatically. Check it with
+`systemctl status ai-usage-gpu-probe.service` and inspect the Usage Metrics status.
+
+The root-owned helper runs isolated Python from `/usr/local/lib/ai-usage-gpu-probe`.
+It has only the capabilities needed for cross-account process reads, no network,
+read-only system/home isolation, and blocked debugging/mount/reboot system calls.
+It exports only PID/start identity and DRM engine counters to an atomic snapshot
+in `/run/ai-usage-probe`. No prompts, command lines or process memory are exported.
+The unprivileged collector rejects stale snapshots, unsafe ownership, PID reuse
+and duplicate descriptors. Its permissions and the dashboard SSH account stay unchanged.
+Installation alone is not proof of attribution: verify changing Ollama engine
+counters during a real job. If the backend exposes none, its usage stays unattributed.
+
+## Electricity estimates
 
 The default electricity rate is **4 c/kWh**. The currency label is deliberately `c`:
 no national currency was specified. Change the rate/unit and power assumptions in

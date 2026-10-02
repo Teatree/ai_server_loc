@@ -27,9 +27,10 @@
 <button id="later" title="Next half-window">Later →</button><button id="live" aria-pressed="true">● Live</button>
 <button id="mode" aria-pressed="false">Line chart</button><button id="reset">Reset all · latest 8h</button>
 <button id="fullscreen">Full screen</button><button id="export">Export CSV</button></div>
-<div class="chart-options"><label><input id="estimate" type="checkbox" checked> Estimate ROCm app shares</label>
+<div class="chart-options"><input id="estimate" type="checkbox" hidden disabled><span>GPU attribution: engine counters only</span>
 <span id="resolution"></span></div>
-<p class="explanation">GPU totals are measured. App shares are estimates; ROCm fallback uses resident VRAM, so an idle loaded model can receive a share. Turn estimates off to leave unsupported usage unattributed.</p>
+<p class="explanation">GPU totals are measured. Per-app shares use GPU engine-time counters, normalized to the device total. Allocated VRAM does not prove an app is using the GPU. Missing activity stays System / Unattributed.</p>
+<p id="probe-status" class="explanation" role="status"></p>
 <div id="error" role="alert" hidden></div><p id="history-start" class="muted"></p>
 <div id="legend" class="legend" aria-label="Application colors; select to hide or show"></div>
 <div id="charts"><p class="empty">Loading recorded history…</p></div>
@@ -49,7 +50,7 @@
 <label>PSU efficiency (%)<input id="efficiency" type="number" min="10" max="100" value="90" required></label>
 <button type="submit">Save on this browser</button></form></details>
 <div id="cost-chart"></div><p id="energy-note" class="muted"></p></section>
-<section class="workspace"><h2>Application totals</h2><p class="explanation">GPU compute-hours use the selected attribution mode. CPU hours represent all cores at full capacity for one hour. RAM is average percent of installed memory. These describe resource use, not completed jobs or generated outputs.</p>
+<section class="workspace"><h2>Application totals</h2><p class="explanation">GPU compute-hours use available engine-time counters. CPU hours represent all cores at full capacity for one hour. RAM is average percent of installed memory. These describe resource use, not completed jobs or generated outputs.</p>
 <div class="table-wrap"><table><thead><tr><th>Application</th><th>GPU hours</th><th>CPU hours</th><th>RAM avg.</th></tr></thead><tbody id="app-totals"></tbody></table></div></section>
 <details class="workspace"><summary>How the history works</summary>
 <p>Collection runs on the AI server every 15 seconds, including when this page is closed. A live minute bar grows as measurements arrive. Every minute’s recorded averages and peaks are retained indefinitely, alongside hourly and daily summaries. Large ranges automatically use a coarser interval; zoom in for minute detail.</p>

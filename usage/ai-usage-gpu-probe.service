@@ -1,0 +1,30 @@
+[Unit]
+Description=Read-only GPU process counters for AI usage history
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -I /usr/local/lib/ai-usage-gpu-probe/gpu_probe.py
+User=root
+RuntimeDirectory=ai-usage-probe
+RuntimeDirectoryMode=0755
+CapabilityBoundingSet=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallFilter=~@debug @mount @reboot @swap @module
+Nice=15
+CPUQuota=10%
+MemoryMax=128M
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

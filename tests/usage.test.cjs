@@ -36,7 +36,7 @@ test('legacy and mixed buckets never attribute unknown service load to another a
   vm.runInContext("U.data.points[0].metrics['quality:gpu-attribution']={value:2,seconds:30}",context);
   assert.equal(vm.runInContext("metric(U.data.points[0],'gpu:test').apps.unattributed",context),50);
   vm.runInContext("U.data.points[0].metrics['quality:gpu-attribution'].seconds=3600",context);
-  assert.equal(vm.runInContext("metric(U.data.points[0],'gpu:test').apps.test",context),50);
+  assert.equal(vm.runInContext("metric(U.data.points[0],'gpu:test').apps.unattributed",context),50);
 });
 test('System / Unattributed remains visible with one app selected and hidden flag set',()=>{
   const {context,element}=page();element('app').value='test';

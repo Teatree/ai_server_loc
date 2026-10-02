@@ -82,7 +82,7 @@ class UsageHistoryTests(unittest.TestCase):
         with self.assertRaises(ValueError): query(self.path,{})
         self.assertEqual(self.store.db.execute('SELECT count(*) FROM buckets').fetchone()[0],3)
 
-    def test_gpu_rocm_estimate_preserves_strict_unknown_and_total(self):
+    def test_allocated_vram_never_claims_execution_from_an_unseen_app(self):
         sensor=Sensors()
         device={'id':'gpu:test','bus':'test','label':'GPU','value':60,'power':100}
         clients={('test','1'):{'owner':'a','compute':True,'engines':{},'vram':300},
@@ -93,6 +93,16 @@ class UsageHistoryTests(unittest.TestCase):
              patch.object(sensor,'devices',return_value=[device]):
             self.assertIsNone(sensor.sample(0))
             _,metrics,_,_=sensor.sample(15)
-        self.assertEqual(metrics['gpu:test']['apps'],{'a':45,'b':15,'unattributed':0})
+        self.assertEqual(metrics['gpu:test']['apps'],{'unattributed':60})
         self.assertEqual(metrics['measured:gpu:test']['apps'],{'unattributed':60})
         self.assertEqual(metrics['power:gpu:test']['value'],100)
+
+    def test_read_api_removes_old_false_estimates_without_changing_saved_history(self):
+        self.store.record(3600,60,{
+            'gpu:x':{'value':80,'apps':{'comfy':80}},
+            'measured:gpu:x':{'value':80,'apps':{'unattributed':80}}},[],{})
+        response=query(self.path,{'start':3540,'end':3600})
+        self.assertEqual(response['points'][0]['metrics']['gpu:x']['apps'],{'unattributed':80})
+        from usage.store import unpack
+        saved=unpack(self.store.db.execute('SELECT data FROM buckets WHERE resolution=60').fetchone()[0])
+        self.assertEqual(saved['gpu:x']['apps'],{'comfy':4800})
