@@ -1,10 +1,14 @@
 # AI Server Remote Gateway — Render setup
 
 Prepared September 14, 2026. This is a separate project at
-`C:\AI\AI-Server-Remote-Gateway`. Your existing control center and AI services are unchanged.
+`C:\AI\AI-Server-Remote-Gateway`. Local dashboard enhancements are installed separately.
 The connector runs on Windows, beside the existing dashboard. Ubuntu runs the AI workloads.
 
 ## What is ready
+
+**Loaded models:** manual memory-release controls on app cards, with concurrent
+app operation. See [MODEL-CONTROLS.md](MODEL-CONTROLS.md) for supported controls,
+installation, safety limits and the existing-service Render update steps.
 
 **Usage Metrics:** portrait-friendly resource/app history, electricity estimates and
 permanent Ubuntu recording. See [USAGE.md](USAGE.md) for the existing-service Render
@@ -31,8 +35,8 @@ One OAuth registration supports all eight exact callback URLs.
 Keeping eight services connected continuously can consume the allowance in about 94 hours
 (just under four days). The connector's keepalives may keep services awake.
 Use `Stop-Connector.ps1` when remote access is not needed; closing only the app-connector
-window leaves the separate metrics channel connected. Reopening the local dashboard
-starts metrics access again. Connect selected apps with `-Apps` below.
+window leaves the separate metrics and model-control channels connected. Reopening
+the local dashboard starts these companions again. Connect selected apps with `-Apps` below.
 Even disconnected services may remain awake for Render's 15-minute idle period.
 The free allowance does not promise unlimited bandwidth or uninterrupted availability.
 No paid plan or database is required. [Render's current free limits](https://render.com/docs/free).

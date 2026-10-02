@@ -16,7 +16,7 @@ log = logging.getLogger('connector')
 
 class Connector:
     def __init__(self, config: dict, testing: bool = False, channel: str = ''):
-        if channel not in ('','usage-'):
+        if channel not in ('','usage-','models-'):
             raise ValueError('Unknown connector channel')
         self.channel = channel
         self.testing = testing
@@ -49,9 +49,13 @@ class Connector:
         stream_id = metadata.get('id', '')
         if not stream_id or len(stream_id) > 64 or not all(c.isalnum() or c in '-_' for c in stream_id):
             raise ValueError('Invalid stream identifier')
-        if self.channel and (expected!='dashboard' or metadata['method']!='GET' or
+        if self.channel=='usage-' and (expected!='dashboard' or metadata['method']!='GET' or
                 metadata['path'].split('?',1)[0]!='/api/usage' or metadata.get('upgrade')):
             raise PermissionError('Metrics channel only permits history reads')
+        if self.channel=='models-' and (expected!='dashboard' or metadata.get('upgrade') or
+                (metadata['method'],metadata['path']) not in {
+                    ('GET','/api/models'),('POST','/api/models/unload')}):
+            raise PermissionError('Models channel only permits model inventory and unload')
         url = endpoint['origin'] + PREFIX + '/' + self.channel + 'stream/' + stream_id
         async with client.ws_connect(url, headers={'Authorization': 'Bearer ' + endpoint['token']},
                 heartbeat=30, max_msg_size=8 * 1024 * 1024) as tunnel:

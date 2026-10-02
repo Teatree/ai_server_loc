@@ -5,6 +5,7 @@ $pythonPath = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 $configPath = Join-Path $PSScriptRoot 'private\connector.json'
 if (-not $Apps -or 'dashboard' -in $Apps.Split(',')) {
     & (Join-Path $PSScriptRoot 'Start-Usage-Metrics.ps1')
+    & (Join-Path $PSScriptRoot 'Start-Model-Controls.ps1')
 }
 if (-not (Test-Path -LiteralPath $pythonPath)) {
     throw 'Run python -m venv .venv, then .\.venv\Scripts\python.exe -m pip install -r requirements.txt'

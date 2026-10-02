@@ -37,6 +37,11 @@ async def dashboard_body(body, path):
             raise ValueError('Unsupported service action')
     if path.startswith('/api/model-download') and record.get('target') not in DOWNLOADS:
         raise ValueError('Unsupported model target')
+    if path=='/api/models/unload':
+        from model_control.query import validate
+        validate(record)
+        if record['action']!='unload':
+            raise ValueError('Expected unload action')
     return bytes(data)
 
 

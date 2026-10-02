@@ -66,7 +66,7 @@ async def route(request):
             filename = 'index.html' if path == '/' else path.lstrip('/')
             allowed = {'index.html', 'app.js', 'styles.css', 'remote.js', 'status.js',
                        'commands.html', 'commands.js', 'usage.html', 'usage.css',
-                       'usage.js', 'usage-charts.js'}
+                       'usage.js', 'usage-charts.js', 'models.js', 'models.css'}
             allowed |= {'assets/' + p.name for p in (WEB_ROOT / 'assets').glob('*') if p.is_file()}
             if filename in allowed and request.method in {'GET', 'HEAD'}:
                 return web.FileResponse(WEB_ROOT / filename)
@@ -76,6 +76,10 @@ async def route(request):
         if request.method!='GET' or request.headers.get('Upgrade'):
             raise web.HTTPMethodNotAllowed(request.method,['GET'])
         return await request.app['usage_relay'].proxy(request)
+    if request['app_id']=='dashboard' and request.path in {'/api/models','/api/models/unload'}:
+        if request.headers.get('Upgrade'):
+            raise PermissionError('Model controls do not accept WebSockets')
+        return await request.app['models_relay'].proxy(request)
     return await request.app['relay'].proxy(request)
 
 
@@ -86,6 +90,7 @@ def create_app(settings: Settings) -> web.Application:
     app['settings'], app['security'] = settings, security
     app['relay'] = Relay(security)
     app['usage_relay'] = Relay(security)
+    app['models_relay'] = Relay(security)
     app.on_response_prepare.append(secure_headers)
 
     async def resources(app):
@@ -93,16 +98,21 @@ def create_app(settings: Settings) -> web.Application:
             app['oauth'] = OAuth(security, client)
             expiry = asyncio.create_task(app['relay'].expire())
             usage_expiry = asyncio.create_task(app['usage_relay'].expire())
+            models_expiry = asyncio.create_task(app['models_relay'].expire())
             yield
             expiry.cancel()
             usage_expiry.cancel()
-            await asyncio.gather(expiry, usage_expiry, return_exceptions=True)
+            models_expiry.cancel()
+            await asyncio.gather(expiry, usage_expiry, models_expiry, return_exceptions=True)
             await app['relay'].close_all()
             if app['relay'].control:
                 await app['relay'].control.close(code=1001)
             await app['usage_relay'].close_all()
             if app['usage_relay'].control:
                 await app['usage_relay'].control.close(code=1001)
+            await app['models_relay'].close_all()
+            if app['models_relay'].control:
+                await app['models_relay'].control.close(code=1001)
     app.cleanup_ctx.append(resources)
     install_routes(app)
     return app
@@ -117,6 +127,7 @@ def install_routes(app):
 
     async def logout(request):
         await request.app['usage_relay'].revoke(request['sid'])
+        await request.app['models_relay'].revoke(request['sid'])
         return await request.app['oauth'].logout(request)
 
     app.router.add_get(PREFIX + '/health', health)
@@ -129,6 +140,8 @@ def install_routes(app):
     app.router.add_get(PREFIX + '/stream/{stream_id}', app['relay'].attach)
     app.router.add_get(PREFIX + '/usage-connector', app['usage_relay'].connector)
     app.router.add_get(PREFIX + '/usage-stream/{stream_id}', app['usage_relay'].attach)
+    app.router.add_get(PREFIX + '/models-connector', app['models_relay'].connector)
+    app.router.add_get(PREFIX + '/models-stream/{stream_id}', app['models_relay'].attach)
     app.router.add_route('*', '/{path:.*}', route)
 
 

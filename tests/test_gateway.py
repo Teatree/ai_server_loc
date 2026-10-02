@@ -85,6 +85,40 @@ class GatewayTests(unittest.IsolatedAsyncioTestCase):
     def headers(self, **extra):
         return {'Cookie': COOKIE + '=' + self.sid, 'Origin': self.public, **extra}
 
+    async def test_model_controls_authentication_isolation_and_mutation_validation(self):
+        self.settings.origins[self.public] = 'dashboard'
+        normal = self.app['relay'].control
+        for path in ('/models.js','/api/models','/_gateway/models-connector'):
+            async with await self.request('GET',path,headers={}) as response:
+                self.assertNotEqual(response.status,200)
+        bridge = Connector(self.bridge.config,testing=True,channel='models-')
+        runner = asyncio.create_task(bridge.run())
+        try:
+            for _ in range(100):
+                if self.app['models_relay'].control is not None: break
+                await asyncio.sleep(.01)
+            async with await self.request('GET','/api/models') as response:
+                self.assertEqual(response.status,200)
+            payload = {'action':'unload','app':'ollama','models':['test']}
+            async with await self.request('POST','/api/models/unload',json=payload) as response:
+                self.assertEqual(response.status,200)
+                self.assertEqual(json.loads((await response.json())['body']),payload)
+            count = len(self.calls)
+            async with await self.request('POST','/api/models/unload',json=payload,
+                    headers=self.headers(Origin='https://evil.example')) as response:
+                self.assertEqual(response.status,403)
+            async with await self.request('POST','/api/models/unload',json={'action':'restart'}) as response:
+                self.assertNotEqual(response.status,200)
+            self.assertEqual(len(self.calls),count)
+            for method,path in [('POST','/api/action'),('GET','/api/usage'),('GET','/api/models?url=x')]:
+                with self.assertRaises(PermissionError):
+                    await bridge.stream(None,self.bridge.config['endpoints'][0],
+                        {'id':'bad','public':self.public,'app':'dashboard','method':method,'path':path})
+            self.assertIs(self.app['relay'].control,normal)
+        finally:
+            runner.cancel()
+            await asyncio.gather(runner,return_exceptions=True)
+
     async def request(self, method, path, **kwargs):
         kwargs.setdefault('headers', self.headers())
         kwargs.setdefault('allow_redirects', False)

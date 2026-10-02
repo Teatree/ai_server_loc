@@ -66,9 +66,9 @@ class Security:
         path = request.path
         if path in {PREFIX + '/health', PREFIX + '/login', PREFIX + '/callback'}:
             return await handler(request)
-        if (path in {PREFIX+'/connector',PREFIX+'/usage-connector'} or
-                path.startswith((PREFIX+'/stream/',PREFIX+'/usage-stream/'))):
-            if '/usage-' in path and request['app_id']!='dashboard':
+        if (path in {PREFIX+'/connector',PREFIX+'/usage-connector',PREFIX+'/models-connector'} or
+                path.startswith((PREFIX+'/stream/',PREFIX+'/usage-stream/',PREFIX+'/models-stream/'))):
+            if any(p in path for p in ('/usage-','/models-')) and request['app_id']!='dashboard':
                 raise web.HTTPNotFound()
             self.machine(request)
             return await handler(request)

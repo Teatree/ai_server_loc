@@ -11,7 +11,7 @@ document.addEventListener("click", event => {
   const action = event.target.closest("[data-action]");
   if (action && !window.confirm(
     `${action.dataset.action.toUpperCase()} ${action.dataset.service}? ` +
-    "Starting an app may stop another GPU workload under your existing controller rules.")) {
+    "Start keeps other apps running. Stop and restart affect this app and its active work.")) {
     event.preventDefault();
     event.stopImmediatePropagation();
   }

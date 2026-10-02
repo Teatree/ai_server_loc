@@ -347,8 +347,6 @@ function renderStatus(data) {
   renderGpus(info.gpus);
   const alert = document.querySelector("#alert");
   const warnings = [];
-  const conflictNames = (data.conflicting || []).map(id => SERVICES[id]?.name || id);
-  if (data.conflict) warnings.push(`<b>GPU MEMORY CONFLICT</b> ${escapeHtml(conflictNames.join(" and "))} are simultaneously active. Starting another GPU workload will stop the others.`);
   alert.classList.toggle("hidden", warnings.length === 0);
   alert.innerHTML = warnings.join("<br>");
 
